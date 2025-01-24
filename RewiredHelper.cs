@@ -46,6 +46,8 @@ public class RewiredHelper : MonoBehaviour
     [SerializeField]
     private bool alreadyShowedControllerHelp;
 
+    public bool IsSteamOverlayActive = false;
+
     /// <summary>
     /// Posição atual do mouse no sistema Rewired
     /// </summary>
@@ -83,6 +85,9 @@ public class RewiredHelper : MonoBehaviour
         (Input.touchCount > 0 && Input.touches[0].phase == TouchPhase.Began);
     #endregion
 
+    protected Callback<GameOverlayActivated_t> m_GameOverlayActivated;
+
+
     #region Unity Lifecycle Methods
     private void Awake()
     {
@@ -92,6 +97,28 @@ public class RewiredHelper : MonoBehaviour
     private void Start()
     {
         InitializePlayer();
+    }
+
+    private void OnEnable()
+    {
+        if (SteamManager.Initialized)
+        {
+            m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
+        }
+    }
+
+    private void OnGameOverlayActivated(GameOverlayActivated_t pCallback)
+    {
+        if (pCallback.m_bActive != 0)
+        {
+            IsSteamOverlayActive = true;
+            Debug.Log("Steam Overlay has been activated");
+        }
+        else
+        {
+            IsSteamOverlayActive = false;
+            Debug.Log("Steam Overlay has been closed");
+        }
     }
 
     private void Update()
@@ -105,7 +132,7 @@ public class RewiredHelper : MonoBehaviour
             PauseGame(false);
 
         //Se Steam e Overlay está Ativo, pausa o Jogo
-        if (Main.main.Config.Publisher == Publisher.Steam && SteamManager.Initialized && SteamUtils.IsOverlayEnabled() && !GamePaused.gameObject.activeSelf)
+        if (Main.main.Config.Publisher == Publisher.Steam && SteamManager.Initialized && IsSteamOverlayActive && !GamePaused.gameObject.activeSelf)
             PauseGame(true);
     }
 

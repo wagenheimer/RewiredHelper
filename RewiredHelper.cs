@@ -8,7 +8,6 @@ using Sirenix.OdinInspector;
 using Steamworks;
 
 using System;
-using System.Collections;
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -99,14 +98,76 @@ public class RewiredHelper : MonoBehaviour
     {
         UpdateCursorPosition();
         HandleInputSystem();
+        HandleScapeButtons();
 
         //Se Está Pausado e Apertou Botão
         if (GamePaused.gameObject.activeSelf && anyButton)
             PauseGame(false);
 
         //Se Steam e Overlay está Ativo, pausa o Jogo
-        if (Main.main.Config.Publisher == Publisher.Steam && SteamUtils.IsOverlayEnabled() && !GamePaused.gameObject.activeSelf)
+        if (Main.main.Config.Publisher == Publisher.Steam && SteamManager.Initialized && SteamUtils.IsOverlayEnabled() && !GamePaused.gameObject.activeSelf)
             PauseGame(true);
+    }
+
+    /// <summary>
+    /// Método responsável por gerenciar a lógica de botões de escape e retorno
+    /// </summary>
+    private void HandleScapeButtons()
+    {
+        // Verifica se a UI não está bloqueada para processamento de inputs
+        if (!Main.main.IsUiBlocked)
+        {
+            // Limpa modais nulos ou inativos para evitar problemas de referência
+            if (Dialogs.Modals.Count > 0 &&
+                (Dialogs.Modals[0] == null || (!Dialogs.Modals[0].gameObject.activeSelf)))
+            {
+                Dialogs.Modals.Clear();
+            }
+
+            // Verifica pressionamento de botões de escape (Escape, Menu, Voltar)
+            if (Input.GetKeyDown(KeyCode.Escape) ||
+                Player.GetButtonDown("MenuButton") ||
+                Player.GetButtonDown("BackButton"))
+            {
+                // Prioriza o botão de escape do último modal ativo
+                if (Dialogs.Modals.Count > 0 &&
+                    Dialogs.Modals[^1].EscapeButton != null &&
+                    Dialogs.Modals[^1].EscapeButton.interactable &&
+                    Dialogs.Modals[^1].EscapeButton.onClick.GetPersistentEventCount() > 0)
+                {
+                    // Dispara o evento de escape do modal
+                    Dialogs.Modals[^1].EscapeButton.onClick.Invoke();
+                }
+                else
+                {
+                    // Caso não haja modal ativo, tenta acionar botões de escape personalizados
+                    if (!EscapeButton.PressedScape())
+                    {
+                        // Se nenhum botão de escape foi acionado, define evento de escape global
+                        ReturnEscapeEvent.EscapePressed = true;
+                    }
+                }
+            }
+
+            // Verifica pressionamento da tecla Enter/Return
+            if (Input.GetKeyDown(KeyCode.Return))
+            {
+                // Prioriza o botão OK do último modal ativo
+                if (Dialogs.Modals.Count > 0 &&
+                    Dialogs.Modals[^1].OkButton != null &&
+                    Dialogs.Modals[^1].OkButton.interactable &&
+                    Dialogs.Modals[^1].OkButton.onClick.GetPersistentEventCount() > 0)
+                {
+                    // Dispara o evento de confirmação do modal
+                    Dialogs.Modals[^1].OkButton.onClick.Invoke();
+                }
+                else
+                {
+                    // Caso não haja modal ativo, define evento de OK global
+                    ReturnEscapeEvent.OkPressed = true;
+                }
+            }
+        }
     }
 
     void OnApplicationPause(bool pauseStatus)
@@ -308,8 +369,13 @@ public class RewiredHelper : MonoBehaviour
 
     public void VibraControle(float motorLevel = 1f, float duration = 0.5f)
     {
-        // Set vibration in all Joysticks assigned to the Player
-        Player.SetVibration(0, motorLevel, duration);
-        Player.SetVibration(1, motorLevel, duration);
+        if (Player.controllers.GetLastActiveController().type == ControllerType.Joystick)
+        {
+            // Set vibration in all Joysticks assigned to the Player
+            Player.SetVibration(0, motorLevel, duration);
+            Player.SetVibration(1, motorLevel, duration);
+        }
     }
+
+
 }

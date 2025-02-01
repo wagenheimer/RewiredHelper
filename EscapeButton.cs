@@ -14,7 +14,7 @@ public class EscapeButton : MonoBehaviour
     [Tooltip("Evento personalizado do Unity a ser disparado")]
     public UnityEvent UnityEvent;
 
-    [Range(0, 100)]
+    [Range(0, 1000)]
     [Tooltip("Prioridade do botão de escape (valores mais altos são acionados primeiro)")]
     public int Priority = 1;
 

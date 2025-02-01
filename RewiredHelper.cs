@@ -5,7 +5,9 @@ using Rewired.Demos;
 
 using Sirenix.OdinInspector;
 
+#if STEAMWORKS_NET && !DISABLESTEAMWORKS
 using Steamworks;
+#endif
 
 using System;
 
@@ -85,7 +87,9 @@ public class RewiredHelper : MonoBehaviour
         (Input.touchCount > 0 && Input.touches[0].phase == TouchPhase.Began);
     #endregion
 
+#if STEAMWORKS_NET && !DISABLESTEAMWORKS
     protected Callback<GameOverlayActivated_t> m_GameOverlayActivated;
+#endif
 
 
     #region Unity Lifecycle Methods
@@ -99,6 +103,7 @@ public class RewiredHelper : MonoBehaviour
         InitializePlayer();
     }
 
+#if STEAMWORKS_NET && !DISABLESTEAMWORKS
     private void OnEnable()
     {
         if (SteamManager.Initialized)
@@ -120,6 +125,7 @@ public class RewiredHelper : MonoBehaviour
             Debug.Log("Steam Overlay has been closed");
         }
     }
+#endif
 
     private void Update()
     {
@@ -142,57 +148,58 @@ public class RewiredHelper : MonoBehaviour
     private void HandleScapeButtons()
     {
         // Verifica se a UI não está bloqueada para processamento de inputs
-        if (!Main.main.IsUiBlocked)
+        if (Main.main.IsUiBlocked) return;
+
+
+        // Limpa modais nulos ou inativos para evitar problemas de referência
+        if (Dialogs.Modals.Count > 0 &&
+            (Dialogs.Modals[0] == null || (!Dialogs.Modals[0].gameObject.activeSelf)))
         {
-            // Limpa modais nulos ou inativos para evitar problemas de referência
+            Dialogs.Modals.Clear();
+        }
+
+        // Verifica pressionamento de botões de escape (Escape, Menu, Voltar)
+        if (Input.GetKeyDown(KeyCode.Escape) ||
+            Player.GetButtonDown("MenuButton") ||
+            Player.GetButtonDown("BackButton"))
+        {
+            // Prioriza o botão de escape do último modal ativo
             if (Dialogs.Modals.Count > 0 &&
-                (Dialogs.Modals[0] == null || (!Dialogs.Modals[0].gameObject.activeSelf)))
+                Dialogs.Modals[^1].EscapeButton != null &&
+                Dialogs.Modals[^1].EscapeButton.interactable &&
+                Dialogs.Modals[^1].EscapeButton.gameObject.activeSelf &&
+                Dialogs.Modals[^1].EscapeButton.onClick.GetPersistentEventCount() > 0)
             {
-                Dialogs.Modals.Clear();
+                // Dispara o evento de escape do modal
+                Dialogs.Modals[^1].EscapeButton.onClick.Invoke();
             }
-
-            // Verifica pressionamento de botões de escape (Escape, Menu, Voltar)
-            if (Input.GetKeyDown(KeyCode.Escape) ||
-                Player.GetButtonDown("MenuButton") ||
-                Player.GetButtonDown("BackButton"))
+            else
             {
-                // Prioriza o botão de escape do último modal ativo
-                if (Dialogs.Modals.Count > 0 &&
-                    Dialogs.Modals[^1].EscapeButton != null &&
-                    Dialogs.Modals[^1].EscapeButton.interactable &&
-                    Dialogs.Modals[^1].EscapeButton.onClick.GetPersistentEventCount() > 0)
+                // Caso não haja modal ativo, tenta acionar botões de escape personalizados
+                if (!EscapeButton.PressedScape())
                 {
-                    // Dispara o evento de escape do modal
-                    Dialogs.Modals[^1].EscapeButton.onClick.Invoke();
-                }
-                else
-                {
-                    // Caso não haja modal ativo, tenta acionar botões de escape personalizados
-                    if (!EscapeButton.PressedScape())
-                    {
-                        // Se nenhum botão de escape foi acionado, define evento de escape global
-                        ReturnEscapeEvent.EscapePressed = true;
-                    }
+                    // Se nenhum botão de escape foi acionado, define evento de escape global
+                    ReturnEscapeEvent.EscapePressed = true;
                 }
             }
+        }
 
-            // Verifica pressionamento da tecla Enter/Return
-            if (Input.GetKeyDown(KeyCode.Return))
+        // Verifica pressionamento da tecla Enter/Return
+        if (Input.GetKeyDown(KeyCode.Return))
+        {
+            // Prioriza o botão OK do último modal ativo
+            if (Dialogs.Modals.Count > 0 &&
+                Dialogs.Modals[^1].OkButton != null &&
+                Dialogs.Modals[^1].OkButton.interactable &&
+                Dialogs.Modals[^1].OkButton.onClick.GetPersistentEventCount() > 0)
             {
-                // Prioriza o botão OK do último modal ativo
-                if (Dialogs.Modals.Count > 0 &&
-                    Dialogs.Modals[^1].OkButton != null &&
-                    Dialogs.Modals[^1].OkButton.interactable &&
-                    Dialogs.Modals[^1].OkButton.onClick.GetPersistentEventCount() > 0)
-                {
-                    // Dispara o evento de confirmação do modal
-                    Dialogs.Modals[^1].OkButton.onClick.Invoke();
-                }
-                else
-                {
-                    // Caso não haja modal ativo, define evento de OK global
-                    ReturnEscapeEvent.OkPressed = true;
-                }
+                // Dispara o evento de confirmação do modal
+                Dialogs.Modals[^1].OkButton.onClick.Invoke();
+            }
+            else
+            {
+                // Caso não haja modal ativo, define evento de OK global
+                ReturnEscapeEvent.OkPressed = true;
             }
         }
     }

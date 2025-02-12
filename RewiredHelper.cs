@@ -10,6 +10,7 @@ using Steamworks;
 #endif
 
 using System;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -55,10 +56,24 @@ public class RewiredHelper : MonoBehaviour
     /// </summary>
     [ShowInInspector]
     public static Vector3 RewiredMousePosition { get; private set; }
+
+    [ShowInInspector]
+    public static event System.Action<bool> OnInputTypeChanged;
+    
+    [ShowInInspector]
+    public static bool IsUsingTouch => instance != null && instance._isUsingTouch;
+    public static RewiredHelper Instance => instance;
     #endregion
 
     #region Private Fields
     private Controller lastActiveController;
+    private bool _isUsingTouch;
+    private bool _previousInputState;
+    private ControllerType _lastControllerType;
+
+    private static HashSet<InputVisibilityController> _visibilityControllers = new();
+
+
     #endregion
 
     #region Properties
@@ -264,9 +279,17 @@ public class RewiredHelper : MonoBehaviour
     {
         if (ReInput.touch == null) return;
 
-        if (HandleTouchInput()) return;
+        _isUsingTouch = HandleTouchInput();
+
+        if (_isUsingTouch)
+        {
+            UltimoControleAtivo = null;
+            UpdateUIForInputType();
+            return;
+        }
 
         UltimoControleAtivo = Player.controllers.GetLastActiveController();
+        _isUsingTouch = false;
 
         if (UltimoControleAtivo != null)
         {
@@ -276,6 +299,8 @@ public class RewiredHelper : MonoBehaviour
         {
             DisableAllCursors();
         }
+
+        UpdateUIForInputType();
     }
 
     private bool HandleTouchInput()
@@ -409,6 +434,33 @@ public class RewiredHelper : MonoBehaviour
             Player.SetVibration(0, motorLevel, duration);
             Player.SetVibration(1, motorLevel, duration);
         }
+    }
+
+    private void UpdateUIForInputType()
+    {
+        if (_previousInputState == _isUsingTouch && UltimoControleAtivo?.type == _lastControllerType) return;
+
+        foreach (var controller in _visibilityControllers)
+        {
+            if (controller != null)
+            {
+                controller.UpdateVisibility();
+            }
+        }
+
+        _previousInputState = _isUsingTouch;
+        _lastControllerType = UltimoControleAtivo?.type ?? ControllerType.Mouse;
+    }
+
+    public static void RegisterVisibilityController(InputVisibilityController controller)
+    {
+        _visibilityControllers.Add(controller);
+        controller.UpdateVisibility(); 
+    }
+
+    public static void UnregisterVisibilityController(InputVisibilityController controller)
+    {
+        _visibilityControllers.Remove(controller);
     }
 
 

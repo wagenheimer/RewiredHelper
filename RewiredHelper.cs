@@ -447,14 +447,11 @@ public class RewiredHelper : MonoBehaviour
     }
     #endregion
 
-    public void VibraControle(float motorLevel = 1f, float duration = 0.5f)
+    public void VibraControle(float motorLevel = 1f, float duration = 0.25f)
     {
-        if (Player.controllers.GetLastActiveController().type == ControllerType.Joystick)
-        {
-            // Set vibration in all Joysticks assigned to the Player
-            Player.SetVibration(0, motorLevel, duration);
-            Player.SetVibration(1, motorLevel, duration);
-        }
+        // Set vibration in all Joysticks assigned to the Player
+        Player.SetVibration(0, motorLevel, duration);
+        //Player.SetVibration(1, motorLevel, duration);
     }
 
     private void UpdateUIForInputType()

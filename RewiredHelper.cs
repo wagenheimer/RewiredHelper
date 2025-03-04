@@ -117,17 +117,13 @@ public class RewiredHelper : MonoBehaviour
     private void Start()
     {
         InitializePlayer();
+
+#if STEAMWORKS_NET && !DISABLESTEAMWORKS
+        if (SteamManager.Initialized) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
+#endif
     }
 
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS
-    private void OnEnable()
-    {
-        if (SteamManager.Initialized)
-        {
-            m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
-        }
-    }
-
     private void OnGameOverlayActivated(GameOverlayActivated_t pCallback)
     {
         if (pCallback.m_bActive != 0)

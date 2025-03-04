@@ -59,7 +59,7 @@ public class RewiredHelper : MonoBehaviour
 
     [ShowInInspector]
     public static event System.Action<bool> OnInputTypeChanged;
-    
+
     [ShowInInspector]
     public static bool IsUsingTouch => instance != null && instance._isUsingTouch;
     public static RewiredHelper Instance => instance;
@@ -69,6 +69,7 @@ public class RewiredHelper : MonoBehaviour
     private Controller lastActiveController;
     private bool _isUsingTouch;
     private bool _previousInputState;
+    private bool lastInputWasTouch = false;
     private ControllerType _lastControllerType;
 
     private static HashSet<InputVisibilityController> _visibilityControllers = new();
@@ -80,6 +81,7 @@ public class RewiredHelper : MonoBehaviour
     /// <summary>
     /// Controla o último dispositivo de entrada ativo
     /// </summary>
+    [ShowInInspector]
     public Controller UltimoControleAtivo
     {
         get => lastActiveController;
@@ -96,10 +98,9 @@ public class RewiredHelper : MonoBehaviour
     /// <summary>
     /// Verifica se algum botão foi pressionado
     /// </summary>
-    public static bool anyButton => instance == null ? false :
-        instance.Player.GetButtonDown("MouseLeftButton") ||
-        instance.Player.GetButtonDown("BackButton") ||
-        (Input.touchCount > 0 && Input.touches[0].phase == TouchPhase.Began);
+    public static bool anyButton => instance != null && (instance.Player.GetButtonDown("MouseLeftButton") ||
+                                                         instance.Player.GetButtonDown("BackButton") ||
+                                                         (Input.touchCount > 0 && Input.touches[0].phase == TouchPhase.Began));
     #endregion
 
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS
@@ -283,6 +284,29 @@ public class RewiredHelper : MonoBehaviour
 
         if (_isUsingTouch)
         {
+            lastInputWasTouch = true;
+        }
+        else
+        {
+            // Verificar movimento do mouse
+            if (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f)
+            {
+                lastInputWasTouch = false;
+            }
+            // Verificar movimento do stick
+            else if (Player.controllers.GetLastActiveController()?.type == ControllerType.Joystick)
+            {
+                if (Mathf.Abs(Player.GetAxis("Horizontal")) > 0.1f || Mathf.Abs(Player.GetAxis("Vertical")) > 0.1f)
+                {
+                    lastInputWasTouch = false;
+                }
+            }
+        }
+
+        _isUsingTouch = lastInputWasTouch;
+
+        if (_isUsingTouch)
+        {
             UltimoControleAtivo = null;
             UpdateUIForInputType();
             return;
@@ -307,6 +331,7 @@ public class RewiredHelper : MonoBehaviour
     {
         if (ReInput.touch.touchCount > 0)
         {
+            lastInputWasTouch = true;
             DisableAllCursors();
             return true;
         }
@@ -455,7 +480,7 @@ public class RewiredHelper : MonoBehaviour
     public static void RegisterVisibilityController(InputVisibilityController controller)
     {
         _visibilityControllers.Add(controller);
-        controller.UpdateVisibility(); 
+        controller.UpdateVisibility();
     }
 
     public static void UnregisterVisibilityController(InputVisibilityController controller)

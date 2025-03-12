@@ -70,9 +70,10 @@ public class RewiredHelper : MonoBehaviour
     private bool _isUsingTouch;
     private bool _previousInputState;
     private bool lastInputWasTouch = false;
+    private bool previousIsUsingTouch;
     private ControllerType _lastControllerType;
 
-    private static HashSet<InputVisibilityController> _visibilityControllers = new();
+    private static readonly HashSet<InputVisibilityController> _visibilityControllers = new();
 
 
     #endregion
@@ -305,22 +306,30 @@ public class RewiredHelper : MonoBehaviour
         {
             UltimoControleAtivo = null;
             UpdateUIForInputType();
-            return;
-        }
-
-        UltimoControleAtivo = Player.controllers.GetLastActiveController();
-        _isUsingTouch = false;
-
-        if (UltimoControleAtivo != null)
-        {
-            HandleControllerType();
         }
         else
         {
-            DisableAllCursors();
+            UltimoControleAtivo = Player.controllers.GetLastActiveController();
+            _isUsingTouch = false;
+
+            if (UltimoControleAtivo != null)
+            {
+                HandleControllerType();
+            }
+            else
+            {
+                DisableAllCursors();
+            }
+
+            UpdateUIForInputType();
         }
 
-        UpdateUIForInputType();
+        // Verificação explícita da mudança de _isUsingTouch
+        if (_isUsingTouch != previousIsUsingTouch)
+        {
+            OnLastActiveControllerChanged();
+            previousIsUsingTouch = _isUsingTouch;
+        }
     }
 
     private bool HandleTouchInput()

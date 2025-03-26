@@ -160,6 +160,8 @@ public class RewiredHelper : MonoBehaviour
     /// </summary>
     private void HandleScapeButtons()
     {
+        if (Main.main == null) return;
+
         // Verifica se a UI não está bloqueada para processamento de inputs
         if (Main.main.IsUiBlocked) return;
 
@@ -276,6 +278,7 @@ public class RewiredHelper : MonoBehaviour
     private void HandleInputSystem()
     {
         if (ReInput.touch == null) return;
+        if (Player == null) return;
 
         _isUsingTouch = HandleTouchInput();
 

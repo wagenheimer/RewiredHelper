@@ -101,18 +101,21 @@ public class RewiredHelper : MonoBehaviour
     /// </summary>
     /// <remarks>This property checks for input from multiple sources, including mouse, controller, and touch
     /// input.</remarks>
-    public static bool anyButton => instance != null && (instance.Player.GetButtonDown("MouseLeftButton") ||
-                                                         instance.Player.GetButtonDown("BackButton") ||
-                                                         (Input.touchCount > 0 && Input.touches[0].phase == TouchPhase.Began));
+    public static bool anyButton => instance != null && instance.Player != null &&
+                                    (instance.Player.GetButtonDown("MouseLeftButton") ||
+                                     instance.Player.GetButtonDown("BackButton") ||
+                                     (Input.touchCount > 0 && Input.touches[0].phase == TouchPhase.Began));
 
     /// <summary>
     /// Gets a value indicating whether any button is currently being pressed.
     /// </summary>
     /// <remarks>This property checks for input from specific buttons or touch interactions. It returns <see
     /// langword="true"/> if at least one of the monitored inputs is active.</remarks>
-    public static bool anyButtonNow => instance != null && (instance.Player.GetButton("MouseLeftButton") ||
-                                                            instance.Player.GetButton("BackButton") ||
-                                                         (Input.touchCount > 0));
+    public static bool anyButtonNow => instance != null && instance.Player != null &&
+                                       (instance.Player.GetButton("MouseLeftButton") ||
+                                        instance.Player.GetButton("BackButton") ||
+                                        (Input.touchCount > 0));
+
     #endregion
 
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS

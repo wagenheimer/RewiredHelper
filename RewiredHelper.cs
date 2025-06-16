@@ -90,7 +90,9 @@ public class RewiredHelper : MonoBehaviour
         {
             if (lastActiveController != value)
             {
+                Controller previous = lastActiveController;
                 lastActiveController = value;
+                Debug.Log($"<color=#FFA500>Controller changed:</color> <color=#FF6347>{(previous != null ? previous.name : "none")}</color> <color=#FFFFFF>-></color> <color=#4CAF50>{(value != null ? value.name : "none")}</color>");
                 OnLastActiveControllerChanged();
             }
         }
@@ -310,7 +312,7 @@ public class RewiredHelper : MonoBehaviour
             // Verificar movimento do stick
             else if (Player.controllers.GetLastActiveController()?.type == ControllerType.Joystick)
             {
-                if (Mathf.Abs(Player.GetAxis("Horizontal")) > 0.1f || Mathf.Abs(Player.GetAxis("Vertical")) > 0.1f)
+                if (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f)
                 {
                     lastInputWasTouch = false;
                 }

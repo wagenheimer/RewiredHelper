@@ -69,7 +69,7 @@ public class RewiredHelper : MonoBehaviour
     #endregion
 
     #region Private Fields
-    private float _lastMouseOrTouchMoveTime; 
+    private float _lastMouseOrTouchMoveTime;
     private Controller lastActiveController;
     private bool _isUsingTouch;
     private bool _previousInputState;
@@ -139,7 +139,7 @@ public class RewiredHelper : MonoBehaviour
     {
         InitializePlayer();
 
-        _lastMouseOrTouchMoveTime = Time.time; 
+        _lastMouseOrTouchMoveTime = Time.time;
 
 
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS
@@ -300,6 +300,9 @@ public class RewiredHelper : MonoBehaviour
         }
     }
 
+    private const float MOUSE_MOVEMENT_TIME_THRESHOLD = 0.01f;
+    private const float MOUSE_MOVEMENT_INPUT_THRESHOLD = 0.1f;
+
     private void HandleInputSystem()
     {
         if (ReInput.touch == null) return;
@@ -314,19 +317,15 @@ public class RewiredHelper : MonoBehaviour
         }
         else
         {
+            // Verifca se houve movimento do mouse 
+            if (Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_TIME_THRESHOLD || Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_TIME_THRESHOLD)
+                _lastMouseOrTouchMoveTime = Time.time;
+
             // Verificar movimento do mouse
-            if (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f)
+            if (Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_INPUT_THRESHOLD)
             {
                 lastInputWasTouch = false;
-                _lastMouseOrTouchMoveTime = Time.time;
-            }
-            // Verificar movimento do stick
-            else if (Player.controllers.GetLastActiveController()?.type == ControllerType.Joystick)
-            {
-                if (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f)
-                {
-                    lastInputWasTouch = false;
-                }
+
             }
         }
 

@@ -60,12 +60,16 @@ public class RewiredHelper : MonoBehaviour
     [ShowInInspector]
     public static event System.Action<bool> OnInputTypeChanged;
 
+    [ShowInInspector, Tooltip("Segundos desde o último movimento do mouse ou toque.")]
+    public static float SecondsSinceLastMouseOrTouchMove { get; private set; }
+
     [ShowInInspector]
     public static bool IsUsingTouch => instance != null && instance._isUsingTouch;
     public static RewiredHelper Instance => instance;
     #endregion
 
     #region Private Fields
+    private float _lastMouseOrTouchMoveTime; 
     private Controller lastActiveController;
     private bool _isUsingTouch;
     private bool _previousInputState;
@@ -135,6 +139,9 @@ public class RewiredHelper : MonoBehaviour
     {
         InitializePlayer();
 
+        _lastMouseOrTouchMoveTime = Time.time; 
+
+
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS
         if (SteamManager.Initialized) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
 #endif
@@ -158,6 +165,8 @@ public class RewiredHelper : MonoBehaviour
 
     private void Update()
     {
+        SecondsSinceLastMouseOrTouchMove = Time.time - _lastMouseOrTouchMoveTime;
+
         UpdateCursorPosition();
         HandleInputSystem();
         HandleScapeButtons();
@@ -301,6 +310,7 @@ public class RewiredHelper : MonoBehaviour
         if (_isUsingTouch)
         {
             lastInputWasTouch = true;
+            _lastMouseOrTouchMoveTime = Time.time;
         }
         else
         {
@@ -308,6 +318,7 @@ public class RewiredHelper : MonoBehaviour
             if (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f)
             {
                 lastInputWasTouch = false;
+                _lastMouseOrTouchMoveTime = Time.time;
             }
             // Verificar movimento do stick
             else if (Player.controllers.GetLastActiveController()?.type == ControllerType.Joystick)

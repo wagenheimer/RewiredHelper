@@ -17,7 +17,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Gerenciador de input que utiliza o sistema Rewired para controlar diferentes tipos de entrada (teclado, mouse, controle, touch).
-/// Respons·vel por gerenciar o cursor do jogo e diferentes estados de input.
+/// Respons√°vel por gerenciar o cursor do jogo e diferentes estados de input.
 /// </summary>
 public class RewiredHelper : MonoBehaviour
 {
@@ -26,13 +26,13 @@ public class RewiredHelper : MonoBehaviour
     #endregion
 
     #region Public Properties
-    [Tooltip("ReferÍncia ao jogador do Rewired")]
+    [Tooltip("Refer√™ncia ao jogador do Rewired")]
     public Rewired.Player Player { get; private set; }
 
-    [Tooltip("ReferÍncia ao cursor customizado do jogo")]
+    [Tooltip("Refer√™ncia ao cursor customizado do jogo")]
     public Image GameCursor;
 
-    [Tooltip("ReferÍncia ao pointer da UI")]
+    [Tooltip("Refer√™ncia ao pointer da UI")]
     public UIPointer CursorUIPointer;
 
     [TabGroup("Editor Canvas")] public GameObject GamePaused;
@@ -43,7 +43,7 @@ public class RewiredHelper : MonoBehaviour
     public static bool CanShowCustomCursor { get; private set; }
 
     /// <summary>
-    /// Indica se o tutorial do controle j· foi exibido
+    /// Indica se o tutorial do controle j√° foi exibido
     /// </summary>
     [SerializeField]
     private bool alreadyShowedControllerHelp;
@@ -51,7 +51,7 @@ public class RewiredHelper : MonoBehaviour
     public bool IsSteamOverlayActive = false;
 
     /// <summary>
-    /// PosiÁ„o atual do mouse no sistema Rewired
+    /// Posi√ß√£o atual do mouse no sistema Rewired
     /// </summary>
     [ShowInInspector]
     public static Vector3 RewiredMousePosition { get; private set; }
@@ -59,12 +59,16 @@ public class RewiredHelper : MonoBehaviour
     [ShowInInspector]
     public static event System.Action<bool> OnInputTypeChanged;
 
+    [ShowInInspector, Tooltip("Segundos desde o √∫ltimo movimento do mouse ou toque.")]
+    public static float SecondsSinceLastMouseOrTouchMove { get; private set; }
+
     [ShowInInspector]
     public static bool IsUsingTouch => instance != null && instance._isUsingTouch;
     public static RewiredHelper Instance => instance;
     #endregion
 
     #region Private Fields
+    private float _lastMouseOrTouchMoveTime;
     private Controller lastActiveController;
     private bool _isUsingTouch;
     private bool _previousInputState;
@@ -72,13 +76,13 @@ public class RewiredHelper : MonoBehaviour
     private bool previousIsUsingTouch;
     private ControllerType _lastControllerType;
 
-    // CORRE«√O: Adicionar campos para gerenciar estado de desconex„o
+    // CORRE√á√ÉO: Adicionar campos para gerenciar estado de desconex√£o
     private bool _controllerWasDisconnected = false;
     private ControllerType _lastKnownControllerType = ControllerType.Joystick; // Default para console
     private float _controllerDisconnectedTime = 0f;
-    private const float CONTROLLER_RECONNECT_DELAY = 0.5f; // Delay para evitar mudanÁas r·pidas
+    private const float CONTROLLER_RECONNECT_DELAY = 0.5f; // Delay para evitar mudan√ßas r√°pidas
 
-    // CORRE«√O: Detectar plataforma para comportamento especÌfico
+    // CORRE√á√ÉO: Detectar plataforma para comportamento espec√≠fico
     private bool IsConsole => Application.platform == RuntimePlatform.Switch ||
                              Application.platform == RuntimePlatform.PS4 ||
                              Application.platform == RuntimePlatform.PS5 ||
@@ -89,7 +93,7 @@ public class RewiredHelper : MonoBehaviour
 
     #region Properties
     /// <summary>
-    /// Controla o ˙ltimo dispositivo de entrada ativo
+    /// Controla o √∫ltimo dispositivo de entrada ativo
     /// </summary>
     [ShowInInspector]
     public Controller UltimoControleAtivo
@@ -99,7 +103,9 @@ public class RewiredHelper : MonoBehaviour
         {
             if (lastActiveController != value)
             {
+                Controller previous = lastActiveController;
                 lastActiveController = value;
+                Debug.Log($"<color=#FFA500>Controller changed:</color> <color=#FF6347>{(previous != null ? previous.name : "none")}</color> <color=#FFFFFF>-></color> <color=#4CAF50>{(value != null ? value.name : "none")}</color>");
                 OnLastActiveControllerChanged();
             }
         }
@@ -121,7 +127,7 @@ public class RewiredHelper : MonoBehaviour
                                         instance.Player.GetButton("BackButton") ||
                                         (Input.touchCount > 0));
 
-    // CORRE«√O: Propriedade para obter o tipo de controle adequado
+    // CORRE√á√ÉO: Propriedade para obter o tipo de controle adequado
     public ControllerType CurrentControllerType
     {
         get
@@ -153,11 +159,13 @@ public class RewiredHelper : MonoBehaviour
     {
         InitializePlayer();
 
-        // CORRE«√O: Definir tipo padr„o baseado na plataforma
+        // CORRE√á√ÉO: Definir tipo padr√£o baseado na plataforma
         if (IsConsole)
         {
             _lastKnownControllerType = ControllerType.Joystick;
         }
+
+        _lastMouseOrTouchMoveTime = Time.time;
 
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS
         if (SteamManager.Initialized) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
@@ -182,26 +190,28 @@ public class RewiredHelper : MonoBehaviour
 
     private void Update()
     {
+        SecondsSinceLastMouseOrTouchMove = Time.time - _lastMouseOrTouchMoveTime;
+
         UpdateCursorPosition();
         HandleInputSystem();
         HandleScapeButtons();
 
-        // CORRE«√O: Gerenciar timeout de desconex„o
+        // CORRE√á√ÉO: Gerenciar timeout de desconex√£o
         if (_controllerWasDisconnected && Time.time - _controllerDisconnectedTime > CONTROLLER_RECONNECT_DELAY)
         {
             CheckForControllerReconnection();
         }
 
-        //Se Est· Pausado e Apertou Bot„o
+        //Se Est√° Pausado e Apertou Bot√£o
         if (GamePaused.gameObject.activeSelf && anyButton)
             PauseGame(false);
 
-        //Se Steam e Overlay est· Ativo, pausa o Jogo
+        //Se Steam e Overlay est√° Ativo, pausa o Jogo
         if (Main.main.Config.Publisher == Publisher.Steam && SteamManager.Initialized && IsSteamOverlayActive && !GamePaused.gameObject.activeSelf)
             PauseGame(true);
     }
 
-    // CORRE«√O: MÈtodo para verificar reconex„o do controle
+    // CORRE√á√ÉO: M√©todo para verificar reconex√£o do controle
     private void CheckForControllerReconnection()
     {
         var currentController = Player.controllers.GetLastActiveController();
@@ -214,7 +224,7 @@ public class RewiredHelper : MonoBehaviour
     }
 
     /// <summary>
-    /// MÈtodo respons·vel por gerenciar a lÛgica de botıes de escape e retorno
+    /// M√©todo respons√°vel por gerenciar a l√≥gica de bot√µes de escape e retorno
     /// </summary>
     private void HandleScapeButtons()
     {
@@ -269,7 +279,7 @@ public class RewiredHelper : MonoBehaviour
         if (pauseStatus) PauseGame(true);
     }
 
-    // CORRE«√O: Detectar mudanÁa de modo handheld no Switch
+    // CORRE√á√ÉO: Detectar mudan√ßa de modo handheld no Switch
     void OnApplicationFocus(bool hasFocus)
     {
         if (Application.platform == RuntimePlatform.Switch && !hasFocus)
@@ -281,9 +291,9 @@ public class RewiredHelper : MonoBehaviour
 
     private System.Collections.IEnumerator HandleSwitchModeChange()
     {
-        yield return new WaitForSeconds(0.5f); // Aguardar estabilizaÁ„o
+        yield return new WaitForSeconds(0.5f); // Aguardar estabiliza√ß√£o
 
-        // ForÁar atualizaÁ„o do estado de input
+        // For√ßar atualiza√ß√£o do estado de input
         var currentController = Player.controllers.GetLastActiveController();
         if (currentController != null)
         {
@@ -328,13 +338,13 @@ public class RewiredHelper : MonoBehaviour
     private void SubscribeToEvents()
     {
         ReInput.ControllerDisconnectedEvent += OnControllerDisconnected;
-        ReInput.ControllerConnectedEvent += OnControllerConnected; // CORRE«√O: Adicionar evento de conex„o
+        ReInput.ControllerConnectedEvent += OnControllerConnected; // CORRE√á√ÉO: Adicionar evento de conex√£o
     }
 
     private void UnsubscribeFromEvents()
     {
         ReInput.ControllerDisconnectedEvent -= OnControllerDisconnected;
-        ReInput.ControllerConnectedEvent -= OnControllerConnected; // CORRE«√O: Remover evento de conex„o
+        ReInput.ControllerConnectedEvent -= OnControllerConnected; // CORRE√á√ÉO: Remover evento de conex√£o
     }
     #endregion
 
@@ -347,6 +357,9 @@ public class RewiredHelper : MonoBehaviour
         }
     }
 
+    private const float MOUSE_MOVEMENT_TIME_THRESHOLD = 0.01f;
+    private const float MOUSE_MOVEMENT_INPUT_THRESHOLD = 0.1f;
+
     private void HandleInputSystem()
     {
         if (ReInput.touch == null) return;
@@ -357,21 +370,18 @@ public class RewiredHelper : MonoBehaviour
         if (_isUsingTouch)
         {
             lastInputWasTouch = true;
+            _lastMouseOrTouchMoveTime = Time.time;
         }
         else
         {
-            // Verificar movimento do mouse (apenas em PC)
-            if (!IsConsole && (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f))
+            // Verifca se houve movimento do mouse 
+            if (Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_TIME_THRESHOLD || Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_TIME_THRESHOLD)
+                _lastMouseOrTouchMoveTime = Time.time;
+
+            // Verificar movimento do mouse
+            if (Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_INPUT_THRESHOLD)
             {
                 lastInputWasTouch = false;
-            }
-            // Verificar movimento do stick
-            else if (Player.controllers.GetLastActiveController()?.type == ControllerType.Joystick)
-            {
-                if (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f)
-                {
-                    lastInputWasTouch = false;
-                }
             }
         }
 
@@ -379,7 +389,7 @@ public class RewiredHelper : MonoBehaviour
 
         if (_isUsingTouch)
         {
-            // CORRE«√O: N„o zerar UltimoControleAtivo se estiver em console
+            // CORRE√á√ÉO: N√£o zerar UltimoControleAtivo se estiver em console
             if (!IsConsole)
             {
                 UltimoControleAtivo = null;
@@ -390,7 +400,7 @@ public class RewiredHelper : MonoBehaviour
         {
             var currentController = Player.controllers.GetLastActiveController();
 
-            // CORRE«√O: Manter ˙ltimo controle conhecido se nenhum estiver ativo
+            // CORRE√á√ÉO: Manter √∫ltimo controle conhecido se nenhum estiver ativo
             if (currentController != null || !_controllerWasDisconnected)
             {
                 UltimoControleAtivo = currentController;
@@ -430,7 +440,7 @@ public class RewiredHelper : MonoBehaviour
 
     private void HandleControllerType()
     {
-        var controllerType = CurrentControllerType; // CORRE«√O: Usar propriedade corrigida
+        var controllerType = CurrentControllerType; // CORRE√á√ÉO: Usar propriedade corrigida
 
         switch (controllerType)
         {
@@ -439,7 +449,7 @@ public class RewiredHelper : MonoBehaviour
                 HandleJoystickOrCustomController();
                 break;
             case ControllerType.Mouse:
-                // CORRE«√O: Em console, tratar mouse como joystick
+                // CORRE√á√ÉO: Em console, tratar mouse como joystick
                 if (IsConsole)
                 {
                     HandleJoystickOrCustomController();
@@ -468,7 +478,7 @@ public class RewiredHelper : MonoBehaviour
     private void HandleMouseController()
     {
 #if UNITY_SWITCH && !UNITY_EDITOR
-        // CORRE«√O: No Switch, sempre tratar como controle
+        // CORRE√á√ÉO: No Switch, sempre tratar como controle
         HandleJoystickOrCustomController();
 #elif UNITY_STANDALONE
         ConfigureStandaloneCursor();
@@ -515,7 +525,7 @@ public class RewiredHelper : MonoBehaviour
 
     #region Event Handlers
     /// <summary>
-    /// CORRE«√O: Manipula o evento de desconex„o do controle sem mudar para PC
+    /// CORRE√á√ÉO: Manipula o evento de desconex√£o do controle sem mudar para PC
     /// </summary>
     private void OnControllerDisconnected(ControllerStatusChangedEventArgs args)
     {
@@ -526,7 +536,7 @@ public class RewiredHelper : MonoBehaviour
         {
             _lastKnownControllerType = args.controller.type;
 
-            // CORRE«√O: N„o pausar imediatamente, dar tempo para reconex„o
+            // CORRE√á√ÉO: N√£o pausar imediatamente, dar tempo para reconex√£o
             if (IsConsole)
             {
                 StartCoroutine(DelayedControllerDisconnectAction());
@@ -538,12 +548,12 @@ public class RewiredHelper : MonoBehaviour
         }
     }
 
-    // CORRE«√O: Delay para pausar o jogo em caso de desconex„o
+    // CORRE√á√ÉO: Delay para pausar o jogo em caso de desconex√£o
     private System.Collections.IEnumerator DelayedControllerDisconnectAction()
     {
         yield return new WaitForSeconds(2f); // Aguardar 2 segundos
 
-        // Se ainda estiver desconectado apÛs o delay, pausar
+        // Se ainda estiver desconectado ap√≥s o delay, pausar
         if (_controllerWasDisconnected && Player.controllers.GetLastActiveController() == null)
         {
             PauseGame(true);
@@ -551,7 +561,7 @@ public class RewiredHelper : MonoBehaviour
     }
 
     /// <summary>
-    /// CORRE«√O: Manipula o evento de conex„o do controle
+    /// CORRE√á√ÉO: Manipula o evento de conex√£o do controle
     /// </summary>
     private void OnControllerConnected(ControllerStatusChangedEventArgs args)
     {
@@ -568,12 +578,12 @@ public class RewiredHelper : MonoBehaviour
     }
 
     /// <summary>
-    /// Atualiza as traduÁıes quando o controlador ativo muda
+    /// Atualiza as tradu√ß√µes quando o controlador ativo muda
     /// </summary>
     private void OnLastActiveControllerChanged()
     {
         LocalizationManager.LocalizeAll(true);
-        OnInputTypeChanged?.Invoke(_isUsingTouch); // CORRE«√O: Disparar evento
+        OnInputTypeChanged?.Invoke(_isUsingTouch); // CORRE√á√ÉO: Disparar evento
     }
     #endregion
 
@@ -599,7 +609,7 @@ public class RewiredHelper : MonoBehaviour
 
     private void UpdateUIForInputType()
     {
-        var currentControllerType = CurrentControllerType; // CORRE«√O: Usar propriedade corrigida
+        var currentControllerType = CurrentControllerType; // CORRE√á√ÉO: Usar propriedade corrigida
 
         if (_previousInputState == _isUsingTouch && currentControllerType == _lastControllerType) return;
 

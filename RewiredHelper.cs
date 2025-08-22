@@ -37,7 +37,6 @@ public class RewiredHelper : MonoBehaviour
 
     [TabGroup("Editor Canvas")] public GameObject GamePaused;
 
-
     /// <summary>
     /// Indica se o cursor customizado pode ser exibido
     /// </summary>
@@ -73,9 +72,19 @@ public class RewiredHelper : MonoBehaviour
     private bool previousIsUsingTouch;
     private ControllerType _lastControllerType;
 
+    // CORREÇÃO: Adicionar campos para gerenciar estado de desconexão
+    private bool _controllerWasDisconnected = false;
+    private ControllerType _lastKnownControllerType = ControllerType.Joystick; // Default para console
+    private float _controllerDisconnectedTime = 0f;
+    private const float CONTROLLER_RECONNECT_DELAY = 0.5f; // Delay para evitar mudanças rápidas
+
+    // CORREÇÃO: Detectar plataforma para comportamento específico
+    private bool IsConsole => Application.platform == RuntimePlatform.Switch ||
+                             Application.platform == RuntimePlatform.PS4 ||
+                             Application.platform == RuntimePlatform.PS5 ||
+                             Application.platform == RuntimePlatform.XboxOne;
+
     private static readonly HashSet<InputVisibilityController> _visibilityControllers = new();
-
-
     #endregion
 
     #region Properties
@@ -99,8 +108,6 @@ public class RewiredHelper : MonoBehaviour
     /// <summary>
     /// Gets a value indicating whether any input button has been pressed.
     /// </summary>
-    /// <remarks>This property checks for input from multiple sources, including mouse, controller, and touch
-    /// input.</remarks>
     public static bool anyButton => instance != null && instance.Player != null &&
                                     (instance.Player.GetButtonDown("MouseLeftButton") ||
                                      instance.Player.GetButtonDown("BackButton") ||
@@ -109,19 +116,32 @@ public class RewiredHelper : MonoBehaviour
     /// <summary>
     /// Gets a value indicating whether any button is currently being pressed.
     /// </summary>
-    /// <remarks>This property checks for input from specific buttons or touch interactions. It returns <see
-    /// langword="true"/> if at least one of the monitored inputs is active.</remarks>
     public static bool anyButtonNow => instance != null && instance.Player != null &&
                                        (instance.Player.GetButton("MouseLeftButton") ||
                                         instance.Player.GetButton("BackButton") ||
                                         (Input.touchCount > 0));
 
+    // CORREÇÃO: Propriedade para obter o tipo de controle adequado
+    public ControllerType CurrentControllerType
+    {
+        get
+        {
+            // Se estamos em console e um controle foi desconectado recentemente, manter o tipo de controle
+            if (IsConsole && _controllerWasDisconnected && Time.time - _controllerDisconnectedTime < 5f)
+            {
+                return _lastKnownControllerType;
+            }
+
+            if (_isUsingTouch) return ControllerType.Custom; // Representa touch
+
+            return UltimoControleAtivo?.type ?? _lastKnownControllerType;
+        }
+    }
     #endregion
 
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS
     protected Callback<GameOverlayActivated_t> m_GameOverlayActivated;
 #endif
-
 
     #region Unity Lifecycle Methods
     private void Awake()
@@ -132,6 +152,12 @@ public class RewiredHelper : MonoBehaviour
     private void Start()
     {
         InitializePlayer();
+
+        // CORREÇÃO: Definir tipo padrão baseado na plataforma
+        if (IsConsole)
+        {
+            _lastKnownControllerType = ControllerType.Joystick;
+        }
 
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS
         if (SteamManager.Initialized) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
@@ -160,6 +186,12 @@ public class RewiredHelper : MonoBehaviour
         HandleInputSystem();
         HandleScapeButtons();
 
+        // CORREÇÃO: Gerenciar timeout de desconexão
+        if (_controllerWasDisconnected && Time.time - _controllerDisconnectedTime > CONTROLLER_RECONNECT_DELAY)
+        {
+            CheckForControllerReconnection();
+        }
+
         //Se Está Pausado e Apertou Botão
         if (GamePaused.gameObject.activeSelf && anyButton)
             PauseGame(false);
@@ -169,65 +201,64 @@ public class RewiredHelper : MonoBehaviour
             PauseGame(true);
     }
 
+    // CORREÇÃO: Método para verificar reconexão do controle
+    private void CheckForControllerReconnection()
+    {
+        var currentController = Player.controllers.GetLastActiveController();
+        if (currentController != null && currentController.type == ControllerType.Joystick)
+        {
+            _controllerWasDisconnected = false;
+            UltimoControleAtivo = currentController;
+            _lastKnownControllerType = currentController.type;
+        }
+    }
+
     /// <summary>
     /// Método responsável por gerenciar a lógica de botões de escape e retorno
     /// </summary>
     private void HandleScapeButtons()
     {
         if (Main.main == null) return;
-
-        // Verifica se a UI não está bloqueada para processamento de inputs
         if (Main.main.IsUiBlocked) return;
 
-
-        // Limpa modais nulos ou inativos para evitar problemas de referência
         if (Dialogs.Modals.Count > 0 &&
             (Dialogs.Modals[0] == null || (!Dialogs.Modals[0].gameObject.activeSelf)))
         {
             Dialogs.Modals.Clear();
         }
 
-        // Verifica pressionamento de botões de escape (Escape, Menu, Voltar)
         if (Input.GetKeyDown(KeyCode.Escape) ||
             Player.GetButtonDown("MenuButton") ||
             Player.GetButtonDown("BackButton"))
         {
-            // Prioriza o botão de escape do último modal ativo
             if (Dialogs.Modals.Count > 0 &&
                 Dialogs.Modals[^1].EscapeButton != null &&
                 Dialogs.Modals[^1].EscapeButton.interactable &&
                 Dialogs.Modals[^1].EscapeButton.gameObject.activeSelf &&
                 Dialogs.Modals[^1].EscapeButton.onClick.GetPersistentEventCount() > 0)
             {
-                // Dispara o evento de escape do modal
                 Dialogs.Modals[^1].EscapeButton.onClick.Invoke();
             }
             else
             {
-                // Caso não haja modal ativo, tenta acionar botões de escape personalizados
                 if (!EscapeButton.PressedScape())
                 {
-                    // Se nenhum botão de escape foi acionado, define evento de escape global
                     ReturnEscapeEvent.EscapePressed = true;
                 }
             }
         }
 
-        // Verifica pressionamento da tecla Enter/Return
         if (Input.GetKeyDown(KeyCode.Return))
         {
-            // Prioriza o botão OK do último modal ativo
             if (Dialogs.Modals.Count > 0 &&
                 Dialogs.Modals[^1].OkButton != null &&
                 Dialogs.Modals[^1].OkButton.interactable &&
                 Dialogs.Modals[^1].OkButton.onClick.GetPersistentEventCount() > 0)
             {
-                // Dispara o evento de confirmação do modal
                 Dialogs.Modals[^1].OkButton.onClick.Invoke();
             }
             else
             {
-                // Caso não haja modal ativo, define evento de OK global
                 ReturnEscapeEvent.OkPressed = true;
             }
         }
@@ -236,6 +267,31 @@ public class RewiredHelper : MonoBehaviour
     void OnApplicationPause(bool pauseStatus)
     {
         if (pauseStatus) PauseGame(true);
+    }
+
+    // CORREÇÃO: Detectar mudança de modo handheld no Switch
+    void OnApplicationFocus(bool hasFocus)
+    {
+        if (Application.platform == RuntimePlatform.Switch && !hasFocus)
+        {
+            // Switch mudando para modo handheld ou perdendo foco
+            StartCoroutine(HandleSwitchModeChange());
+        }
+    }
+
+    private System.Collections.IEnumerator HandleSwitchModeChange()
+    {
+        yield return new WaitForSeconds(0.5f); // Aguardar estabilização
+
+        // Forçar atualização do estado de input
+        var currentController = Player.controllers.GetLastActiveController();
+        if (currentController != null)
+        {
+            _lastKnownControllerType = currentController.type;
+        }
+
+        OnLastActiveControllerChanged();
+        UpdateUIForInputType();
     }
 
     private void PauseGame(bool pause)
@@ -272,11 +328,13 @@ public class RewiredHelper : MonoBehaviour
     private void SubscribeToEvents()
     {
         ReInput.ControllerDisconnectedEvent += OnControllerDisconnected;
+        ReInput.ControllerConnectedEvent += OnControllerConnected; // CORREÇÃO: Adicionar evento de conexão
     }
 
     private void UnsubscribeFromEvents()
     {
         ReInput.ControllerDisconnectedEvent -= OnControllerDisconnected;
+        ReInput.ControllerConnectedEvent -= OnControllerConnected; // CORREÇÃO: Remover evento de conexão
     }
     #endregion
 
@@ -302,15 +360,15 @@ public class RewiredHelper : MonoBehaviour
         }
         else
         {
-            // Verificar movimento do mouse
-            if (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f)
+            // Verificar movimento do mouse (apenas em PC)
+            if (!IsConsole && (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f))
             {
                 lastInputWasTouch = false;
             }
             // Verificar movimento do stick
             else if (Player.controllers.GetLastActiveController()?.type == ControllerType.Joystick)
             {
-                if (Mathf.Abs(Player.GetAxis("Horizontal")) > 0.1f || Mathf.Abs(Player.GetAxis("Vertical")) > 0.1f)
+                if (Mathf.Abs(Player.GetAxis("MouseX")) > 0.1f || Mathf.Abs(Player.GetAxis("MouseY")) > 0.1f)
                 {
                     lastInputWasTouch = false;
                 }
@@ -321,15 +379,26 @@ public class RewiredHelper : MonoBehaviour
 
         if (_isUsingTouch)
         {
-            UltimoControleAtivo = null;
+            // CORREÇÃO: Não zerar UltimoControleAtivo se estiver em console
+            if (!IsConsole)
+            {
+                UltimoControleAtivo = null;
+            }
             UpdateUIForInputType();
         }
         else
         {
-            UltimoControleAtivo = Player.controllers.GetLastActiveController();
+            var currentController = Player.controllers.GetLastActiveController();
+
+            // CORREÇÃO: Manter último controle conhecido se nenhum estiver ativo
+            if (currentController != null || !_controllerWasDisconnected)
+            {
+                UltimoControleAtivo = currentController;
+            }
+
             _isUsingTouch = false;
 
-            if (UltimoControleAtivo != null)
+            if (UltimoControleAtivo != null || _controllerWasDisconnected)
             {
                 HandleControllerType();
             }
@@ -341,7 +410,6 @@ public class RewiredHelper : MonoBehaviour
             UpdateUIForInputType();
         }
 
-        // Verificação explícita da mudança de _isUsingTouch
         if (_isUsingTouch != previousIsUsingTouch)
         {
             OnLastActiveControllerChanged();
@@ -362,26 +430,36 @@ public class RewiredHelper : MonoBehaviour
 
     private void HandleControllerType()
     {
-        switch (UltimoControleAtivo.type)
+        var controllerType = CurrentControllerType; // CORREÇÃO: Usar propriedade corrigida
+
+        switch (controllerType)
         {
             case ControllerType.Joystick:
             case ControllerType.Custom:
                 HandleJoystickOrCustomController();
                 break;
             case ControllerType.Mouse:
-                HandleMouseController();
+                // CORREÇÃO: Em console, tratar mouse como joystick
+                if (IsConsole)
+                {
+                    HandleJoystickOrCustomController();
+                }
+                else
+                {
+                    HandleMouseController();
+                }
                 break;
         }
     }
 
     private void HandleJoystickOrCustomController()
     {
-        if (UltimoControleAtivo.type == ControllerType.Joystick && !alreadyShowedControllerHelp)
+        if (CurrentControllerType == ControllerType.Joystick && !alreadyShowedControllerHelp)
         {
             ShowControllerHelpIfPossible();
         }
 
-        GameCursor.enabled = UltimoControleAtivo.type == ControllerType.Joystick ||
+        GameCursor.enabled = CurrentControllerType == ControllerType.Joystick ||
                             CanActivateAndroidCursor(UltimoControleAtivo);
         Cursor.visible = false;
         CanShowCustomCursor = false;
@@ -390,7 +468,8 @@ public class RewiredHelper : MonoBehaviour
     private void HandleMouseController()
     {
 #if UNITY_SWITCH && !UNITY_EDITOR
-        DisableAllCursors();
+        // CORREÇÃO: No Switch, sempre tratar como controle
+        HandleJoystickOrCustomController();
 #elif UNITY_STANDALONE
         ConfigureStandaloneCursor();
 #else
@@ -436,13 +515,55 @@ public class RewiredHelper : MonoBehaviour
 
     #region Event Handlers
     /// <summary>
-    /// Manipula o evento de desconexão do controle
+    /// CORREÇÃO: Manipula o evento de desconexão do controle sem mudar para PC
     /// </summary>
     private void OnControllerDisconnected(ControllerStatusChangedEventArgs args)
     {
-        if (Player.controllers.GetLastActiveController() == args.controller)
+        _controllerWasDisconnected = true;
+        _controllerDisconnectedTime = Time.time;
+
+        if (args.controller?.type == ControllerType.Joystick)
+        {
+            _lastKnownControllerType = args.controller.type;
+
+            // CORREÇÃO: Não pausar imediatamente, dar tempo para reconexão
+            if (IsConsole)
+            {
+                StartCoroutine(DelayedControllerDisconnectAction());
+            }
+            else
+            {
+                PauseGame(true);
+            }
+        }
+    }
+
+    // CORREÇÃO: Delay para pausar o jogo em caso de desconexão
+    private System.Collections.IEnumerator DelayedControllerDisconnectAction()
+    {
+        yield return new WaitForSeconds(2f); // Aguardar 2 segundos
+
+        // Se ainda estiver desconectado após o delay, pausar
+        if (_controllerWasDisconnected && Player.controllers.GetLastActiveController() == null)
         {
             PauseGame(true);
+        }
+    }
+
+    /// <summary>
+    /// CORREÇÃO: Manipula o evento de conexão do controle
+    /// </summary>
+    private void OnControllerConnected(ControllerStatusChangedEventArgs args)
+    {
+        if (args.controller.type == ControllerType.Joystick)
+        {
+            _controllerWasDisconnected = false;
+            _lastKnownControllerType = args.controller.type;
+            UltimoControleAtivo = args.controller;
+
+            // Atualizar UI imediatamente
+            OnLastActiveControllerChanged();
+            UpdateUIForInputType();
         }
     }
 
@@ -452,6 +573,7 @@ public class RewiredHelper : MonoBehaviour
     private void OnLastActiveControllerChanged()
     {
         LocalizationManager.LocalizeAll(true);
+        OnInputTypeChanged?.Invoke(_isUsingTouch); // CORREÇÃO: Disparar evento
     }
     #endregion
 
@@ -459,11 +581,9 @@ public class RewiredHelper : MonoBehaviour
     /// <summary>
     /// Verifica se o cursor pode ser ativado para um controle AndroidRemote
     /// </summary>
-    /// <param name="controller">O controle a ser verificado</param>
-    /// <returns>True se o cursor puder ser ativado, false caso contrário</returns>
     public bool CanActivateAndroidCursor(Controller controller)
     {
-        if (controller.tag != "AndroidRemote") return false;
+        if (controller?.tag != "AndroidRemote") return false;
 
         return Input.GetKey(KeyCode.UpArrow) ||
                Input.GetKey(KeyCode.DownArrow) ||
@@ -471,18 +591,17 @@ public class RewiredHelper : MonoBehaviour
                Input.GetKey(KeyCode.RightArrow) ||
                GameCursor.enabled;
     }
-    #endregion
 
     public void VibraControle(float motorLevel = 1f, float duration = 0.25f)
     {
-        // Set vibration in all Joysticks assigned to the Player
         Player.SetVibration(0, motorLevel, duration);
-        //Player.SetVibration(1, motorLevel, duration);
     }
 
     private void UpdateUIForInputType()
     {
-        if (_previousInputState == _isUsingTouch && UltimoControleAtivo?.type == _lastControllerType) return;
+        var currentControllerType = CurrentControllerType; // CORREÇÃO: Usar propriedade corrigida
+
+        if (_previousInputState == _isUsingTouch && currentControllerType == _lastControllerType) return;
 
         foreach (var controller in _visibilityControllers)
         {
@@ -493,7 +612,7 @@ public class RewiredHelper : MonoBehaviour
         }
 
         _previousInputState = _isUsingTouch;
-        _lastControllerType = UltimoControleAtivo?.type ?? ControllerType.Mouse;
+        _lastControllerType = currentControllerType;
     }
 
     public static void RegisterVisibilityController(InputVisibilityController controller)
@@ -506,6 +625,5 @@ public class RewiredHelper : MonoBehaviour
     {
         _visibilityControllers.Remove(controller);
     }
-
-
+    #endregion
 }

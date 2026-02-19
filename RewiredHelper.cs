@@ -316,7 +316,7 @@ public class RewiredHelper : MonoBehaviour
     {
         UnsubscribeFromEvents();
     }
-#endregion
+    #endregion
 
     #region Initialization Methods
     private void InitializeSingleton()
@@ -584,7 +584,7 @@ public class RewiredHelper : MonoBehaviour
     /// </summary>
     private void OnLastActiveControllerChanged()
     {
-        LocalizationManager.LocalizeAll(true);
+        // LocalizationManager.LocalizeAll(true); // REMOVIDO: Agora é chamado apenas quando o tipo muda em UpdateUIForInputType
         OnInputTypeChanged?.Invoke(_isUsingTouch); // CORREÇÃO: Disparar evento
     }
     #endregion
@@ -622,6 +622,9 @@ public class RewiredHelper : MonoBehaviour
                 controller.UpdateVisibility();
             }
         }
+
+        // OTIMIZAÇÃO: Forçar atualização de especialização apenas quando o tipo de controle muda
+        SpecializationManager.Singleton.ForceUpdateSpecialization();
 
         _previousInputState = _isUsingTouch;
         _lastControllerType = currentControllerType;

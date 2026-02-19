@@ -207,8 +207,10 @@ public class RewiredHelper : MonoBehaviour
             PauseGame(false);
 
         //Se Steam e Overlay está Ativo, pausa o Jogo
+#if STEAMWORKS_NET && !DISABLESTEAMWORKS
         if (Main.main.Config.Publisher == Publisher.Steam && SteamManager.Initialized && IsSteamOverlayActive && !GamePaused.gameObject.activeSelf)
             PauseGame(true);
+#endif
     }
 
     // CORREÇÃO: Método para verificar reconexão do controle
@@ -314,7 +316,7 @@ public class RewiredHelper : MonoBehaviour
     {
         UnsubscribeFromEvents();
     }
-    #endregion
+#endregion
 
     #region Initialization Methods
     private void InitializeSingleton()

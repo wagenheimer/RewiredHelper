@@ -60,7 +60,6 @@ namespace I2.Loc
         /// <returns>True se for Switch, PlayStation ou Xbox.</returns>
         private bool IsConsolePlatform()
         {
-            return true;
             // Usar um switch expression é mais limpo e extensível para adicionar futuras plataformas.
             return Application.platform switch
             {

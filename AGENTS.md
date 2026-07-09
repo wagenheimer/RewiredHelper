@@ -23,21 +23,27 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
 
 ## Conventions & Gotchas
 
-- **No `Runtime`/`Editor` `.asmdef` in this package** (removed in 0.2.1) — this is intentional,
-  not an oversight. Most Rewired installs ship the core `Rewired` namespace (`Player`,
-  `Controller`, `ControllerType`, `ReInput`, etc.) as loose scripts with **no asmdef of their
-  own**, compiling into the default `Assembly-CSharp`. A package with its own separate asmdef can
-  never reference types that only exist in `Assembly-CSharp` (wrong compile-order direction) — so
-  an isolated package asmdef makes `RewiredInputManager.cs` fail to compile with `CS0246` for
-  every Rewired type, in *any* consuming project, regardless of whether Rewired is installed. Do
-  not re-add an asmdef here unless Rewired's own distribution model changes (i.e. ships a proper
-  asmdef for its core scripts) — verify against a real install before ever doing this again.
+- **This package DOES have `Runtime`/`Editor` `.asmdef` files, and must keep them.** A commit on
+  2026-07-09 (`cb07f45`) briefly removed them on the theory that Rewired ships its core namespace
+  (`Player`, `Controller`, `ControllerType`, `ReInput`, etc.) as loose scripts with no asmdef,
+  making it unreachable from an isolated package assembly. That theory was wrong and was never
+  verified against a real install — it was reverted the same day. In every Rewired distribution
+  actually seen so far, the core namespace ships as **precompiled per-platform DLLs**
+  (`Assets/Rewired/Internal/Libraries/Runtime/Rewired_*.dll`) with `isExplicitlyReferenced: 0` in
+  the plugin importer, which Unity auto-references into **every** assembly — including an isolated
+  package asmdef — as long as that asmdef leaves `overrideReferences: false` (the default, and
+  what this package uses). So the package asmdef needs no `"Rewired"` entry in `references` at
+  all; the precompiled DLL just resolves automatically. If a future CS0246 on a Rewired type
+  reappears, verify what Rewired's core namespace actually compiles into in that project
+  (`Library/ScriptAssemblies/*.dll` containing the types, or the plugin importer's
+  `isExplicitlyReferenced` flag) before touching this asmdef again — do not re-remove it on
+  assumption.
 - No Odin Inspector, no I2 Localization dependency in `Runtime/` or `Editor/` — those are the two
   things this package was explicitly de-coupled from when ported out of the original game
   (NordStormSolitaire). Do not reintroduce a hard reference to either.
 - Rewired itself is **not** a UPM dependency (it's an Asset Store asset, not distributable via
   `package.json`), so it's undeclared there — document it as a manual prerequisite in the README
-  instead.
+  instead, and don't add a `references` entry for it in the asmdef (precompiled DLLs auto-resolve).
 - `RewiredInputManager.Configure()` must be called manually by the host game — it is not invoked
   automatically from `Awake()`, so the manager works correctly (with no-op defaults) even before
   `Configure()` runs, but a host game that needs `IUiBlocker`/`IModalStackProvider`/

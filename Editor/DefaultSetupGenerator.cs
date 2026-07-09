@@ -19,13 +19,12 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// correctly) — save the result as a prefab in your own project once you're happy with it.
     ///
     /// The controller-help form is populated using Rewired's own official glyph system
-    /// (Assets/Rewired/Internal/Assets/Extras/Glyphs.zip +
-    /// GlyphsUnityUITMProAddonV2.zip → Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper) if the
-    /// consumer has extracted those into their project — this package cannot bundle that addon
-    /// itself since it ships under Rewired's own commercial license, not this package's MIT one.
-    /// Referenced via reflection so this package compiles whether or not the addon is present.
-    /// If it isn't found, the form is still created with placeholder text and a console warning
-    /// explaining what to extract.
+    /// (Window > Rewired > Extras > Glyphs > Install → installs the icon sets and
+    /// Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper) if the consumer has installed it —
+    /// this package cannot bundle that addon itself since it ships under Rewired's own commercial
+    /// license, not this package's MIT one. Referenced via reflection so this package compiles
+    /// whether or not the addon is present. If it isn't found, the form is still created with
+    /// placeholder text pointing at that install menu.
     /// </summary>
     internal static class DefaultSetupGenerator
     {
@@ -57,11 +56,11 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
             else
             {
-                label.text = "Extract Assets/Rewired/Internal/Assets/Extras/Glyphs.zip and " +
-                    "GlyphsUnityUITMProAddonV2.zip into your project, then regenerate this form " +
-                    "to show real controller glyphs.";
-                Debug.LogWarning($"[RewiredHelper] {GlyphHelperTypeName} not found — see the label text on the " +
-                    "generated form for setup instructions. See README.md > Controller Help Form.");
+                label.text = "Install Rewired's Glyphs addon first: Window > Rewired > Extras > Glyphs > " +
+                    "Install (installs both the icon sets and the TextMeshPro UI helper), then " +
+                    "regenerate this form to show real controller glyphs.";
+                Debug.LogWarning($"[RewiredHelper] {GlyphHelperTypeName} not found — install it via " +
+                    "Window > Rewired > Extras > Glyphs > Install, then regenerate this form. See README.md > Controller Help Form.");
             }
 
             panel.gameObject.SetActive(false);

@@ -226,15 +226,15 @@ Only import this sample if you already use I2 Localization.
 
 ## Controller Help Form
 
-Rewired ships its own official glyph system as extra assets in every install —
-`Assets/Rewired/Internal/Assets/Extras/Glyphs.zip` (icon sets for Xbox/PlayStation/Switch/etc.)
-and `GlyphsUnityUITMProAddonV2.zip` (`Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper`, a TMP
-component that parses `<rewiredElement>`/`<rewiredAction>` tags in a text and swaps in the glyph
-for whichever controller is currently active). **Extract both zips into your project first** —
-this package cannot bundle that addon itself, since it ships under Rewired's own commercial
-license rather than this package's MIT one.
+Rewired ships its own official glyph system as an installable extra — **Window → Rewired → Extras
+→ Glyphs → Install** — which sets up both the icon sets (Xbox/PlayStation/Switch/etc.) and
+`Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper`, a TMP component that parses
+`<rewiredElement>`/`<rewiredAction>` tags in a text and swaps in the glyph for whichever
+controller is currently active. **Install it via that menu first** — this package cannot bundle
+that addon itself, since it ships under Rewired's own commercial license rather than this
+package's MIT one.
 
-Once extracted, use **Tools → Wagenheimer → Rewired Helper → Create Controller Help Form** to
+Once installed, use **Tools → Wagenheimer → Rewired Helper → Create Controller Help Form** to
 generate a panel in the open scene: it detects the addon via reflection, adds
 `UnityUITextMeshProGlyphHelper` to a TMP label, and fills it with one
 `<rewiredElement actionName="X"> <rewiredAction name="X">` line per Button-type Action already

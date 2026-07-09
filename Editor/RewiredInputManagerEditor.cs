@@ -88,7 +88,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorGUILayout.Space(5);
 
             // 1. Verificar Rewired Input Manager na Cena
-            var hasRewired = UnityEngine.Object.FindObjectOfType<Rewired.InputManager>() != null;
+            var rewiredManagerType = DefaultSetupGenerator.GetInputManagerType();
+            var hasRewired = rewiredManagerType != null && UnityEngine.Object.FindObjectOfType(rewiredManagerType) != null;
             DrawCheckResult("Rewired Input Manager (Nativo)", hasRewired, 
                 "Instancie o prefab configurado do Rewired para gerenciar mapeamentos e botões.",
                 "Criar Manager", () => DefaultSetupGenerator.CreateRewiredInputManager());

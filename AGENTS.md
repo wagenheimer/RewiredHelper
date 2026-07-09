@@ -18,17 +18,26 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   sibling packages (UnityRateControl/UnityCloudSave), not a shared library. If you fix a bug
   here, port the fix to the other three `wagenheimer/Unity*` repos by hand.
 - `Samples~/DefaultSetup` — minimal bootstrap, no optional interfaces wired.
-- `Samples~/I2LocalizationIntegration` — **not** part of the Runtime asmdef. Only compiled if a
-  consumer copies these files into their own project (which already has I2 Localization).
+- `Samples~/I2LocalizationIntegration` — not compiled by default. Only built if a consumer copies
+  these files into their own project (which already has I2 Localization).
 
 ## Conventions & Gotchas
 
+- **No `Runtime`/`Editor` `.asmdef` in this package** (removed in 0.2.1) — this is intentional,
+  not an oversight. Most Rewired installs ship the core `Rewired` namespace (`Player`,
+  `Controller`, `ControllerType`, `ReInput`, etc.) as loose scripts with **no asmdef of their
+  own**, compiling into the default `Assembly-CSharp`. A package with its own separate asmdef can
+  never reference types that only exist in `Assembly-CSharp` (wrong compile-order direction) — so
+  an isolated package asmdef makes `RewiredInputManager.cs` fail to compile with `CS0246` for
+  every Rewired type, in *any* consuming project, regardless of whether Rewired is installed. Do
+  not re-add an asmdef here unless Rewired's own distribution model changes (i.e. ships a proper
+  asmdef for its core scripts) — verify against a real install before ever doing this again.
 - No Odin Inspector, no I2 Localization dependency in `Runtime/` or `Editor/` — those are the two
   things this package was explicitly de-coupled from when ported out of the original game
   (NordStormSolitaire). Do not reintroduce a hard reference to either.
 - Rewired itself is **not** a UPM dependency (it's an Asset Store asset, not distributable via
   `package.json`), so it's undeclared there — document it as a manual prerequisite in the README
-  instead, and don't add a `references` entry for it in the asmdef (precompiled DLLs auto-resolve).
+  instead.
 - `RewiredInputManager.Configure()` must be called manually by the host game — it is not invoked
   automatically from `Awake()`, so the manager works correctly (with no-op defaults) even before
   `Configure()` runs, but a host game that needs `IUiBlocker`/`IModalStackProvider`/

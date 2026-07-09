@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-09
+
+### Fixed
+
+- Removed the package's own `Runtime`/`Editor` assembly definitions. Most Rewired installs ship
+  the core `Rewired` namespace (`Player`, `Controller`, `ControllerType`, `ReInput`, etc.) as loose
+  scripts with no `.asmdef` of their own, compiling into the default `Assembly-CSharp`. A package
+  with its own separate asmdef can never reference types that only exist in `Assembly-CSharp` —
+  so `RewiredInputManager.cs` failed to compile with `CS0246` errors for every Rewired type,
+  regardless of whether Rewired was actually installed. The package now compiles as loose scripts
+  too, alongside Rewired, exactly like the `Samples~/I2LocalizationIntegration` files already did
+  and the `ModalDialog`/DOTween override pattern already assumed for optional dependencies —
+  except here it applies to the package's core, unconditional dependency on Rewired itself.
+
 ## [0.3.0] - 2026-07-09
 
 ### Added

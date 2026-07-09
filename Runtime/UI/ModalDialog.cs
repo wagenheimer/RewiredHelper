@@ -23,11 +23,9 @@ namespace Wagenheimer.RewiredHelper.UI
     ///
     /// The default show/hide animation is a built-in coroutine tween — no third-party dependency
     /// is required. To use DOTween (or any other tweening library) instead, subclass this type in
-    /// your own project (which, unlike this package, can freely reference a loose-script DOTween
-    /// install) and override <see cref="PlayFadeIn"/>/<see cref="PlayFadeOut"/>/
-    /// <see cref="PlayMoveIn"/>/<see cref="PlayMoveOut"/>. A package assembly cannot reference
-    /// DOTween's core scripts directly when they're imported without an .asmdef (the common case),
-    /// since those compile into the default Assembly-CSharp, which packages can never reference.
+    /// your own project and override <see cref="PlayFadeIn"/>/<see cref="PlayFadeOut"/>/
+    /// <see cref="PlayMoveIn"/>/<see cref="PlayMoveOut"/>. Kept opt-in on purpose so this package
+    /// never forces a DOTween dependency on consumers who don't have it installed.
     /// </summary>
     [RequireComponent(typeof(CanvasGroup))]
     public class ModalDialog : MonoBehaviour

@@ -185,10 +185,9 @@ bool anyOpen = ModalDialogStack.IsThereAnyVisible;
 ```
 
 - **Show/hide animation** is a built-in coroutine tween by default — no third-party dependency.
-  To use DOTween (or any other tweener), subclass `ModalDialog` in your own project and override
-  `PlayFadeIn`/`PlayFadeOut`/`PlayMoveIn`/`PlayMoveOut`. This has to happen in your project, not
-  inside the package: a loose-script DOTween install (the common case — no `.asmdef`) compiles
-  into the default `Assembly-CSharp`, which a package assembly can never reference.
+  To use DOTween (or any other tweener) instead, subclass `ModalDialog` in your own project and
+  override `PlayFadeIn`/`PlayFadeOut`/`PlayMoveIn`/`PlayMoveOut`. Kept opt-in on purpose so the
+  package never forces a DOTween dependency on consumers who don't have it installed.
 - **Sound**: not baked in. Subscribe to `ModalDialog.AfterShow`/`AfterHide` (`UnityEvent`) or the
   `OnShow`/`OnHide` (`Action`) hooks to play your own audio.
 - **UI blocking during animation**: subscribe to the static `ModalDialog.OnBlockUiRequested`

@@ -110,7 +110,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         static Canvas FindOrCreateCanvas()
         {
-            var existing = Object.FindObjectOfType<Canvas>();
+            var existing = UnityEngine.Object.FindObjectOfType<Canvas>();
             if (existing != null)
                 return existing;
 
@@ -122,7 +122,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
 
-            if (Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
+            if (UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
                 new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem),
                     typeof(UnityEngine.EventSystems.StandaloneInputModule));
 

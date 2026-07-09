@@ -38,9 +38,6 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("Referência ao cursor customizado do jogo")]
         public Image GameCursor;
 
-        [Tooltip("Referência ao pointer da UI")]
-        public UIPointer CursorUIPointer;
-
         [Tooltip("GameObject exibido/ocultado ao pausar o jogo (opcional)")]
         public GameObject GamePaused;
 

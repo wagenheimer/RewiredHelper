@@ -14,9 +14,17 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   (`IUiBlocker`, `IModalStackProvider`, `IControllerHelpGate`), each with an internal
   `Null*` default implementation. `RewiredInputManager.Configure(...)` wires them in; omit any
   argument to keep the no-op default.
+- `Runtime/UI/ControllerHelpPanel.cs` + `ControllerHelpRow.cs` — generic "list every mapped
+  action" panel for `RewiredInputManager.OnShowControllerHelp`. Icons are opt-in: only shown if
+  the consuming project has a Rewired Glyph Provider configured with glyph assets, since
+  trademarked controller button art can't ship in this package. Text fallback always works.
+- `Editor/DefaultSetupGenerator.cs` — menu items that build a `RewiredInputManager` GameObject and
+  an unstyled `ControllerHelpPanel` hierarchy directly in the open scene (not shipped as a
+  hand-authored `.prefab` file — this package's CI can't validate a raw prefab YAML actually
+  instantiates correctly, generating it via code is safer).
 - `Editor/UpdateChecker.cs` + `UpdateAvailableWindow.cs` — copy-pasted-and-renamed from the
-  sibling packages (UnityRateControl/UnityCloudSave), not a shared library. If you fix a bug
-  here, port the fix to the other three `wagenheimer/Unity*` repos by hand.
+  sibling packages (UnityRateControl/UnityCloudSave/UnityNativeSocial), not a shared library. If
+  you fix a bug here, port the fix to the other three `wagenheimer/Unity*` repos by hand.
 - `Samples~/DefaultSetup` — minimal bootstrap, no optional interfaces wired.
 - `Samples~/I2LocalizationIntegration` — not compiled by default. Only built if a consumer copies
   these files into their own project (which already has I2 Localization).

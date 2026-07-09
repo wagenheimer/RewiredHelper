@@ -224,10 +224,47 @@ Only import this sample if you already use I2 Localization.
 
 ---
 
+## Controller Help UI (`Wagenheimer.RewiredHelper.UI.ControllerHelpPanel`)
+
+A ready-to-use panel that lists every action currently mapped on the player's active controller —
+one row (icon + text) per binding — for `RewiredInputManager.OnShowControllerHelp` to show the
+first time a controller is detected. Ships as part of Runtime, no sample import needed.
+
+Use **Tools → Wagenheimer → Rewired Helper → Create Default Controller Help UI** to generate a
+bare-bones instance (Canvas/panel/scroll list/row template) directly in the open scene — restyle
+it and save as a prefab in your own project.
+
+```csharp
+_input.OnShowControllerHelp.AddListener(() =>
+{
+    controllerHelpPanel.gameObject.SetActive(true);
+    controllerHelpPanel.Populate();
+});
+```
+
+Row labels use Rewired's own localized `actionDescriptiveName` by default. To route them through
+I2 Localization (or any other system) instead, set `ActionNameLocalizer`:
+
+```csharp
+controllerHelpPanel.ActionNameLocalizer = action =>
+    I2.Loc.LocalizationManager.GetTranslation(action.name) ?? action.descriptiveName;
+```
+
+**Icons are opt-in and project-specific.** `ControllerHelpRow.SetGlyph` only shows an icon if
+Rewired's `ActionElementMap.elementIdentifierGlyph` returns one, which requires *your* project to
+have a Glyph Provider configured and glyph assets assigned per element identifier in the Rewired
+Input Manager. Controller button art (Xbox/PlayStation/Switch icons) is trademarked and can't ship
+inside this package — without glyphs configured, rows fall back to text-only labels
+(`elementIdentifierName — actionDescriptiveName`), which always works out of the box.
+
+---
+
 ## Editor Utilities
 
 | Menu | Action |
 |---|---|
+| Tools → Wagenheimer → Rewired Helper → Create Rewired Input Manager | Adds a `RewiredInputManager` GameObject to the open scene |
+| Tools → Wagenheimer → Rewired Helper → Create Default Controller Help UI | Generates an unstyled `ControllerHelpPanel` in the open scene |
 | Tools → Wagenheimer → Rewired Helper → Check for Updates... | Manually check for a new package version |
 | Tools → Wagenheimer → Rewired Helper → Integration Guide (README) | Opens this README on GitHub |
 | Tools → Wagenheimer → Rewired Helper → Report Issue | Opens a new GitHub issue |

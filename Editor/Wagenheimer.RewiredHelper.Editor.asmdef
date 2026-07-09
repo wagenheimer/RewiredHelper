@@ -1,7 +1,7 @@
 {
   "name": "Wagenheimer.RewiredHelper.Editor",
   "rootNamespace": "Wagenheimer.RewiredHelper.Editor",
-  "references": ["Wagenheimer.RewiredHelper"],
+  "references": ["Wagenheimer.RewiredHelper", "Unity.TextMeshPro", "UnityEngine.UI"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

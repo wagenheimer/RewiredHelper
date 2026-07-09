@@ -7,6 +7,9 @@ namespace Wagenheimer.RewiredHelper.Editor
 {
     internal class UpdateAvailableWindow : EditorWindow
     {
+        const string RepoBranch = "main";
+        static readonly Color AccentColor = new Color(0.24f, 0.48f, 0.95f);
+
         string _packageDisplayName;
         string _currentVersion;
         string _latestVersion;
@@ -20,67 +23,180 @@ namespace Wagenheimer.RewiredHelper.Editor
         bool _updating;
         string _updateError;
 
+        Texture2D _headerTex;
+        Texture2D _dividerTex;
+        GUIStyle _headerTitleStyle;
+        GUIStyle _headerSubtitleStyle;
+        GUIStyle _arrowStyle;
+        GUIStyle _primaryButtonStyle;
+        GUIStyle _footerStyle;
+        bool _stylesBuilt;
+
         public static void Show(string packageDisplayName, string currentVersion, string latestVersion,
             string repoUrl, string gitUrl, string releaseNotes, string skipPrefKey)
         {
             var window = CreateInstance<UpdateAvailableWindow>();
-            window.titleContent = new GUIContent($"{packageDisplayName} — Update Available");
+            window.titleContent = new GUIContent($"{packageDisplayName} — Atualização");
             window._packageDisplayName = packageDisplayName;
             window._currentVersion = currentVersion;
             window._latestVersion = latestVersion;
             window._repoUrl = repoUrl;
             window._gitUrl = gitUrl;
             window._releaseNotes = string.IsNullOrEmpty(releaseNotes)
-                ? "(Sem notas de versão disponíveis — veja o Changelog completo no GitHub.)"
+                ? "Sem notas de versão disponíveis — veja o changelog completo no GitHub."
                 : releaseNotes;
             window._skipPrefKey = skipPrefKey;
 
-            var size = new Vector2(440, 380);
+            var size = new Vector2(460, 420);
             window.minSize = size;
-            window.maxSize = new Vector2(600, 700);
+            window.maxSize = new Vector2(640, 760);
             window.ShowUtility();
+        }
+
+        void BuildStyles()
+        {
+            if (_stylesBuilt)
+                return;
+            _stylesBuilt = true;
+
+            var dark = EditorGUIUtility.isProSkin;
+            var headerBg = dark ? new Color(0.17f, 0.17f, 0.19f) : new Color(0.90f, 0.92f, 0.97f);
+            var dividerColor = dark ? new Color(1f, 1f, 1f, 0.08f) : new Color(0f, 0f, 0f, 0.10f);
+
+            _headerTex = MakeTex(headerBg);
+            _dividerTex = MakeTex(dividerColor);
+
+            _headerTitleStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                fontSize = 15,
+                normal = { textColor = dark ? Color.white : new Color(0.12f, 0.12f, 0.14f) }
+            };
+
+            _headerSubtitleStyle = new GUIStyle(EditorStyles.label)
+            {
+                fontSize = 11,
+                normal = { textColor = dark ? new Color(1f, 1f, 1f, 0.6f) : new Color(0f, 0f, 0f, 0.55f) }
+            };
+
+            _arrowStyle = new GUIStyle(EditorStyles.miniBoldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = AccentColor }
+            };
+
+            _primaryButtonStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontStyle = FontStyle.Bold
+            };
+
+            _footerStyle = new GUIStyle(EditorStyles.miniLabel)
+            {
+                normal = { textColor = dark ? new Color(1f, 1f, 1f, 0.4f) : new Color(0f, 0f, 0f, 0.4f) }
+            };
+        }
+
+        static Texture2D MakeTex(Color color)
+        {
+            var tex = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
+            tex.SetPixel(0, 0, color);
+            tex.Apply();
+            return tex;
         }
 
         void OnGUI()
         {
-            EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField($"Nova versão do {_packageDisplayName} disponível!", EditorStyles.boldLabel);
-            EditorGUILayout.Space(4);
-            EditorGUILayout.LabelField($"Instalada: {_currentVersion}    →    Disponível: {_latestVersion}");
-            EditorGUILayout.Space(8);
+            BuildStyles();
 
-            EditorGUILayout.LabelField("Novidades desta versão", EditorStyles.boldLabel);
-            _notesScroll = EditorGUILayout.BeginScrollView(_notesScroll, GUILayout.ExpandHeight(true));
-            EditorGUILayout.LabelField(_releaseNotes, EditorStyles.wordWrappedLabel);
-            EditorGUILayout.EndScrollView();
+            var headerRect = GUILayoutUtility.GetRect(position.width, 56);
+            GUI.DrawTexture(headerRect, _headerTex);
+            var innerHeader = new Rect(headerRect.x + 16, headerRect.y + 8, headerRect.width - 32, headerRect.height - 12);
+            GUI.BeginGroup(innerHeader);
+            GUI.Label(new Rect(0, 0, innerHeader.width, 20), "Nova versão disponível", _headerTitleStyle);
+            GUI.Label(new Rect(0, 20, innerHeader.width, 16), _packageDisplayName, _headerSubtitleStyle);
+            GUI.EndGroup();
 
-            if (!string.IsNullOrEmpty(_updateError))
-                EditorGUILayout.HelpBox(_updateError, MessageType.Error);
+            DrawDivider();
+            GUILayout.Space(12);
 
-            EditorGUILayout.Space(8);
             using (new EditorGUILayout.HorizontalScope())
             {
-                using (new EditorGUI.DisabledScope(_updating))
-                {
-                    if (GUILayout.Button(_updating ? "Atualizando…" : "Atualizar Agora", GUILayout.Height(28)))
-                        StartUpdate();
-                }
-
-                if (GUILayout.Button("Ver Changelog Completo"))
-                    Application.OpenURL($"{_repoUrl}/blob/main/CHANGELOG.md");
+                GUILayout.FlexibleSpace();
+                GUILayout.Label(_currentVersion, EditorStyles.label);
+                GUILayout.Label("→", _arrowStyle, GUILayout.Width(22));
+                GUILayout.Label(_latestVersion, EditorStyles.boldLabel);
+                GUILayout.FlexibleSpace();
             }
 
+            GUILayout.Space(14);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(12);
+            GUILayout.Label("Novidades desta versão", EditorStyles.boldLabel);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(4);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(12);
+            _notesScroll = EditorGUILayout.BeginScrollView(_notesScroll, GUILayout.ExpandHeight(true));
+            EditorGUILayout.LabelField(_releaseNotes, EditorStyles.wordWrappedLabel, GUILayout.ExpandWidth(true));
+            EditorGUILayout.EndScrollView();
+            GUILayout.Space(12);
+            GUILayout.EndHorizontal();
+
+            if (!string.IsNullOrEmpty(_updateError))
+            {
+                GUILayout.Space(6);
+                EditorGUILayout.HelpBox(_updateError, MessageType.Error);
+            }
+
+            GUILayout.Space(10);
+            DrawDivider();
+            GUILayout.Space(10);
+
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Lembrar depois"))
+                GUILayout.Space(10);
+                var prevColor = GUI.backgroundColor;
+                GUI.backgroundColor = AccentColor;
+                using (new EditorGUI.DisabledScope(_updating))
+                {
+                    if (GUILayout.Button(_updating ? "Atualizando…" : "Atualizar Agora", _primaryButtonStyle, GUILayout.Height(30), GUILayout.MinWidth(140)))
+                        StartUpdate();
+                }
+                GUI.backgroundColor = prevColor;
+
+                if (GUILayout.Button("Ver Changelog", GUILayout.Height(30)))
+                    Application.OpenURL($"{_repoUrl}/blob/{RepoBranch}/CHANGELOG.md");
+                GUILayout.Space(10);
+            }
+
+            GUILayout.Space(6);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Space(10);
+                if (GUILayout.Button("Lembrar depois", EditorStyles.miniButton))
                     Close();
 
-                if (GUILayout.Button("Ignorar esta versão"))
+                if (GUILayout.Button("Ignorar esta versão", EditorStyles.miniButton))
                 {
                     EditorPrefs.SetString(_skipPrefKey, _latestVersion);
                     Close();
                 }
+                GUILayout.Space(10);
             }
+
+            GUILayout.Space(8);
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(12);
+            GUILayout.Label(_repoUrl, _footerStyle);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(6);
+        }
+
+        void DrawDivider()
+        {
+            var rect = GUILayoutUtility.GetRect(position.width, 1, GUILayout.ExpandWidth(true));
+            GUI.DrawTexture(rect, _dividerTex);
         }
 
         void StartUpdate()
@@ -119,6 +235,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         void OnDestroy()
         {
             EditorApplication.update -= PollUpdate;
+            if (_headerTex != null) DestroyImmediate(_headerTex);
+            if (_dividerTex != null) DestroyImmediate(_dividerTex);
         }
     }
 }

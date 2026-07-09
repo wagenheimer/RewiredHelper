@@ -156,6 +156,46 @@ _input.Configure(
 Wire `RewiredInputManager.OnShowControllerHelp` (a `UnityEvent`) to whatever dialog you want to
 show the first time a controller is detected — the package never assumes a specific dialog system.
 
+### Don't want to write your own `IModalStackProvider`?
+
+Use the bundled `ModalDialog`/`ModalDialogStack` (`Wagenheimer.RewiredHelper.UI`) — a generic
+modal dialog stack with overlay, fade/move show-hide animation, and Escape/OK button wiring — and
+pass its ready-made `DefaultModalStackProvider`:
+
+```csharp
+_input.Configure(modalStack: new DefaultModalStackProvider());
+```
+
+See **Modal Dialog Stack** below.
+
+---
+
+## Modal Dialog Stack (`Wagenheimer.RewiredHelper.UI`)
+
+`ModalDialog` (attach to a dialog GameObject, requires `CanvasGroup`) + `ModalDialogStack`
+(static, tracks open dialogs) give you a ready-to-use modal system:
+
+```csharp
+using Wagenheimer.RewiredHelper.UI;
+
+ModalDialogStack.ShowDialog(myDialog, effect: ShowDialogEffect.Fade, onShow: () => { });
+ModalDialogStack.CloseDialog(myDialog);
+
+bool anyOpen = ModalDialogStack.IsThereAnyVisible;
+```
+
+- **Show/hide animation** is a built-in coroutine tween by default — no third-party dependency.
+  To use DOTween (or any other tweener), subclass `ModalDialog` in your own project and override
+  `PlayFadeIn`/`PlayFadeOut`/`PlayMoveIn`/`PlayMoveOut`. This has to happen in your project, not
+  inside the package: a loose-script DOTween install (the common case — no `.asmdef`) compiles
+  into the default `Assembly-CSharp`, which a package assembly can never reference.
+- **Sound**: not baked in. Subscribe to `ModalDialog.AfterShow`/`AfterHide` (`UnityEvent`) or the
+  `OnShow`/`OnHide` (`Action`) hooks to play your own audio.
+- **UI blocking during animation**: subscribe to the static `ModalDialog.OnBlockUiRequested`
+  (`Action<float>`) event and forward the duration into your own `IUiBlocker`.
+- **`DefaultModalStackProvider`**: implements `IModalStackProvider` by reading
+  `ModalDialogStack.Modals` — pass it straight to `RewiredInputManager.Configure`.
+
 ---
 
 ## Custom Cursor

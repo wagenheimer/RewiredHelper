@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace Wagenheimer.RewiredHelper
 {
@@ -7,6 +8,7 @@ namespace Wagenheimer.RewiredHelper
     /// Toggles this GameObject's active state based on the current input type
     /// (<see cref="RewiredInputManager.IsUsingTouch"/>), e.g. to show touch-only controls.
     /// </summary>
+    [MovedFrom(true, sourceClassName: "InputVisibilityController")]
     public class InputVisibilityController : MonoBehaviour
     {
         public enum VisibilityMode

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace Wagenheimer.RewiredHelper
 {
@@ -9,6 +10,7 @@ namespace Wagenheimer.RewiredHelper
     /// <see cref="RewiredInputManager"/> sets <see cref="OkPressed"/>/<see cref="EscapePressed"/>
     /// (i.e. Return/Escape was pressed and no modal claimed it first).
     /// </summary>
+    [MovedFrom(true, sourceClassName: "ReturnEscapeEvent")]
     public class ReturnEscapeEvent : MonoBehaviour
     {
         public static bool EscapePressed = false;

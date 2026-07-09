@@ -10,6 +10,7 @@ using Steamworks;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace Wagenheimer.RewiredHelper
 {
@@ -23,6 +24,7 @@ namespace Wagenheimer.RewiredHelper
     /// using the optional <see cref="IUiBlocker"/>, <see cref="IModalStackProvider"/> and
     /// <see cref="IControllerHelpGate"/> interfaces. None of them are required.
     /// </summary>
+    [MovedFrom(true, sourceClassName: "RewiredHelper")]
     public class RewiredInputManager : MonoBehaviour
     {
         #region Singleton Pattern

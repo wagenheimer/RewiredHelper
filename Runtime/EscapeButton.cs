@@ -3,6 +3,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using UnityEngine.Scripting.APIUpdating;
 
 namespace Wagenheimer.RewiredHelper
 {
@@ -11,6 +12,7 @@ namespace Wagenheimer.RewiredHelper
     /// <see cref="IModalStackProvider"/> claims it first. Multiple active instances are
     /// resolved by <see cref="Priority"/> (higher first).
     /// </summary>
+    [MovedFrom(true, sourceClassName: "EscapeButton")]
     public class EscapeButton : MonoBehaviour
     {
         [Header("Configuração de Evento")]

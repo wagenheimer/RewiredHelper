@@ -19,5 +19,17 @@
     "dialog"
   ],
   "category": "Tools",
-  "dependencies": {}
+  "dependencies": {},
+  "samples": [
+    {
+      "displayName": "Default Setup",
+      "description": "Minimal bootstrap: add RewiredInputManager + this script to a persistent GameObject and call Configure().",
+      "path": "Samples~/DefaultSetup"
+    },
+    {
+      "displayName": "I2 Localization Integration",
+      "description": "Wires controller-help specialization into I2 Localization. Only import if your project already uses I2 Localization.",
+      "path": "Samples~/I2LocalizationIntegration"
+    }
+  ]
 }

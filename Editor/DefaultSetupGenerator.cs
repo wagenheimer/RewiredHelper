@@ -30,48 +30,126 @@ namespace Wagenheimer.RewiredHelper.Editor
     {
         const string GlyphHelperTypeName = "Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper";
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Rewired Input Manager", priority = 11)]
-        static void CreateRewiredInputManager()
-        {
-            var go = new GameObject("RewiredInputManager");
-            Undo.RegisterCreatedObjectUndo(go, "Create Rewired Input Manager");
-            go.AddComponent<RewiredInputManager>();
+        const string InputManagerPrefabPath = "Packages/com.wagenheimer.rewiredhelper/Runtime/Prefabs/Rewired Input Manager.prefab";
+        const string EventSystemPrefabPath = "Packages/com.wagenheimer.rewiredhelper/Runtime/Prefabs/Rewired Event System.prefab";
+        const string FormControllerPrefabPath = "Packages/com.wagenheimer.rewiredhelper/Runtime/Prefabs/formController.prefab";
 
-            Selection.activeGameObject = go;
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Rewired Input Manager", priority = 11)]
+        internal static void CreateRewiredInputManager()
+        {
+            // 1. Instantiate Rewired Input Manager if not present
+            var rewiredManager = UnityEngine.Object.FindObjectOfType<Rewired.InputManager>();
+            if (rewiredManager == null)
+            {
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(InputManagerPrefabPath);
+                if (prefab != null)
+                {
+                    var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                    Undo.RegisterCreatedObjectUndo(instance, "Create Rewired Input Manager");
+                    rewiredManager = instance.GetComponent<Rewired.InputManager>();
+                }
+                else
+                {
+                    Debug.LogWarning($"[RewiredHelper] Prefab not found at {InputManagerPrefabPath}");
+                }
+            }
+
+            // If still null (e.g. prefab missing), create a fallback empty gameobject
+            GameObject managerGo = rewiredManager != null ? rewiredManager.gameObject : null;
+            if (managerGo == null)
+            {
+                managerGo = new GameObject("Rewired Input Manager");
+                Undo.RegisterCreatedObjectUndo(managerGo, "Create Rewired Input Manager");
+            }
+
+            // 2. Add our RewiredInputManager component if not present
+            var helper = managerGo.GetComponent<RewiredInputManager>();
+            if (helper == null)
+            {
+                helper = managerGo.AddComponent<RewiredInputManager>();
+                Undo.RegisterCompleteObjectUndo(managerGo, "Add RewiredInputManager Component");
+            }
+
+            // 3. Instantiate Rewired Event System if not present
+            var eventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
+            if (eventSystem == null)
+            {
+                var eventSystemPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EventSystemPrefabPath);
+                if (eventSystemPrefab != null)
+                {
+                    var instance = (GameObject)PrefabUtility.InstantiatePrefab(eventSystemPrefab);
+                    Undo.RegisterCreatedObjectUndo(instance, "Create Rewired Event System");
+                }
+                else
+                {
+                    // Fallback to standard EventSystem
+                    var go = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem),
+                        typeof(UnityEngine.EventSystems.StandaloneInputModule));
+                    Undo.RegisterCreatedObjectUndo(go, "Create Event System");
+                }
+            }
+
+            Selection.activeGameObject = managerGo;
             MarkSceneDirty();
         }
 
         [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Controller Help Form", priority = 12)]
-        static void CreateControllerHelpForm()
+        internal static void CreateControllerHelpForm()
         {
-            var canvas = FindOrCreateCanvas();
-            var panel = CreatePanel(canvas.transform);
-            var label = CreateLabel(panel);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FormControllerPrefabPath);
+            GameObject formGo = null;
 
-            var glyphHelperType = FindGlyphHelperType();
-            if (glyphHelperType != null)
+            if (prefab != null)
             {
-                var helper = panel.gameObject.AddComponent(glyphHelperType);
-                ApplyGlyphText(helper, glyphHelperType);
+                var canvas = FindOrCreateCanvas();
+                formGo = (GameObject)PrefabUtility.InstantiatePrefab(prefab, canvas.transform);
+                Undo.RegisterCreatedObjectUndo(formGo, "Create Controller Help Form");
+                
+                // If the glyph helper addon is installed, apply glyph text dynamically via reflection
+                var glyphHelperType = FindGlyphHelperType();
+                if (glyphHelperType != null)
+                {
+                    var helper = formGo.GetComponentInChildren(glyphHelperType);
+                    if (helper != null)
+                    {
+                        ApplyGlyphText(helper, glyphHelperType);
+                    }
+                }
             }
             else
             {
-                label.text = "Install Rewired's Glyphs addon first: Window > Rewired > Extras > Glyphs > " +
-                    "Install (installs both the icon sets and the TextMeshPro UI helper), then " +
-                    "regenerate this form to show real controller glyphs.";
-                Debug.LogWarning($"[RewiredHelper] {GlyphHelperTypeName} not found — install it via " +
-                    "Window > Rewired > Extras > Glyphs > Install, then regenerate this form. See README.md > Controller Help Form.");
+                // Fallback to procedural generation if prefab not found
+                var canvas = FindOrCreateCanvas();
+                var panel = CreatePanel(canvas.transform);
+                var label = CreateLabel(panel);
+                formGo = panel.gameObject;
+
+                var glyphHelperType = FindGlyphHelperType();
+                if (glyphHelperType != null)
+                {
+                    var helper = panel.gameObject.AddComponent(glyphHelperType);
+                    ApplyGlyphText(helper, glyphHelperType);
+                }
+                else
+                {
+                    label.text = "Install Rewired's Glyphs addon first: Window > Rewired > Extras > Glyphs > " +
+                        "Install (installs both the icon sets and the TextMeshPro UI helper), then " +
+                        "regenerate this form to show real controller glyphs.";
+                    Debug.LogWarning($"[RewiredHelper] {GlyphHelperTypeName} not found — install it via " +
+                        "Window > Rewired > Extras > Glyphs > Install, then regenerate this form. See README.md > Controller Help Form.");
+                }
             }
 
-            panel.gameObject.SetActive(false);
+            if (formGo != null)
+            {
+                formGo.SetActive(false);
+                Selection.activeGameObject = formGo;
+                MarkSceneDirty();
 
-            Undo.RegisterCreatedObjectUndo(panel.gameObject, "Create Controller Help Form");
-            Selection.activeGameObject = panel.gameObject;
-            MarkSceneDirty();
-
-            Debug.Log("[RewiredHelper] Created a Controller Help form (inactive by default). Wire " +
-                "RewiredInputManager.OnShowControllerHelp to SetActive(true) it — it already only " +
-                "fires once, the first time a joystick/gamepad is detected.");
+                Debug.Log("[RewiredHelper] Created a Controller Help form (inactive by default). Wire " +
+                    "RewiredInputManager.OnShowControllerHelp to SetActive(true) it — it already only " +
+                    "fires once, the first time a joystick/gamepad is detected.");
+            }
         }
 
         static Type FindGlyphHelperType()
@@ -94,6 +172,14 @@ namespace Wagenheimer.RewiredHelper.Editor
         /// </summary>
         static void ApplyGlyphText(Component helper, Type helperType)
         {
+            if (ReInput.mapping == null)
+            {
+                Debug.LogWarning("[RewiredHelper] ReInput.mapping is null. ReInput is not initialized. Make sure to set up actions in your Rewired Input Manager configuration. A placeholder has been set.");
+                var textProp = helperType.GetProperty("text", BindingFlags.Public | BindingFlags.Instance);
+                textProp?.SetValue(helper, "<!-- ReInput.mapping was null at generation time. Ensure Rewired is initialized or run in Play Mode to populate this list. -->");
+                return;
+            }
+
             var sb = new StringBuilder();
             foreach (var action in ReInput.mapping.Actions.OrderBy(a => a.categoryId).ThenBy(a => a.name))
             {

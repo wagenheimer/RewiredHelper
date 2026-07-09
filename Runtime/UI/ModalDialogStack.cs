@@ -73,22 +73,23 @@ namespace Wagenheimer.RewiredHelper.UI
 
         public void PruneInactiveTop()
         {
-            if (ModalDialogStack.Modals.Count > 0 &&
-                (ModalDialogStack.Modals[0] == null || !ModalDialogStack.Modals[0].gameObject.activeSelf))
+            while (ModalDialogStack.Modals.Count > 0 &&
+                   (ModalDialogStack.Modals[ModalDialogStack.Modals.Count - 1] == null ||
+                    !ModalDialogStack.Modals[ModalDialogStack.Modals.Count - 1].gameObject.activeInHierarchy))
             {
-                ModalDialogStack.Modals.RemoveAt(0);
+                ModalDialogStack.Modals.RemoveAt(ModalDialogStack.Modals.Count - 1);
             }
         }
 
         public bool TryGetTopEscapeButton(out UnityEngine.UI.Button escapeButton)
         {
-            escapeButton = ModalDialogStack.Modals.Count > 0 ? ModalDialogStack.Modals[0]?.EscapeButton : null;
+            escapeButton = ModalDialogStack.Modals.Count > 0 ? ModalDialogStack.Modals[ModalDialogStack.Modals.Count - 1]?.EscapeButton : null;
             return escapeButton != null;
         }
 
         public bool TryGetTopOkButton(out UnityEngine.UI.Button okButton)
         {
-            okButton = ModalDialogStack.Modals.Count > 0 ? ModalDialogStack.Modals[0]?.OkButton : null;
+            okButton = ModalDialogStack.Modals.Count > 0 ? ModalDialogStack.Modals[ModalDialogStack.Modals.Count - 1]?.OkButton : null;
             return okButton != null;
         }
     }

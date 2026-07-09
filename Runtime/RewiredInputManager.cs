@@ -73,6 +73,9 @@ namespace Wagenheimer.RewiredHelper
 
         /// <summary>Invocado ao invés de abrir um diálogo de ajuda do controle diretamente — o jogo decide o que mostrar.</summary>
         public UnityEvent OnShowControllerHelp;
+
+        /// <summary>Indica se o Configure() foi chamado com sucesso.</summary>
+        public bool IsConfigured { get; private set; }
         #endregion
 
         #region Private Fields
@@ -156,6 +159,7 @@ namespace Wagenheimer.RewiredHelper
             _uiBlocker = uiBlocker ?? NullUiBlocker.Instance;
             _modalStack = modalStack ?? NullModalStackProvider.Instance;
             _controllerHelpGate = controllerHelpGate ?? NullControllerHelpGate.Instance;
+            IsConfigured = true;
         }
         #endregion
 
@@ -237,7 +241,7 @@ namespace Wagenheimer.RewiredHelper
                 }
                 else if (!EscapeButton.PressedScape())
                 {
-                    ReturnEscapeEvent.EscapePressed = true;
+                    ReturnEscapeEvent.TriggerEscape();
                 }
             }
 
@@ -250,7 +254,7 @@ namespace Wagenheimer.RewiredHelper
                 }
                 else
                 {
-                    ReturnEscapeEvent.OkPressed = true;
+                    ReturnEscapeEvent.TriggerOk();
                 }
             }
         }

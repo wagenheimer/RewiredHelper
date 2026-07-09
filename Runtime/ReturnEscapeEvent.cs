@@ -6,16 +6,12 @@ using UnityEngine.Scripting.APIUpdating;
 namespace Wagenheimer.RewiredHelper
 {
     /// <summary>
-    /// Fires <see cref="ReturnEvent"/>/<see cref="EscapeEvent"/> on every active instance when
-    /// <see cref="RewiredInputManager"/> sets <see cref="OkPressed"/>/<see cref="EscapePressed"/>
-    /// (i.e. Return/Escape was pressed and no modal claimed it first).
+    /// Fires <see cref="ReturnEvent"/>/<see cref="EscapeEvent"/> on active instances when
+    /// triggered by <see cref="RewiredInputManager"/> via static Trigger methods.
     /// </summary>
     [MovedFrom(true, sourceClassName: "ReturnEscapeEvent")]
     public class ReturnEscapeEvent : MonoBehaviour
     {
-        public static bool EscapePressed = false;
-        public static bool OkPressed = false;
-
         public static List<ReturnEscapeEvent> ReturnEscapeEventList { get; private set; } = new List<ReturnEscapeEvent>();
 
         [Header("Eventos Personalizados")]
@@ -26,22 +22,25 @@ namespace Wagenheimer.RewiredHelper
 
         private void OnDisable() => ReturnEscapeEventList.Remove(this);
 
-        private void Update()
+        public static void TriggerOk()
         {
-            if (OkPressed)
+            // Copy to array to prevent InvalidOperationException if invoking an event modifies the list (e.g. via disabling/destroying a component)
+            var instances = ReturnEscapeEventList.ToArray();
+            foreach (var instance in instances)
             {
-                foreach (var instance in ReturnEscapeEventList)
-                    instance.ReturnEvent.Invoke();
-
-                OkPressed = false;
+                if (instance != null && instance.gameObject.activeInHierarchy)
+                    instance.ReturnEvent?.Invoke();
             }
+        }
 
-            if (EscapePressed)
+        public static void TriggerEscape()
+        {
+            // Copy to array to prevent InvalidOperationException if invoking an event modifies the list
+            var instances = ReturnEscapeEventList.ToArray();
+            foreach (var instance in instances)
             {
-                foreach (var instance in ReturnEscapeEventList)
-                    instance.EscapeEvent.Invoke();
-
-                EscapePressed = false;
+                if (instance != null && instance.gameObject.activeInHierarchy)
+                    instance.EscapeEvent?.Invoke();
             }
         }
 

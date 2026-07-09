@@ -6,7 +6,7 @@ namespace Wagenheimer.RewiredHelper
     /// Lets the host game's modal/dialog stack take priority over the generic
     /// <see cref="EscapeButton"/>/<see cref="ReturnEscapeEvent"/> routing — e.g. if a modal
     /// is open, Escape/Return should trigger its buttons instead. Optional — if none is
-    /// supplied to <see cref="RewiredInputManager.Initialize"/>, the stack is treated as empty
+    /// supplied to <see cref="RewiredInputManager.Configure"/>, the stack is treated as empty
     /// and Escape/Return fall straight through to the generic routing.
     /// </summary>
     public interface IModalStackProvider

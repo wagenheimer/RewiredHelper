@@ -69,7 +69,7 @@ namespace Wagenheimer.RewiredHelper.UI
         public ShowDialogEffect ShowEffect = ShowDialogEffect.Fade;
 
         private List<SpriteRenderer> _childSpriteRenderers;
-        private List<TextMeshPro> _childTextMeshPro;
+        private List<TMP_Text> _childTextMeshPro;
         protected CanvasGroup _canvasGroup;
         private Coroutine _activeTween;
 
@@ -81,7 +81,7 @@ namespace Wagenheimer.RewiredHelper.UI
         public void OnEnable()
         {
             _childSpriteRenderers = GetComponentsInChildren<SpriteRenderer>(true).ToList();
-            _childTextMeshPro = GetComponentsInChildren<TextMeshPro>(true).ToList();
+            _childTextMeshPro = GetComponentsInChildren<TMP_Text>(true).ToList();
 
             float targetAlpha = UseFadeSpriteRenderers ? 0 : 1;
             foreach (var sr in _childSpriteRenderers) sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, targetAlpha);
@@ -213,7 +213,7 @@ namespace Wagenheimer.RewiredHelper.UI
             sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, to);
         }
 
-        private IEnumerator FadeTmpRoutine(TextMeshPro tmp, float to, float duration, float delay)
+        private IEnumerator FadeTmpRoutine(TMP_Text tmp, float to, float duration, float delay)
         {
             if (delay > 0) yield return new WaitForSeconds(delay);
             float from = tmp.color.a;

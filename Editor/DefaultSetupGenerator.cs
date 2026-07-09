@@ -1,27 +1,36 @@
+using System;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using Rewired;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
-using Wagenheimer.RewiredHelper;
 
 namespace Wagenheimer.RewiredHelper.Editor
 {
     /// <summary>
     /// Scene-building helpers under <b>Tools → Wagenheimer → Rewired Helper</b> that create a
-    /// standard, ready-to-use <see cref="RewiredInputManager"/> setup and a bare-bones controller
-    /// help UI, wired together. These build plain GameObjects directly in the open scene (rather
-    /// than shipping a hand-authored .prefab file, which this package's CI can't validate compiles
-    /// or instantiates correctly) — save the result as a prefab in your own project once you're
-    /// happy with it.
+    /// standard <see cref="RewiredInputManager"/> setup and a controller-help form wired to it.
+    /// These build plain GameObjects directly in the open scene (rather than shipping a
+    /// hand-authored .prefab file, which this package's CI can't validate compiles or instantiates
+    /// correctly) — save the result as a prefab in your own project once you're happy with it.
     ///
-    /// The generated controller help UI is intentionally unstyled: Rewired glyph icons (Xbox/
-    /// PlayStation/Switch button art) are project-specific data configured in each project's own
-    /// Rewired Input Manager asset, and can't be shipped inside an open-source package for
-    /// licensing reasons. Without glyphs configured, rows fall back to text-only labels.
+    /// The controller-help form is populated using Rewired's own official glyph system
+    /// (Assets/Rewired/Internal/Assets/Extras/Glyphs.zip +
+    /// GlyphsUnityUITMProAddonV2.zip → Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper) if the
+    /// consumer has extracted those into their project — this package cannot bundle that addon
+    /// itself since it ships under Rewired's own commercial license, not this package's MIT one.
+    /// Referenced via reflection so this package compiles whether or not the addon is present.
+    /// If it isn't found, the form is still created with placeholder text and a console warning
+    /// explaining what to extract.
     /// </summary>
     internal static class DefaultSetupGenerator
     {
+        const string GlyphHelperTypeName = "Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper";
+
         [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Rewired Input Manager", priority = 11)]
         static void CreateRewiredInputManager()
         {
@@ -33,29 +42,71 @@ namespace Wagenheimer.RewiredHelper.Editor
             MarkSceneDirty();
         }
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Default Controller Help UI", priority = 12)]
-        static void CreateControllerHelpUI()
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Controller Help Form", priority = 12)]
+        static void CreateControllerHelpForm()
         {
             var canvas = FindOrCreateCanvas();
-
             var panel = CreatePanel(canvas.transform);
-            CreateScrollArea(panel.transform, out var content);
-            var rowTemplate = CreateRowTemplate(content);
+            var label = CreateLabel(panel);
 
-            var panelGo = panel.gameObject;
-            var help = panelGo.AddComponent<Wagenheimer.RewiredHelper.UI.ControllerHelpPanel>();
-            help.RowTemplate = rowTemplate;
-            help.RowContainer = content;
+            var glyphHelperType = FindGlyphHelperType();
+            if (glyphHelperType != null)
+            {
+                var helper = panel.gameObject.AddComponent(glyphHelperType);
+                ApplyGlyphText(helper, glyphHelperType);
+            }
+            else
+            {
+                label.text = "Extract Assets/Rewired/Internal/Assets/Extras/Glyphs.zip and " +
+                    "GlyphsUnityUITMProAddonV2.zip into your project, then regenerate this form " +
+                    "to show real controller glyphs.";
+                Debug.LogWarning($"[RewiredHelper] {GlyphHelperTypeName} not found — see the label text on the " +
+                    "generated form for setup instructions. See README.md > Controller Help Form.");
+            }
 
-            panelGo.SetActive(false);
+            panel.gameObject.SetActive(false);
 
-            Undo.RegisterCreatedObjectUndo(panelGo, "Create Default Controller Help UI");
-            Selection.activeGameObject = panelGo;
+            Undo.RegisterCreatedObjectUndo(panel.gameObject, "Create Controller Help Form");
+            Selection.activeGameObject = panel.gameObject;
             MarkSceneDirty();
 
-            Debug.Log("[RewiredHelper] Created a Controller Help panel (inactive by default). Wire " +
-                "RewiredInputManager.OnShowControllerHelp to call SetActive(true) + ControllerHelpPanel.Populate() " +
-                "on it, then style RowTemplate/panel background to match your game.");
+            Debug.Log("[RewiredHelper] Created a Controller Help form (inactive by default). Wire " +
+                "RewiredInputManager.OnShowControllerHelp to SetActive(true) it — it already only " +
+                "fires once, the first time a joystick/gamepad is detected.");
+        }
+
+        static Type FindGlyphHelperType()
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(GlyphHelperTypeName);
+                if (type != null)
+                    return type;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Builds one "&lt;rewiredElement&gt; &lt;rewiredAction&gt;" line per Action defined in
+        /// this project's Rewired Input Manager and assigns it to the glyph helper's `text`
+        /// property (both accessed via reflection — see <see cref="GlyphHelperTypeName"/>). The
+        /// glyph helper re-parses this at runtime and swaps in the icon for whichever controller
+        /// is currently active, so this is generated once at edit time and stays correct forever.
+        /// </summary>
+        static void ApplyGlyphText(Component helper, Type helperType)
+        {
+            var sb = new StringBuilder();
+            foreach (var action in ReInput.mapping.Actions.OrderBy(a => a.categoryId).ThenBy(a => a.name))
+            {
+                if (action.type != InputActionType.Button)
+                    continue; // Axis actions need firstPole/range attributes to make sense in a flat list; skip here.
+
+                sb.Append("<rewiredElement playerId=0 actionName=\"").Append(action.name).Append("\">  ");
+                sb.Append("<rewiredAction name=\"").Append(action.name).Append("\">\n");
+            }
+
+            var textProperty = helperType.GetProperty("text", BindingFlags.Public | BindingFlags.Instance);
+            textProperty?.SetValue(helper, sb.ToString());
         }
 
         static Canvas FindOrCreateCanvas()
@@ -82,7 +133,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         static RectTransform CreatePanel(Transform parent)
         {
-            var go = new GameObject("ControllerHelpPanel", typeof(RectTransform), typeof(Image));
+            var go = new GameObject("ControllerHelpForm", typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
             rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -96,92 +147,23 @@ namespace Wagenheimer.RewiredHelper.Editor
             return rect;
         }
 
-        static ScrollRect CreateScrollArea(Transform parent, out RectTransform content)
+        static TMP_Text CreateLabel(Transform parent)
         {
-            var scrollGo = new GameObject("ScrollView", typeof(RectTransform), typeof(ScrollRect));
-            var scrollRect = (RectTransform)scrollGo.transform;
-            scrollRect.SetParent(parent, false);
-            scrollRect.anchorMin = Vector2.zero;
-            scrollRect.anchorMax = Vector2.one;
-            scrollRect.offsetMin = new Vector2(20, 20);
-            scrollRect.offsetMax = new Vector2(-20, -20);
+            var go = new GameObject("Label", typeof(RectTransform));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(24, 24);
+            rect.offsetMax = new Vector2(-24, -24);
 
-            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
-            var viewport = (RectTransform)viewportGo.transform;
-            viewport.SetParent(scrollRect, false);
-            viewport.anchorMin = Vector2.zero;
-            viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = Vector2.zero;
-            viewport.offsetMax = Vector2.zero;
-            viewportGo.GetComponent<Image>().color = new Color(1, 1, 1, 0.01f);
-            viewportGo.GetComponent<Mask>().showMaskGraphic = false;
-
-            var contentGo = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
-            content = (RectTransform)contentGo.transform;
-            content.SetParent(viewport, false);
-            content.anchorMin = new Vector2(0, 1);
-            content.anchorMax = new Vector2(1, 1);
-            content.pivot = new Vector2(0.5f, 1);
-
-            var layout = contentGo.GetComponent<VerticalLayoutGroup>();
-            layout.spacing = 8;
-            layout.padding = new RectOffset(8, 8, 8, 8);
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
-
-            var fitter = contentGo.GetComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var scroll = scrollGo.GetComponent<ScrollRect>();
-            scroll.viewport = viewport;
-            scroll.content = content;
-            scroll.horizontal = false;
-            scroll.vertical = true;
-
-            return scroll;
-        }
-
-        static Wagenheimer.RewiredHelper.UI.ControllerHelpRow CreateRowTemplate(Transform parent)
-        {
-            var rowGo = new GameObject("Row", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
-            var rowRect = (RectTransform)rowGo.transform;
-            rowRect.SetParent(parent, false);
-
-            var rowLayout = rowGo.GetComponent<HorizontalLayoutGroup>();
-            rowLayout.spacing = 10;
-            rowLayout.childAlignment = TextAnchor.MiddleLeft;
-            rowLayout.childControlHeight = true;
-            rowLayout.childControlWidth = false;
-
-            var layoutElement = rowGo.GetComponent<LayoutElement>();
-            layoutElement.preferredHeight = 36;
-
-            var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-            var iconRect = (RectTransform)iconGo.transform;
-            iconRect.SetParent(rowRect, false);
-            iconRect.sizeDelta = new Vector2(32, 32);
-            var icon = iconGo.GetComponent<Image>();
-            icon.enabled = false;
-            icon.preserveAspect = true;
-
-            var labelGo = new GameObject("Label", typeof(RectTransform));
-            var labelRect = (RectTransform)labelGo.transform;
-            labelRect.SetParent(rowRect, false);
-            var labelLayoutElement = labelGo.AddComponent<LayoutElement>();
-            labelLayoutElement.flexibleWidth = 1;
-            var label = labelGo.AddComponent<TextMeshProUGUI>();
-            label.fontSize = 22;
+            var label = go.AddComponent<TextMeshProUGUI>();
+            label.fontSize = 24;
             label.color = Color.white;
-            label.text = "Element — Action";
+            label.enableWordWrapping = true;
+            label.alignment = TextAlignmentOptions.TopLeft;
 
-            var row = rowGo.AddComponent<Wagenheimer.RewiredHelper.UI.ControllerHelpRow>();
-            row.Icon = icon;
-            row.Label = label;
-
-            rowGo.SetActive(false);
-            return row;
+            return label;
         }
 
         static void MarkSceneDirty()

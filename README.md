@@ -224,38 +224,31 @@ Only import this sample if you already use I2 Localization.
 
 ---
 
-## Controller Help UI (`Wagenheimer.RewiredHelper.UI.ControllerHelpPanel`)
+## Controller Help Form
 
-A ready-to-use panel that lists every action currently mapped on the player's active controller —
-one row (icon + text) per binding — for `RewiredInputManager.OnShowControllerHelp` to show the
-first time a controller is detected. Ships as part of Runtime, no sample import needed.
+Rewired ships its own official glyph system as extra assets in every install —
+`Assets/Rewired/Internal/Assets/Extras/Glyphs.zip` (icon sets for Xbox/PlayStation/Switch/etc.)
+and `GlyphsUnityUITMProAddonV2.zip` (`Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper`, a TMP
+component that parses `<rewiredElement>`/`<rewiredAction>` tags in a text and swaps in the glyph
+for whichever controller is currently active). **Extract both zips into your project first** —
+this package cannot bundle that addon itself, since it ships under Rewired's own commercial
+license rather than this package's MIT one.
 
-Use **Tools → Wagenheimer → Rewired Helper → Create Default Controller Help UI** to generate a
-bare-bones instance (Canvas/panel/scroll list/row template) directly in the open scene — restyle
-it and save as a prefab in your own project.
+Once extracted, use **Tools → Wagenheimer → Rewired Helper → Create Controller Help Form** to
+generate a panel in the open scene: it detects the addon via reflection, adds
+`UnityUITextMeshProGlyphHelper` to a TMP label, and fills it with one
+`<rewiredElement actionName="X"> <rewiredAction name="X">` line per Button-type Action already
+defined in your Rewired Input Manager — real glyphs, correct action names, no manual wiring. If
+the addon isn't found yet, the form is still created with placeholder text explaining what to
+extract, so you can re-run the command after.
+
+Restyle the generated form and save it as a prefab in your own project. Wire it to
+`RewiredInputManager.OnShowControllerHelp` — that event already fires exactly once, the first time
+a joystick/gamepad is detected (see `alreadyShowedControllerHelp` / `IControllerHelpGate` above):
 
 ```csharp
-_input.OnShowControllerHelp.AddListener(() =>
-{
-    controllerHelpPanel.gameObject.SetActive(true);
-    controllerHelpPanel.Populate();
-});
+_input.OnShowControllerHelp.AddListener(() => controllerHelpForm.SetActive(true));
 ```
-
-Row labels use Rewired's own localized `actionDescriptiveName` by default. To route them through
-I2 Localization (or any other system) instead, set `ActionNameLocalizer`:
-
-```csharp
-controllerHelpPanel.ActionNameLocalizer = action =>
-    I2.Loc.LocalizationManager.GetTranslation(action.name) ?? action.descriptiveName;
-```
-
-**Icons are opt-in and project-specific.** `ControllerHelpRow.SetGlyph` only shows an icon if
-Rewired's `ActionElementMap.elementIdentifierGlyph` returns one, which requires *your* project to
-have a Glyph Provider configured and glyph assets assigned per element identifier in the Rewired
-Input Manager. Controller button art (Xbox/PlayStation/Switch icons) is trademarked and can't ship
-inside this package — without glyphs configured, rows fall back to text-only labels
-(`elementIdentifierName — actionDescriptiveName`), which always works out of the box.
 
 ---
 
@@ -264,7 +257,7 @@ inside this package — without glyphs configured, rows fall back to text-only l
 | Menu | Action |
 |---|---|
 | Tools → Wagenheimer → Rewired Helper → Create Rewired Input Manager | Adds a `RewiredInputManager` GameObject to the open scene |
-| Tools → Wagenheimer → Rewired Helper → Create Default Controller Help UI | Generates an unstyled `ControllerHelpPanel` in the open scene |
+| Tools → Wagenheimer → Rewired Helper → Create Controller Help Form | Generates a controller-help panel using Rewired's official glyph addon, if present |
 | Tools → Wagenheimer → Rewired Helper → Check for Updates... | Manually check for a new package version |
 | Tools → Wagenheimer → Rewired Helper → Integration Guide (README) | Opens this README on GitHub |
 | Tools → Wagenheimer → Rewired Helper → Report Issue | Opens a new GitHub issue |

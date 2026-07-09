@@ -14,14 +14,17 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   (`IUiBlocker`, `IModalStackProvider`, `IControllerHelpGate`), each with an internal
   `Null*` default implementation. `RewiredInputManager.Configure(...)` wires them in; omit any
   argument to keep the no-op default.
-- `Runtime/UI/ControllerHelpPanel.cs` + `ControllerHelpRow.cs` — generic "list every mapped
-  action" panel for `RewiredInputManager.OnShowControllerHelp`. Icons are opt-in: only shown if
-  the consuming project has a Rewired Glyph Provider configured with glyph assets, since
-  trademarked controller button art can't ship in this package. Text fallback always works.
 - `Editor/DefaultSetupGenerator.cs` — menu items that build a `RewiredInputManager` GameObject and
-  an unstyled `ControllerHelpPanel` hierarchy directly in the open scene (not shipped as a
-  hand-authored `.prefab` file — this package's CI can't validate a raw prefab YAML actually
-  instantiates correctly, generating it via code is safer).
+  a controller-help form directly in the open scene (not shipped as a hand-authored `.prefab`
+  file — this package's CI can't validate a raw prefab YAML actually instantiates correctly,
+  generating it via code is safer). The form uses Rewired's own official glyph addon
+  (`Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper`, from
+  `Assets/Rewired/Internal/Assets/Extras/GlyphsUnityUITMProAddonV2.zip` — extracted by the
+  consumer, not bundled here) via `Type.GetType`/reflection, since this package cannot reference
+  it directly (it ships under Rewired's commercial license, not this package's MIT one) or even
+  guarantee it's present. Do not reintroduce a hand-rolled glyph reader
+  (`ActionElementMap.elementIdentifierGlyph` etc.) — Rewired's own addon already solves this
+  better; this was tried and removed on 2026-07-09.
 - `Editor/UpdateChecker.cs` + `UpdateAvailableWindow.cs` — copy-pasted-and-renamed from the
   sibling packages (UnityRateControl/UnityCloudSave/UnityNativeSocial), not a shared library. If
   you fix a bug here, port the fix to the other three `wagenheimer/Unity*` repos by hand.

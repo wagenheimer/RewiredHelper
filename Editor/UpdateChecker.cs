@@ -68,8 +68,18 @@ namespace Wagenheimer.RewiredHelper.Editor
             request.Dispose();
 
             var localVersion = GetLocalVersion();
-            if (string.IsNullOrEmpty(remoteVersion) || string.IsNullOrEmpty(localVersion))
+            if (string.IsNullOrEmpty(remoteVersion))
+            {
+                Debug.Log("[RewiredHelper] Update check failed: remote package.json has no version field.");
                 return;
+            }
+
+            if (string.IsNullOrEmpty(localVersion))
+            {
+                Debug.Log("[RewiredHelper] Update check failed: could not resolve the installed package version " +
+                    "(PackageInfo.FindForAssembly returned null for this assembly).");
+                return;
+            }
 
             if (!IsNewer(remoteVersion, localVersion))
             {

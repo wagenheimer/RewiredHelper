@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-09
+
+### Added
+- add generic modal dialog stack, [MovedFrom] compatibility for renamed types
+- restructure as a UPM package, decouple from game-specific singletons
+
+### Changed
+- Optimize controller change event: replace LocalizeAll with ForceUpdateSpecialization and reduce redundancy
+- Use platform switch in IsConsolePlatform
+- Refactor: Replace ReturnEscapeEvent script and fix RewiredHelper
+- Improve controller handling for consoles and input detection
+- Refactor input handling in RewiredHelper.cs
+- Add mouse/touch movement tracking functionality
+- Update RewiredHelper.cs
+- Enhance null safety for input properties
+- Enhance input handling in RewiredHelper.cs
+- Update RewiredHelper.cs
+- Improve input handling and add specialization detection
+- Update RewiredHelper.cs
+- Refactor RewiredHelper methods and add overlay handling
+- Update RewiredHelper.cs
+- Adiciona suporte para visibilidade e localização de UI
+- Verifica se o GO está ativo
+- Ajustes Detecção do Steam Overlay
+- Atualizado GitIgnore
+- Add escape and return button handling in Unity project
+- Update RewiredHelper.cs
+- Primeira Versão
+- Initial commit
+
 ## [0.2.0] - 2026-07-08
 
 ### Added

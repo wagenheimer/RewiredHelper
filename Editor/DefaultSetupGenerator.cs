@@ -96,60 +96,169 @@ namespace Wagenheimer.RewiredHelper.Editor
         [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Controller Help Form", priority = 12)]
         internal static void CreateControllerHelpForm()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FormControllerPrefabPath);
-            GameObject formGo = null;
+            var canvas = FindOrCreateCanvas();
+            var formGo = GenerateRowBasedHelpForm(canvas.transform);
 
-            if (prefab != null)
+            Undo.RegisterCreatedObjectUndo(formGo, "Create Controller Help Form");
+            formGo.SetActive(false);
+
+            Selection.activeGameObject = formGo;
+            MarkSceneDirty();
+
+            Debug.Log("[RewiredHelper] Created a custom Row-Based Controller Help form (inactive by default). " +
+                "Wire RewiredInputManager.OnShowControllerHelp to SetActive(true) it.");
+        }
+
+        static GameObject GenerateRowBasedHelpForm(Transform parent)
+        {
+            // 1. Create Main Panel (650x480)
+            var formGo = new GameObject("ControllerHelpForm", typeof(RectTransform), typeof(Image));
+            var formRect = (RectTransform)formGo.transform;
+            formRect.SetParent(parent, false);
+            formRect.anchorMin = new Vector2(0.5f, 0.5f);
+            formRect.anchorMax = new Vector2(0.5f, 0.5f);
+            formRect.sizeDelta = new Vector2(650, 480);
+            formRect.anchoredPosition = Vector2.zero;
+
+            var bgImage = formGo.GetComponent<Image>();
+            bgImage.color = new Color(0.12f, 0.12f, 0.14f, 0.95f); // Dark panel background
+
+            // 2. Create Header Title
+            var headerGo = new GameObject("HeaderTitle", typeof(RectTransform));
+            var headerRect = (RectTransform)headerGo.transform;
+            headerRect.SetParent(formRect, false);
+            headerRect.anchorMin = new Vector2(0, 1);
+            headerRect.anchorMax = new Vector2(1, 1);
+            headerRect.pivot = new Vector2(0.5f, 1);
+            headerRect.sizeDelta = new Vector2(0, 50);
+            headerRect.anchoredPosition = new Vector2(0, -10);
+
+            var headerText = headerGo.AddComponent<TextMeshProUGUI>();
+            headerText.text = "CONTROLLER CONTROLS";
+            headerText.fontSize = 22;
+            headerText.color = Color.white;
+            headerText.fontStyle = FontStyles.Bold;
+            headerText.alignment = TextAlignmentOptions.Center;
+
+            // 3. Create Scroll View
+            var scrollViewGo = new GameObject("Scroll View", typeof(RectTransform), typeof(ScrollRect));
+            var scrollRect = scrollViewGo.GetComponent<ScrollRect>();
+            var scrollRectTransform = (RectTransform)scrollViewGo.transform;
+            scrollRectTransform.SetParent(formRect, false);
+            scrollRectTransform.anchorMin = Vector2.zero;
+            scrollRectTransform.anchorMax = Vector2.one;
+            scrollRectTransform.offsetMin = new Vector2(20, 20);
+            scrollRectTransform.offsetMax = new Vector2(-20, -70); // Offset top for header
+
+            // Viewport
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            var viewportRect = (RectTransform)viewportGo.transform;
+            viewportRect.SetParent(scrollRectTransform, false);
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.sizeDelta = Vector2.zero;
+            viewportGo.GetComponent<Image>().color = new Color(0, 0, 0, 0); // Transparent mask
+            viewportGo.GetComponent<Mask>().showMaskGraphic = false;
+
+            // Content Container
+            var contentGo = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            var contentRect = (RectTransform)contentGo.transform;
+            contentRect.SetParent(viewportRect, false);
+            contentRect.anchorMin = new Vector2(0, 1);
+            contentRect.anchorMax = new Vector2(1, 1);
+            contentRect.pivot = new Vector2(0.5f, 1);
+            contentRect.sizeDelta = new Vector2(0, 0);
+
+            var vlg = contentGo.GetComponent<VerticalLayoutGroup>();
+            vlg.spacing = 8f;
+            vlg.childAlignment = TextAnchor.UpperCenter;
+            vlg.childControlWidth = true;
+            vlg.childControlHeight = false;
+            vlg.childForceExpandWidth = true;
+            vlg.childForceExpandHeight = false;
+            vlg.padding = new RectOffset(10, 10, 10, 10);
+
+            var csf = contentGo.GetComponent<ContentSizeFitter>();
+            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scrollRect.viewport = viewportRect;
+            scrollRect.content = contentRect;
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+
+            // 4. Generate Rows
+            var glyphHelperType = FindGlyphHelperType();
+            var actions = ReInput.mapping != null 
+                ? ReInput.mapping.Actions.Where(a => a.type == InputActionType.Button).OrderBy(a => a.categoryId).ThenBy(a => a.name).ToList()
+                : new System.Collections.Generic.List<InputAction>();
+
+            if (actions.Count == 0)
             {
-                var canvas = FindOrCreateCanvas();
-                formGo = (GameObject)PrefabUtility.InstantiatePrefab(prefab, canvas.transform);
-                Undo.RegisterCreatedObjectUndo(formGo, "Create Controller Help Form");
-                
-                // If the glyph helper addon is installed, apply glyph text dynamically via reflection
-                var glyphHelperType = FindGlyphHelperType();
-                if (glyphHelperType != null)
-                {
-                    var helper = formGo.GetComponentInChildren(glyphHelperType);
-                    if (helper != null)
-                    {
-                        ApplyGlyphText(helper, glyphHelperType);
-                    }
-                }
+                // Fallback template rows if mapping is empty (e.g. edit mode)
+                CreateHelpRow(contentRect, "UIHorizontal", "Move Selection (Horizontal)", glyphHelperType);
+                CreateHelpRow(contentRect, "UIVertical", "Move Selection (Vertical)", glyphHelperType);
+                CreateHelpRow(contentRect, "UISubmit", "Confirm / Select", glyphHelperType);
+                CreateHelpRow(contentRect, "UICancel", "Back / Cancel", glyphHelperType);
             }
             else
             {
-                // Fallback to procedural generation if prefab not found
-                var canvas = FindOrCreateCanvas();
-                var panel = CreatePanel(canvas.transform);
-                var label = CreateLabel(panel);
-                formGo = panel.gameObject;
-
-                var glyphHelperType = FindGlyphHelperType();
-                if (glyphHelperType != null)
+                foreach (var action in actions)
                 {
-                    var helper = panel.gameObject.AddComponent(glyphHelperType);
-                    ApplyGlyphText(helper, glyphHelperType);
-                }
-                else
-                {
-                    label.text = "Install Rewired's Glyphs addon first: Window > Rewired > Extras > Glyphs > " +
-                        "Install (installs both the icon sets and the TextMeshPro UI helper), then " +
-                        "regenerate this form to show real controller glyphs.";
-                    Debug.LogWarning($"[RewiredHelper] {GlyphHelperTypeName} not found — install it via " +
-                        "Window > Rewired > Extras > Glyphs > Install, then regenerate this form. See README.md > Controller Help Form.");
+                    CreateHelpRow(contentRect, action.name, action.descriptiveName, glyphHelperType);
                 }
             }
 
-            if (formGo != null)
+            return formGo;
+        }
+
+        static void CreateHelpRow(Transform parent, string actionName, string actionDesc, Type glyphHelperType)
+        {
+            var rowGo = new GameObject($"Row_{actionName}", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
+            var rowRect = (RectTransform)rowGo.transform;
+            rowRect.SetParent(parent, false);
+            rowRect.sizeDelta = new Vector2(0, 44);
+
+            var bgImage = rowGo.GetComponent<Image>();
+            bgImage.color = new Color(0.18f, 0.18f, 0.20f, 0.8f); // Row dark background
+
+            var hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 20f;
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childControlWidth = false;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+            hlg.padding = new RectOffset(20, 20, 5, 5);
+
+            // Icon Label (Left side)
+            var iconGo = new GameObject("Icon", typeof(RectTransform));
+            var iconRect = (RectTransform)iconGo.transform;
+            iconRect.SetParent(rowRect, false);
+            iconRect.sizeDelta = new Vector2(120, 34);
+
+            var iconText = iconGo.AddComponent<TextMeshProUGUI>();
+            iconText.text = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+            iconText.fontSize = 20;
+            iconText.color = Color.white;
+            iconText.alignment = TextAlignmentOptions.Center;
+
+            if (glyphHelperType != null)
             {
-                formGo.SetActive(false);
-                Selection.activeGameObject = formGo;
-                MarkSceneDirty();
-
-                Debug.Log("[RewiredHelper] Created a Controller Help form (inactive by default). Wire " +
-                    "RewiredInputManager.OnShowControllerHelp to SetActive(true) it — it already only " +
-                    "fires once, the first time a joystick/gamepad is detected.");
+                iconGo.AddComponent(glyphHelperType);
             }
+
+            // Description Label (Right side)
+            var descGo = new GameObject("Description", typeof(RectTransform));
+            var descRect = (RectTransform)descGo.transform;
+            descRect.SetParent(rowRect, false);
+            descRect.sizeDelta = new Vector2(380, 34);
+
+            var descText = descGo.AddComponent<TextMeshProUGUI>();
+            descText.text = !string.IsNullOrEmpty(actionDesc) ? actionDesc : $"<rewiredAction name=\"{actionName}\">";
+            descText.fontSize = 16;
+            descText.color = new Color(0.85f, 0.85f, 0.88f);
+            descText.alignment = TextAlignmentOptions.Left;
         }
 
         static Type FindGlyphHelperType()
@@ -161,37 +270,6 @@ namespace Wagenheimer.RewiredHelper.Editor
                     return type;
             }
             return null;
-        }
-
-        /// <summary>
-        /// Builds one "&lt;rewiredElement&gt; &lt;rewiredAction&gt;" line per Action defined in
-        /// this project's Rewired Input Manager and assigns it to the glyph helper's `text`
-        /// property (both accessed via reflection — see <see cref="GlyphHelperTypeName"/>). The
-        /// glyph helper re-parses this at runtime and swaps in the icon for whichever controller
-        /// is currently active, so this is generated once at edit time and stays correct forever.
-        /// </summary>
-        static void ApplyGlyphText(Component helper, Type helperType)
-        {
-            if (ReInput.mapping == null)
-            {
-                Debug.LogWarning("[RewiredHelper] ReInput.mapping is null. ReInput is not initialized. Make sure to set up actions in your Rewired Input Manager configuration. A placeholder has been set.");
-                var textProp = helperType.GetProperty("text", BindingFlags.Public | BindingFlags.Instance);
-                textProp?.SetValue(helper, "<!-- ReInput.mapping was null at generation time. Ensure Rewired is initialized or run in Play Mode to populate this list. -->");
-                return;
-            }
-
-            var sb = new StringBuilder();
-            foreach (var action in ReInput.mapping.Actions.OrderBy(a => a.categoryId).ThenBy(a => a.name))
-            {
-                if (action.type != InputActionType.Button)
-                    continue; // Axis actions need firstPole/range attributes to make sense in a flat list; skip here.
-
-                sb.Append("<rewiredElement playerId=0 actionName=\"").Append(action.name).Append("\">  ");
-                sb.Append("<rewiredAction name=\"").Append(action.name).Append("\">\n");
-            }
-
-            var textProperty = helperType.GetProperty("text", BindingFlags.Public | BindingFlags.Instance);
-            textProperty?.SetValue(helper, sb.ToString());
         }
 
         static Canvas FindOrCreateCanvas()
@@ -214,41 +292,6 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             Undo.RegisterCreatedObjectUndo(canvasGo, "Create Canvas");
             return canvas;
-        }
-
-        static RectTransform CreatePanel(Transform parent)
-        {
-            var go = new GameObject("ControllerHelpForm", typeof(RectTransform), typeof(Image));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(700, 500);
-            rect.anchoredPosition = Vector2.zero;
-
-            var image = go.GetComponent<Image>();
-            image.color = new Color(0f, 0f, 0f, 0.85f);
-
-            return rect;
-        }
-
-        static TMP_Text CreateLabel(Transform parent)
-        {
-            var go = new GameObject("Label", typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = new Vector2(24, 24);
-            rect.offsetMax = new Vector2(-24, -24);
-
-            var label = go.AddComponent<TextMeshProUGUI>();
-            label.fontSize = 24;
-            label.color = Color.white;
-            label.enableWordWrapping = true;
-            label.alignment = TextAlignmentOptions.TopLeft;
-
-            return label;
         }
 
         static void MarkSceneDirty()

@@ -38,8 +38,7 @@ namespace Wagenheimer.RewiredHelper.Editor
         internal static void CreateRewiredInputManager()
         {
             // 1. Instantiate Rewired Input Manager if not present
-            var rewiredManagerType = GetInputManagerType();
-            Component rewiredManager = rewiredManagerType != null ? (Component)UnityEngine.Object.FindObjectOfType(rewiredManagerType) : null;
+            var rewiredManager = FindInputManagerInScene();
             if (rewiredManager == null)
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(InputManagerPrefabPath);
@@ -47,7 +46,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 {
                     var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
                     Undo.RegisterCreatedObjectUndo(instance, "Create Rewired Input Manager");
-                    rewiredManager = rewiredManagerType != null ? instance.GetComponent(rewiredManagerType) : null;
+                    rewiredManager = instance.GetComponent("InputManager");
                 }
                 else
                 {
@@ -257,13 +256,13 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
         }
 
-        internal static Type GetInputManagerType()
+        internal static Component FindInputManagerInScene()
         {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            foreach (var go in UnityEngine.Object.FindObjectsOfType<GameObject>())
             {
-                var type = assembly.GetType("Rewired.InputManager");
-                if (type != null)
-                    return type;
+                var comp = go.GetComponent("InputManager");
+                if (comp != null && comp.GetType().FullName == "Rewired.InputManager")
+                    return comp;
             }
             return null;
         }

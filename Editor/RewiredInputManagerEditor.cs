@@ -33,10 +33,50 @@ namespace Wagenheimer.RewiredHelper.Editor
         {
             var manager = (RewiredInputManager)target;
 
-            // Draw default properties
-            DrawDefaultInspector();
+            serializedObject.Update();
 
-            EditorGUILayout.Space(15);
+            // Draw Script field (read-only)
+            GUI.enabled = false;
+            EditorGUILayout.ObjectField("Script", MonoScript.FromMonoBehaviour((MonoBehaviour)target), typeof(MonoScript), false);
+            GUI.enabled = true;
+
+            EditorGUILayout.Space(5);
+
+            // ==========================================
+            // SETTINGS GROUPS (MANUAL DRAWING)
+            // ==========================================
+            
+            // 1. Cursor & Visuals Settings
+            DrawSettingsGroup("Cursor & Visuals", "🖱️", new[] {
+                serializedObject.FindProperty("GameCursor")
+            }, new[] {
+                new GUIContent("Game Cursor", "UI Image used to render the custom in-game cursor.")
+            }, ColAccent);
+
+            // 2. Pause & Steam Overlay
+            var steamProp = serializedObject.FindProperty("IsSteamOverlayActive");
+            DrawSettingsGroup("Pause & Steam Overlay", "🎮", new[] {
+                serializedObject.FindProperty("GamePaused"),
+                serializedObject.FindProperty("PauseOnSteamOverlay"),
+                steamProp
+            }, new[] {
+                new GUIContent("Game Paused", "GameObject toggled when the game pauses."),
+                new GUIContent("Pause On Steam Overlay", "Automatically pauses the game when Steam overlay opens."),
+                new GUIContent("Is Steam Overlay Active", "Indicates if the Steam overlay is currently active.")
+            }, ColAccent);
+
+            // 3. Controller Help Events
+            DrawSettingsGroup("Controller Help", "❔", new[] {
+                serializedObject.FindProperty("alreadyShowedControllerHelp"),
+                serializedObject.FindProperty("OnShowControllerHelp")
+            }, new[] {
+                new GUIContent("Already Showed Help", "Tracks if the player was already shown the controller help form."),
+                new GUIContent("On Show Controller Help", "Event triggered once the first time physical controller input is detected.")
+            }, ColAccent);
+
+            serializedObject.ApplyModifiedProperties();
+
+            EditorGUILayout.Space(10);
             DrawSeparator();
             EditorGUILayout.Space(5);
 
@@ -247,6 +287,39 @@ namespace Wagenheimer.RewiredHelper.Editor
             GUILayout.Space(4);
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(4);
+        }
+
+        private void DrawSettingsGroup(string title, string icon, SerializedProperty[] properties, GUIContent[] labels, Color accentColor)
+        {
+            GUILayout.Label($"{icon}  {title.ToUpper()}", EditorStyles.boldLabel);
+            var r = EditorGUILayout.BeginVertical();
+            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), ColCard);
+            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, 3, r.height + 4), accentColor);
+            GUILayout.Space(5);
+
+            EditorGUI.indentLevel++;
+            for (int i = 0; i < properties.Length; i++)
+            {
+                if (properties[i] != null)
+                {
+                    // Disable editing for IsSteamOverlayActive
+                    if (properties[i].name == "IsSteamOverlayActive")
+                    {
+                        GUI.enabled = false;
+                        EditorGUILayout.PropertyField(properties[i], labels[i]);
+                        GUI.enabled = true;
+                    }
+                    else
+                    {
+                        EditorGUILayout.PropertyField(properties[i], labels[i]);
+                    }
+                }
+            }
+            EditorGUI.indentLevel--;
+
+            GUILayout.Space(5);
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(10);
         }
 
         private void DrawSeparator()

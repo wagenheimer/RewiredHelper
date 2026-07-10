@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
+using Wagenheimer.RewiredHelper;
 
 namespace Wagenheimer.RewiredHelper.Editor
 {

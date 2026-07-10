@@ -109,6 +109,100 @@ namespace Wagenheimer.RewiredHelper.Editor
                 "Wire RewiredInputManager.OnShowControllerHelp to SetActive(true) it.");
         }
 
+        internal static void CreateControllerHelpFormAndWire(RewiredInputManager manager)
+        {
+            var canvas = FindOrCreateCanvas();
+            var formGo = GenerateRowBasedHelpForm(canvas.transform);
+
+            Undo.RegisterCreatedObjectUndo(formGo, "Create Controller Help Form");
+            formGo.SetActive(false);
+
+            if (manager != null)
+            {
+                // Register persistent listener to OnShowControllerHelp
+                var methodInfo = typeof(GameObject).GetMethod("SetActive", new[] { typeof(bool) });
+                if (methodInfo != null)
+                {
+                    var delegateAction = Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<bool>), formGo, methodInfo) as UnityEngine.Events.UnityAction<bool>;
+                    UnityEditor.Events.UnityEventTools.AddBoolPersistentListener(manager.OnShowControllerHelp, delegateAction, true);
+                }
+            }
+
+            Selection.activeGameObject = formGo;
+            MarkSceneDirty();
+
+            Debug.Log("[RewiredHelper] Created custom Row-Based Controller Help form and wired to OnShowControllerHelp event.");
+        }
+
+        internal static void CreatePauseScreenAndWire(RewiredInputManager manager, SerializedObject serializedObject)
+        {
+            var canvas = FindOrCreateCanvas();
+            var pauseGo = CreatePauseScreen(canvas.transform);
+
+            Undo.RegisterCreatedObjectUndo(pauseGo, "Create Pause Screen");
+
+            if (serializedObject != null)
+            {
+                var prop = serializedObject.FindProperty("GamePaused");
+                if (prop != null)
+                {
+                    prop.objectReferenceValue = pauseGo;
+                    serializedObject.ApplyModifiedProperties();
+                }
+            }
+
+            Selection.activeGameObject = pauseGo;
+            MarkSceneDirty();
+
+            Debug.Log("[RewiredHelper] Created Pause Screen and linked to GamePaused field.");
+        }
+
+        private static GameObject CreatePauseScreen(Transform parent)
+        {
+            var pauseGo = new GameObject("PauseScreen", typeof(RectTransform), typeof(Image));
+            var pauseRect = (RectTransform)pauseGo.transform;
+            pauseRect.SetParent(parent, false);
+            pauseRect.anchorMin = Vector2.zero;
+            pauseRect.anchorMax = Vector2.one;
+            pauseRect.sizeDelta = Vector2.zero;
+            pauseRect.anchoredPosition = Vector2.zero;
+
+            var bg = pauseGo.GetComponent<Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.75f);
+
+            var titleGo = new GameObject("PauseTitle", typeof(RectTransform));
+            var titleRect = (RectTransform)titleGo.transform;
+            titleRect.SetParent(pauseRect, false);
+            titleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            titleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            titleRect.sizeDelta = new Vector2(400, 100);
+            titleRect.anchoredPosition = new Vector2(0, 50);
+
+            var titleText = titleGo.AddComponent<TextMeshProUGUI>();
+            titleText.text = "GAME PAUSED";
+            titleText.fontSize = 40;
+            titleText.fontStyle = FontStyles.Bold;
+            titleText.color = Color.white;
+            titleText.alignment = TextAlignmentOptions.Center;
+
+            var subGo = new GameObject("PauseSubtitle", typeof(RectTransform));
+            var subRect = (RectTransform)subGo.transform;
+            subRect.SetParent(pauseRect, false);
+            subRect.anchorMin = new Vector2(0.5f, 0.5f);
+            subRect.anchorMax = new Vector2(0.5f, 0.5f);
+            subRect.sizeDelta = new Vector2(400, 50);
+            subRect.anchoredPosition = new Vector2(0, -20);
+
+            var subText = subGo.AddComponent<TextMeshProUGUI>();
+            subText.text = "Press ESC or Menu button to resume";
+            subText.fontSize = 18;
+            subText.color = new Color(0.7f, 0.7f, 0.75f);
+            subText.alignment = TextAlignmentOptions.Center;
+
+            pauseGo.SetActive(false);
+            return pauseGo;
+        }
+
         static GameObject GenerateRowBasedHelpForm(Transform parent)
         {
             // 1. Create Root Backdrop Panel (Stretches full screen)

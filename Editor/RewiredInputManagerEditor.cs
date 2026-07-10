@@ -317,6 +317,32 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
             EditorGUI.indentLevel--;
 
+            // Draw custom creation shortcuts
+            if (title == "Pause & Steam Overlay" && properties[0].objectReferenceValue == null)
+            {
+                EditorGUILayout.Space(2);
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(15);
+                if (GUILayout.Button("🛠️  Generate Pause Screen & Link", GUILayout.Height(20)))
+                {
+                    DefaultSetupGenerator.CreatePauseScreenAndWire((RewiredInputManager)serializedObject.targetObject, serializedObject);
+                }
+                GUILayout.Space(5);
+                EditorGUILayout.EndHorizontal();
+            }
+            else if (title == "Controller Help")
+            {
+                EditorGUILayout.Space(2);
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(15);
+                if (GUILayout.Button("🛠️  Generate Help Form & Wire Event", GUILayout.Height(20)))
+                {
+                    DefaultSetupGenerator.CreateControllerHelpFormAndWire((RewiredInputManager)serializedObject.targetObject);
+                }
+                GUILayout.Space(5);
+                EditorGUILayout.EndHorizontal();
+            }
+
             GUILayout.Space(5);
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(10);

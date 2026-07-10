@@ -16,11 +16,24 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private static readonly string GlyphHelperTypeName = "Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper";
 
+        private static Color ColBg => EditorGUIUtility.isProSkin
+            ? new(0.16f, 0.16f, 0.18f) : new(0.82f, 0.82f, 0.84f);
+        private static Color ColCard => EditorGUIUtility.isProSkin
+            ? new(0.20f, 0.20f, 0.22f) : new(0.90f, 0.90f, 0.92f);
+        private static Color ColGreen => EditorGUIUtility.isProSkin
+            ? new(0.20f, 0.75f, 0.35f) : new(0.10f, 0.55f, 0.20f);
+        private static Color ColRed => EditorGUIUtility.isProSkin
+            ? new(0.85f, 0.25f, 0.20f) : new(0.70f, 0.15f, 0.10f);
+        private static Color ColOrange => EditorGUIUtility.isProSkin
+            ? new(1.00f, 0.60f, 0.10f) : new(0.85f, 0.50f, 0.05f);
+        private static readonly Color ColAccent = new(0.22f, 0.60f, 1.00f);
+        private static readonly Color ColDim = new(0.55f, 0.55f, 0.60f);
+
         public override void OnInspectorGUI()
         {
             var manager = (RewiredInputManager)target;
 
-            // Desenhar campos padrões do Inspector
+            // Draw default properties
             DrawDefaultInspector();
 
             EditorGUILayout.Space(15);
@@ -28,47 +41,47 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorGUILayout.Space(5);
 
             // ==========================================
-            // SEÇÃO 1: MANUAL DE AJUDA / DOCUMENTAÇÃO
+            // SECTION 1: QUICK HELP GUIDE & DOCUMENTATION
             // ==========================================
-            showHelpFoldout = EditorGUILayout.BeginFoldoutHeaderGroup(showHelpFoldout, "📖 GUIA DE AJUDA RÁPIDA (HELP)");
+            showHelpFoldout = EditorGUILayout.BeginFoldoutHeaderGroup(showHelpFoldout, "📖 QUICK HELP GUIDE");
             if (showHelpFoldout)
             {
                 EditorGUI.indentLevel++;
 
-                showBootstrapHelp = EditorGUILayout.Foldout(showBootstrapHelp, "Como Inicializar (Bootstrap)");
+                showBootstrapHelp = EditorGUILayout.Foldout(showBootstrapHelp, "How to Initialize (Bootstrap)");
                 if (showBootstrapHelp)
                 {
                     EditorGUILayout.HelpBox(
-                        "Para inicializar o gerenciador, chame o método Configure() no seu script de bootstrap (ex. no Awake):\n\n" +
+                        "To initialize the manager, call Configure() in your bootstrap script (e.g. in Awake):\n\n" +
                         "RewiredInputManager.Instance.Configure(\n" +
-                        "    uiBlocker: seuUiBlocker,\n" +
-                        "    modalStack: seuModalStack,\n" +
-                        "    controllerHelpGate: seuHelpGate\n" +
+                        "    uiBlocker: yourUiBlocker,\n" +
+                        "    modalStack: yourModalStack,\n" +
+                        "    controllerHelpGate: yourHelpGate\n" +
                         ");\n\n" +
-                        "Todos os argumentos são opcionais e assumem comportamentos padrões seguros se omitidos.",
+                        "All arguments are optional and will assume safe default behaviors if omitted.",
                         MessageType.Info
                     );
                 }
 
-                showRoutingHelp = EditorGUILayout.Foldout(showRoutingHelp, "Roteamento de Escape & Return");
+                showRoutingHelp = EditorGUILayout.Foldout(showRoutingHelp, "Escape & Return Routing");
                 if (showRoutingHelp)
                 {
                     EditorGUILayout.HelpBox(
-                        "• EscapeButton: Anexe a qualquer botão UI. O de maior prioridade ativo no momento responderá ao 'Escape' (ou botões Back/Menu dos controles).\n\n" +
-                        "• ReturnEscapeEvent: Dispara eventos genéricos quando Escape ou Return forem pressionados e nenhum botão ou modal reivindicar a tecla primeiro.\n\n" +
-                        "• IModalStackProvider: Registre seu próprio stack de modais para que o topo dele ganhe prioridade no roteamento de teclas automaticamente.",
+                        "• EscapeButton: Attach to any UI button. The active button with the highest priority will respond to the Escape key (or Back/Menu buttons on controllers).\n\n" +
+                        "• ReturnEscapeEvent: Fires generic events when Escape or Return are pressed and no button or modal dialog claims the key first.\n\n" +
+                        "• IModalStackProvider: Register your own modal stack so that its top-most modal automatically gains routing priority.",
                         MessageType.Info
                     );
                 }
 
-                showApisHelp = EditorGUILayout.Foldout(showApisHelp, "APIs Principais para seu Código");
+                showApisHelp = EditorGUILayout.Foldout(showApisHelp, "Core APIs for your Code");
                 if (showApisHelp)
                 {
                     EditorGUILayout.HelpBox(
-                        "• RewiredInputManager.IsUsingTouch: true se o jogador tocou na tela recentemente.\n\n" +
-                        "• manager.CurrentControllerType: Retorna se o jogador está usando Mouse/Teclado, Joystick (Controle) ou Custom (Touch).\n\n" +
-                        "• RewiredInputManager.OnInputTypeChanged: Evento estático disparado ao trocar o tipo de entrada (ex: alternar ícones de ajuda).\n\n" +
-                        "• manager.Vibrate(): Dispara vibração no controle ativo do jogador 0.",
+                        "• RewiredInputManager.IsUsingTouch: true if the player touched the screen recently.\n\n" +
+                        "• manager.CurrentControllerType: Returns whether the player is using Mouse/Keyboard, Joystick (Controller), or Custom (Touch).\n\n" +
+                        "• RewiredInputManager.OnInputTypeChanged: Static event fired when the active input source changes (e.g. to swap controller UI glyphs).\n\n" +
+                        "• manager.Vibrate(): Fires controller rumble on the active controller for Player 0.",
                         MessageType.Info
                     );
                 }
@@ -82,67 +95,68 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorGUILayout.Space(5);
 
             // ==========================================
-            // SEÇÃO 2: DIAGNOSTICADOR DE SETUP (CHECKER)
+            // SECTION 2: SETUP DIAGNOSTIC & STATUS CHECKER
             // ==========================================
-            GUILayout.Label("🛠️ DIAGNOSTICADOR DE SETUP (STATUS CHECKER)", EditorStyles.boldLabel);
+            var sectionHeaderStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = ColAccent } };
+            GUILayout.Label("🛠️ SETUP DIAGNOSTIC & STATUS CHECKER", sectionHeaderStyle);
             EditorGUILayout.Space(5);
 
-            // 1. Verificar Rewired Input Manager na Cena
+            // 1. Verify Native Manager in Scene
             var hasRewired = DefaultSetupGenerator.FindInputManagerInScene() != null;
-            DrawCheckResult("Rewired Input Manager (Nativo)", hasRewired, 
-                "Instancie o prefab configurado do Rewired para gerenciar mapeamentos e botões.",
-                "Criar Manager", () => DefaultSetupGenerator.CreateRewiredInputManager());
+            DrawCheckResult("Rewired Input Manager (Native)", hasRewired, 
+                "Instantiate the configured Rewired prefab to manage bindings and controls.",
+                "Create Manager", () => DefaultSetupGenerator.CreateRewiredInputManager());
 
-            // 2. Verificar Event System com módulo do Rewired
+            // 2. Verify Event System
             var hasEventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null;
             DrawCheckResult("Rewired Event System", hasEventSystem,
-                "É necessário um Event System com suporte ao Rewired para navegação de UI via controle.",
-                "Criar Event System", () => DefaultSetupGenerator.CreateRewiredInputManager()); // CreateRewiredInputManager já cria o Event System se faltar
+                "An Event System with Rewired support is required for controller UI navigation.",
+                "Create Event System", () => DefaultSetupGenerator.CreateRewiredInputManager());
 
-            // 3. Verificar Canvas
+            // 3. Verify Canvas
             var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;
-            DrawCheckResult("Canvas de UI", hasCanvas,
-                "A cena precisa de um Canvas para renderizar o cursor customizado e modais de diálogo.",
-                "Criar Canvas", () => {
+            DrawCheckResult("UI Canvas", hasCanvas,
+                "The scene requires a Canvas to render custom cursors and modal dialogs.",
+                "Create Canvas", () => {
                     var go = new GameObject("Canvas", typeof(Canvas), typeof(GraphicRaycaster));
                     var canvas = go.GetComponent<Canvas>();
                     canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                     Undo.RegisterCreatedObjectUndo(go, "Create Canvas");
                 });
 
-            // 4. Verificação de Propriedades do Componente
+            // 4. Standalone Custom Cursor warnings
             if (manager.CustomCursorEnabled && manager.CursorTexture == null)
             {
-                EditorGUILayout.HelpBox("⚠️ Cursor Customizado Standalone ativado, mas nenhuma textura (Cursor Texture) foi atribuída!", MessageType.Warning);
+                DrawWarningBox("Standalone Custom Cursor is enabled, but no Cursor Texture has been assigned!");
             }
 
             if (manager.GameCursor == null)
             {
-                EditorGUILayout.HelpBox("💡 Dica: Atribua uma imagem de UI no campo 'Game Cursor' se você utiliza um cursor customizado renderizado na tela.", MessageType.None);
+                DrawHintBox("Hint: Assign a UI Image to the 'Game Cursor' field if you use a screen-space custom cursor.");
             }
 
-            // 5. Verificar Estado de Inicialização em Runtime
+            // 5. Verify Runtime Initialization
             if (EditorApplication.isPlaying)
             {
                 if (!manager.IsConfigured)
                 {
-                    EditorGUILayout.HelpBox("❌ Runtime: O método Configure() ainda não foi chamado nesta execução. Inicialize-o no Awake/Start do seu jogo.", MessageType.Error);
+                    DrawErrorBox("Runtime: The Configure() method has not been called in this session. Initialize it in your game's Awake/Start.");
                 }
                 else
                 {
-                    EditorGUILayout.HelpBox("✅ Runtime: Inicializado e configurado com sucesso!", MessageType.Info);
+                    DrawSuccessBox("Runtime: Initialized and configured successfully!");
                 }
             }
 
-            // 6. Verificar Addon de Glifos do Rewired
+            // 6. Verify Rewired Glyphs Addon
             var glyphHelperType = FindGlyphHelperType();
             if (glyphHelperType == null)
             {
-                EditorGUILayout.HelpBox("ℹ️ Nota: O Addon Oficial de Glifos do Rewired não foi detectado no projeto. Se você deseja usar glifos dinâmicos nos textos de ajuda, instale-o em:\nWindow > Rewired > Extras > Glyphs > Install", MessageType.None);
+                DrawHintBox("Note: The Rewired Official Glyphs Addon was not detected in the project. If you wish to use dynamic controller icons in help texts, install it via:\nWindow > Rewired > Extras > Glyphs > Install");
             }
             else
             {
-                EditorGUILayout.HelpBox("✅ Addon de Glifos do Rewired detectado e ativo!", MessageType.Info);
+                DrawSuccessBox("Rewired Glyphs Addon detected and active!");
             }
 
             EditorGUILayout.Space(10);
@@ -150,41 +164,96 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private void DrawCheckResult(string title, bool pass, string missingDesc, string fixBtnText, Action fixAction)
         {
-            EditorGUILayout.BeginHorizontal();
+            var color = pass ? ColGreen : ColRed;
+            var r = EditorGUILayout.BeginVertical();
             
-            var statusIcon = pass ? "  ✅  " : "  ❌  ";
-            var style = new GUIStyle(EditorStyles.label) { richText = true };
-            
-            GUILayout.Label($"<b>{statusIcon} {title}</b>", style, GUILayout.Width(250));
+            // Render Card with left colored sidebar
+            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), ColCard);
+            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, 3, r.height + 4), color);
+            GUILayout.Space(4);
 
-            if (!pass)
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(10);
+            
+            var style = new GUIStyle(EditorStyles.boldLabel) { fontSize = 11, normal = { textColor = color } };
+            var statusIcon = pass ? "✅  " : "❌  ";
+            GUILayout.Label($"{statusIcon}{title}", style);
+
+            GUILayout.FlexibleSpace();
+
+            if (!pass && !string.IsNullOrEmpty(fixBtnText) && fixAction != null)
             {
-                if (GUILayout.Button(fixBtnText, GUILayout.Width(130)))
+                if (GUILayout.Button(fixBtnText, GUILayout.Width(120), GUILayout.Height(18)))
                 {
-                    fixAction?.Invoke();
+                    fixAction.Invoke();
                 }
             }
             else
             {
-                GUILayout.Label("<color=green>Pronto!</color>", style);
+                var greenStyle = new GUIStyle(EditorStyles.label) { richText = true };
+                GUILayout.Label("<color=green>Ready</color>", greenStyle);
             }
-
+            GUILayout.Space(5);
             EditorGUILayout.EndHorizontal();
 
             if (!pass && !string.IsNullOrEmpty(missingDesc))
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField(missingDesc, EditorStyles.wordWrappedMiniLabel);
+                var descStyle = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = ColDim }, wordWrap = true };
+                EditorGUILayout.LabelField(missingDesc, descStyle);
                 EditorGUI.indentLevel--;
                 EditorGUILayout.Space(2);
             }
+
+            GUILayout.Space(4);
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(4);
+        }
+
+        private void DrawWarningBox(string msg)
+        {
+            DrawStatusBox(msg, ColOrange, "⚠️  Warning");
+        }
+
+        private void DrawHintBox(string msg)
+        {
+            DrawStatusBox(msg, ColDim, "💡  Info");
+        }
+
+        private void DrawErrorBox(string msg)
+        {
+            DrawStatusBox(msg, ColRed, "❌  Error");
+        }
+
+        private void DrawSuccessBox(string msg)
+        {
+            DrawStatusBox(msg, ColGreen, "✅  Success");
+        }
+
+        private void DrawStatusBox(string msg, Color statusColor, string tag)
+        {
+            var r = EditorGUILayout.BeginVertical();
+            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), ColCard);
+            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, 3, r.height + 4), statusColor);
+            GUILayout.Space(4);
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(10);
+            
+            var style = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = ColDim }, wordWrap = true };
+            GUILayout.Label($"<b>{tag}:</b> {msg}", style);
+            
+            EditorGUILayout.EndHorizontal();
+            GUILayout.Space(4);
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(4);
         }
 
         private void DrawSeparator()
         {
             Rect rect = EditorGUILayout.GetControlRect(false, 1);
             rect.height = 1;
-            EditorGUI.DrawRect(rect, new Color(0.5f, 0.5f, 0.5f, 1));
+            EditorGUI.DrawRect(rect, new Color(0.5f, 0.5f, 0.5f, 0.3f));
         }
 
         private Type FindGlyphHelperType()

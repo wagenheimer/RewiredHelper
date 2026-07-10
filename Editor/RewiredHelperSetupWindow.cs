@@ -15,6 +15,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         private bool _ranScan;
         private bool _showHelp = true;
 
+        private static readonly string GlyphHelperTypeName = "Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper";
+
         // Cores no estilo do CloudSaveAudit/Editor do Unity
         private static Color ColBg => EditorGUIUtility.isProSkin
             ? new(0.16f, 0.16f, 0.18f) : new(0.82f, 0.82f, 0.84f);

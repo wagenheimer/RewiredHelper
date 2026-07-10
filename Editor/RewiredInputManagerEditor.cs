@@ -173,15 +173,16 @@ namespace Wagenheimer.RewiredHelper.Editor
                     Undo.RegisterCreatedObjectUndo(go, "Create Canvas");
                 });
 
-            // 4. Standalone Custom Cursor warnings
+            // 4. Verify Game Cursor (Required)
+            var hasCursor = manager.GameCursor != null;
+            DrawCheckResult("Game Cursor", hasCursor,
+                "A UI Image is required to act as the visual cursor on screen.",
+                "Create Cursor", () => DefaultSetupGenerator.CreateGameCursorAndWire(manager, serializedObject));
+
+            // Standalone Custom Cursor warnings
             if (manager.CustomCursorEnabled && manager.CursorTexture == null)
             {
                 DrawWarningBox("Standalone Custom Cursor is enabled, but no Cursor Texture has been assigned!");
-            }
-
-            if (manager.GameCursor == null)
-            {
-                DrawHintBox("Hint: Assign a UI Image to the 'Game Cursor' field if you use a screen-space custom cursor.");
             }
 
             // 5. Verify Runtime Initialization
@@ -327,7 +328,19 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorGUI.indentLevel--;
 
             // Draw custom creation shortcuts
-            if (title == "Pause & Steam Overlay" && properties[0].objectReferenceValue == null)
+            if (title == "Cursor & Visuals" && properties[0].objectReferenceValue == null)
+            {
+                EditorGUILayout.Space(2);
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(15);
+                if (GUILayout.Button("🛠️  Generate Game Cursor & Link", GUILayout.Height(20)))
+                {
+                    DefaultSetupGenerator.CreateGameCursorAndWire((RewiredInputManager)serializedObject.targetObject, serializedObject);
+                }
+                GUILayout.Space(5);
+                EditorGUILayout.EndHorizontal();
+            }
+            else if (title == "Pause & Steam Overlay" && properties[0].objectReferenceValue == null)
             {
                 EditorGUILayout.Space(2);
                 EditorGUILayout.BeginHorizontal();

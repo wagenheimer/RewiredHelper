@@ -92,14 +92,16 @@ namespace Wagenheimer.RewiredHelper.Editor
                 var hasHelper = hasManager && managerComp.GetComponent<RewiredInputManager>() != null;
                 var hasEventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null;
                 var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;
+                var hasCursor = hasHelper && managerComp.GetComponent<RewiredInputManager>().GameCursor != null;
 
                 int passed = 0;
-                int total = 4;
+                int total = 5;
 
                 if (hasManager) passed++;
                 if (hasHelper) passed++;
                 if (hasEventSystem) passed++;
                 if (hasCanvas) passed++;
+                if (hasCursor) passed++;
 
                 var pct = (float)passed / total;
 
@@ -180,6 +182,19 @@ namespace Wagenheimer.RewiredHelper.Editor
                     canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                     Undo.RegisterCreatedObjectUndo(go, "Create Canvas");
                 }, isOptional: true);
+
+            // 5. Game Cursor
+            var hasCursor = hasHelper && managerComp.GetComponent<RewiredInputManager>().GameCursor != null;
+            DrawCardItem("Game Cursor (Required)",
+                hasCursor ? "✅ Game Cursor image assigned." : "❌ Missing! Visual custom cursor will not render on screen.",
+                hasCursor, "Create Game Cursor", () => {
+                    var manager = managerComp.GetComponent<RewiredInputManager>();
+                    if (manager != null)
+                    {
+                        var so = new SerializedObject(manager);
+                        DefaultSetupGenerator.CreateGameCursorAndWire(manager, so);
+                    }
+                });
 
             // 5. Glyphs Addon
             var hasGlyphs = FindGlyphHelperType() != null;

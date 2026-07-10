@@ -157,6 +157,42 @@ namespace Wagenheimer.RewiredHelper.Editor
             Debug.Log("[RewiredHelper] Created Pause Screen and linked to GamePaused field.");
         }
 
+        internal static void CreateGameCursorAndWire(RewiredInputManager manager, SerializedObject serializedObject)
+        {
+            var canvas = FindOrCreateCanvas();
+            
+            // Create a GameCursor GameObject under the Canvas
+            var cursorGo = new GameObject("GameCursor", typeof(RectTransform), typeof(Image));
+            var cursorRect = (RectTransform)cursorGo.transform;
+            cursorRect.SetParent(canvas.transform, false);
+            cursorRect.anchorMin = new Vector2(0f, 1f); // top-left corner anchor
+            cursorRect.anchorMax = new Vector2(0f, 1f);
+            cursorRect.pivot = new Vector2(0f, 1f);      // top-left pivot
+            cursorRect.sizeDelta = new Vector2(32, 32);
+            cursorRect.anchoredPosition = Vector2.zero;
+
+            var img = cursorGo.GetComponent<Image>();
+            img.raycastTarget = false; // MUST be false so it doesn't block UI clicks!
+            img.color = Color.white;
+
+            Undo.RegisterCreatedObjectUndo(cursorGo, "Create Game Cursor");
+
+            if (serializedObject != null)
+            {
+                var prop = serializedObject.FindProperty("GameCursor");
+                if (prop != null)
+                {
+                    prop.objectReferenceValue = img;
+                    serializedObject.ApplyModifiedProperties();
+                }
+            }
+
+            Selection.activeGameObject = cursorGo;
+            MarkSceneDirty();
+
+            Debug.Log("[RewiredHelper] Created custom Game Cursor UI Image (raycastTarget=false) and linked to GameCursor field.");
+        }
+
         private static GameObject CreatePauseScreen(Transform parent)
         {
             var pauseGo = new GameObject("PauseScreen", typeof(RectTransform), typeof(Image));

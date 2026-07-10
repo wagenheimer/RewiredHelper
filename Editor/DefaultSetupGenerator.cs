@@ -111,22 +111,41 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         static GameObject GenerateRowBasedHelpForm(Transform parent)
         {
-            // 1. Create Main Panel (600x450)
-            var formGo = new GameObject("ControllerHelpForm", typeof(RectTransform), typeof(Image));
+            // 1. Create Root Backdrop Panel (Stretches full screen)
+            var formGo = new GameObject("ControllerHelpForm", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
             var formRect = (RectTransform)formGo.transform;
             formRect.SetParent(parent, false);
-            formRect.anchorMin = new Vector2(0.5f, 0.5f);
-            formRect.anchorMax = new Vector2(0.5f, 0.5f);
-            formRect.sizeDelta = new Vector2(600, 450);
+            formRect.anchorMin = Vector2.zero;
+            formRect.anchorMax = Vector2.one;
+            formRect.sizeDelta = Vector2.zero;
             formRect.anchoredPosition = Vector2.zero;
 
-            var bgImage = formGo.GetComponent<Image>();
-            bgImage.color = new Color(0.08f, 0.08f, 0.10f, 0.98f); // Sleek dark blue-black background
+            var bgOverlay = formGo.GetComponent<Image>();
+            bgOverlay.color = new Color(0f, 0f, 0f, 0.6f); // Semi-transparent black backdrop overlay
+
+            // Add ModalDialog component from the package
+            var modalDialog = formGo.AddComponent<Wagenheimer.RewiredHelper.UI.ModalDialog>();
+            modalDialog.Black = bgOverlay;
+            modalDialog.BlackAlpha = 0.6f;
+            modalDialog.ShowEffect = Wagenheimer.RewiredHelper.UI.ShowDialogEffect.Fade;
+            modalDialog.ShowHideDialogTime = 0.15f;
+
+            // 1b. Create Main Dialog Window Panel (600x450)
+            var cardGo = new GameObject("Card", typeof(RectTransform), typeof(Image));
+            var cardRect = (RectTransform)cardGo.transform;
+            cardRect.SetParent(formRect, false);
+            cardRect.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRect.sizeDelta = new Vector2(600, 450);
+            cardRect.anchoredPosition = Vector2.zero;
+
+            var bgCard = cardGo.GetComponent<Image>();
+            bgCard.color = new Color(0.08f, 0.08f, 0.10f, 0.98f); // Sleek dark blue-black background
 
             // Top Color Highlight Bar (Accent)
             var topBarGo = new GameObject("TopAccentBar", typeof(RectTransform), typeof(Image));
             var topBarRect = (RectTransform)topBarGo.transform;
-            topBarRect.SetParent(formRect, false);
+            topBarRect.SetParent(cardRect, false);
             topBarRect.anchorMin = new Vector2(0, 1);
             topBarRect.anchorMax = new Vector2(1, 1);
             topBarRect.pivot = new Vector2(0.5f, 1);
@@ -137,7 +156,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             // 2. Create Header Title
             var headerGo = new GameObject("HeaderTitle", typeof(RectTransform));
             var headerRect = (RectTransform)headerGo.transform;
-            headerRect.SetParent(formRect, false);
+            headerRect.SetParent(cardRect, false);
             headerRect.anchorMin = new Vector2(0, 1);
             headerRect.anchorMax = new Vector2(1, 1);
             headerRect.pivot = new Vector2(0.5f, 1);
@@ -154,7 +173,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             // Separator Underline
             var sepGo = new GameObject("HeaderSeparator", typeof(RectTransform), typeof(Image));
             var sepRect = (RectTransform)sepGo.transform;
-            sepRect.SetParent(formRect, false);
+            sepRect.SetParent(cardRect, false);
             sepRect.anchorMin = new Vector2(0, 1);
             sepRect.anchorMax = new Vector2(1, 1);
             sepRect.pivot = new Vector2(0.5f, 1);
@@ -166,7 +185,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             var scrollViewGo = new GameObject("Scroll View", typeof(RectTransform), typeof(ScrollRect));
             var scrollRect = scrollViewGo.GetComponent<ScrollRect>();
             var scrollRectTransform = (RectTransform)scrollViewGo.transform;
-            scrollRectTransform.SetParent(formRect, false);
+            scrollRectTransform.SetParent(cardRect, false);
             scrollRectTransform.anchorMin = Vector2.zero;
             scrollRectTransform.anchorMax = Vector2.one;
             scrollRectTransform.offsetMin = new Vector2(20, 50); // Leave room for footer
@@ -212,7 +231,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             // Footer Prompt
             var footerGo = new GameObject("FooterPrompt", typeof(RectTransform));
             var footerRect = (RectTransform)footerGo.transform;
-            footerRect.SetParent(formRect, false);
+            footerRect.SetParent(cardRect, false);
             footerRect.anchorMin = new Vector2(0, 0);
             footerRect.anchorMax = new Vector2(1, 0);
             footerRect.pivot = new Vector2(0.5f, 0);

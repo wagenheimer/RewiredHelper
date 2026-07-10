@@ -9,6 +9,12 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// </summary>
     internal static class RewiredHelperMenuItems
     {
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Setup Checker & Help", priority = 1)]
+        private static void OpenSetupChecker()
+        {
+            RewiredHelperSetupWindow.ShowWindow();
+        }
+
         [MenuItem("Tools/Wagenheimer/Rewired Helper/Integration Guide (README)", priority = 21)]
         private static void OpenIntegrationGuide()
         {

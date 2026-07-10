@@ -46,6 +46,15 @@ namespace Wagenheimer.RewiredHelper.Editor
             // SETTINGS GROUPS (MANUAL DRAWING)
             // ==========================================
             
+            // 0. Initialization & Boot
+            DrawSettingsGroup("Initialization & Boot", "🚀", new[] {
+                serializedObject.FindProperty("AutoConfigureOnStart"),
+                serializedObject.FindProperty("UseDefaultModalStack")
+            }, new[] {
+                new GUIContent("Auto Configure On Start", "If checked, the manager will automatically configure itself on Start, removing the need to call Configure() from code."),
+                new GUIContent("Use Default Modal Stack", "Automatically uses the built-in ModalDialogStack provider for UI modals navigation (Escape/Return keys).")
+            }, ColAccent);
+
             // 1. Cursor & Visuals Settings
             DrawSettingsGroup("Cursor & Visuals", "🖱️", new[] {
                 serializedObject.FindProperty("GameCursor")

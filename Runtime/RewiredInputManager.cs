@@ -74,6 +74,12 @@ namespace Wagenheimer.RewiredHelper
         /// <summary>Invocado ao invés de abrir um diálogo de ajuda do controle diretamente — o jogo decide o que mostrar.</summary>
         public UnityEvent OnShowControllerHelp;
 
+        [Tooltip("If enabled, the manager will automatically configure itself on Start, using default providers.")]
+        public bool AutoConfigureOnStart = true;
+
+        [Tooltip("If AutoConfigureOnStart is enabled, this controls whether the default ModalDialogStack provider is used.")]
+        public bool UseDefaultModalStack = true;
+
         /// <summary>Indica se o Configure() foi chamado com sucesso.</summary>
         public bool IsConfigured { get; private set; }
         #endregion
@@ -181,6 +187,16 @@ namespace Wagenheimer.RewiredHelper
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS
             if (SteamManager.Initialized) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
 #endif
+
+            // Auto-configure using default providers if enabled and not already configured via code
+            if (AutoConfigureOnStart && !IsConfigured)
+            {
+                Configure(
+                    null,
+                    UseDefaultModalStack ? new UI.DefaultModalStackProvider() : null,
+                    null
+                );
+            }
         }
 
 #if STEAMWORKS_NET && !DISABLESTEAMWORKS

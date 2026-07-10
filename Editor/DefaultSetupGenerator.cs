@@ -111,17 +111,28 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         static GameObject GenerateRowBasedHelpForm(Transform parent)
         {
-            // 1. Create Main Panel (650x480)
+            // 1. Create Main Panel (600x450)
             var formGo = new GameObject("ControllerHelpForm", typeof(RectTransform), typeof(Image));
             var formRect = (RectTransform)formGo.transform;
             formRect.SetParent(parent, false);
             formRect.anchorMin = new Vector2(0.5f, 0.5f);
             formRect.anchorMax = new Vector2(0.5f, 0.5f);
-            formRect.sizeDelta = new Vector2(650, 480);
+            formRect.sizeDelta = new Vector2(600, 450);
             formRect.anchoredPosition = Vector2.zero;
 
             var bgImage = formGo.GetComponent<Image>();
-            bgImage.color = new Color(0.12f, 0.12f, 0.14f, 0.95f); // Dark panel background
+            bgImage.color = new Color(0.08f, 0.08f, 0.10f, 0.98f); // Sleek dark blue-black background
+
+            // Top Color Highlight Bar (Accent)
+            var topBarGo = new GameObject("TopAccentBar", typeof(RectTransform), typeof(Image));
+            var topBarRect = (RectTransform)topBarGo.transform;
+            topBarRect.SetParent(formRect, false);
+            topBarRect.anchorMin = new Vector2(0, 1);
+            topBarRect.anchorMax = new Vector2(1, 1);
+            topBarRect.pivot = new Vector2(0.5f, 1);
+            topBarRect.sizeDelta = new Vector2(0, 5);
+            topBarRect.anchoredPosition = Vector2.zero;
+            topBarGo.GetComponent<Image>().color = new Color(0.22f, 0.60f, 1.00f); // Accent Blue
 
             // 2. Create Header Title
             var headerGo = new GameObject("HeaderTitle", typeof(RectTransform));
@@ -130,15 +141,26 @@ namespace Wagenheimer.RewiredHelper.Editor
             headerRect.anchorMin = new Vector2(0, 1);
             headerRect.anchorMax = new Vector2(1, 1);
             headerRect.pivot = new Vector2(0.5f, 1);
-            headerRect.sizeDelta = new Vector2(0, 50);
-            headerRect.anchoredPosition = new Vector2(0, -10);
+            headerRect.sizeDelta = new Vector2(0, 45);
+            headerRect.anchoredPosition = new Vector2(0, -15);
 
             var headerText = headerGo.AddComponent<TextMeshProUGUI>();
-            headerText.text = "CONTROLLER CONTROLS";
-            headerText.fontSize = 22;
+            headerText.text = "GAMEPAD CONTROLS";
+            headerText.fontSize = 20;
             headerText.color = Color.white;
             headerText.fontStyle = FontStyles.Bold;
             headerText.alignment = TextAlignmentOptions.Center;
+
+            // Separator Underline
+            var sepGo = new GameObject("HeaderSeparator", typeof(RectTransform), typeof(Image));
+            var sepRect = (RectTransform)sepGo.transform;
+            sepRect.SetParent(formRect, false);
+            sepRect.anchorMin = new Vector2(0, 1);
+            sepRect.anchorMax = new Vector2(1, 1);
+            sepRect.pivot = new Vector2(0.5f, 1);
+            sepRect.sizeDelta = new Vector2(-40, 1);
+            sepRect.anchoredPosition = new Vector2(0, -60);
+            sepGo.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.22f, 1f);
 
             // 3. Create Scroll View
             var scrollViewGo = new GameObject("Scroll View", typeof(RectTransform), typeof(ScrollRect));
@@ -147,8 +169,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             scrollRectTransform.SetParent(formRect, false);
             scrollRectTransform.anchorMin = Vector2.zero;
             scrollRectTransform.anchorMax = Vector2.one;
-            scrollRectTransform.offsetMin = new Vector2(20, 20);
-            scrollRectTransform.offsetMax = new Vector2(-20, -70); // Offset top for header
+            scrollRectTransform.offsetMin = new Vector2(20, 50); // Leave room for footer
+            scrollRectTransform.offsetMax = new Vector2(-20, -75); // Offset top for header
 
             // Viewport
             var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
@@ -170,7 +192,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             contentRect.sizeDelta = new Vector2(0, 0);
 
             var vlg = contentGo.GetComponent<VerticalLayoutGroup>();
-            vlg.spacing = 8f;
+            vlg.spacing = 6f;
             vlg.childAlignment = TextAnchor.UpperCenter;
             vlg.childControlWidth = true;
             vlg.childControlHeight = false;
@@ -187,6 +209,23 @@ namespace Wagenheimer.RewiredHelper.Editor
             scrollRect.vertical = true;
             scrollRect.movementType = ScrollRect.MovementType.Clamped;
 
+            // Footer Prompt
+            var footerGo = new GameObject("FooterPrompt", typeof(RectTransform));
+            var footerRect = (RectTransform)footerGo.transform;
+            footerRect.SetParent(formRect, false);
+            footerRect.anchorMin = new Vector2(0, 0);
+            footerRect.anchorMax = new Vector2(1, 0);
+            footerRect.pivot = new Vector2(0.5f, 0);
+            footerRect.sizeDelta = new Vector2(0, 30);
+            footerRect.anchoredPosition = new Vector2(0, 12);
+
+            var footerText = footerGo.AddComponent<TextMeshProUGUI>();
+            footerText.text = "PRESS ANY BUTTON TO RESUME";
+            footerText.fontSize = 11;
+            footerText.color = new Color(0.45f, 0.45f, 0.50f);
+            footerText.fontStyle = FontStyles.Bold;
+            footerText.alignment = TextAlignmentOptions.Center;
+
             // 4. Generate Rows
             var glyphHelperType = FindGlyphHelperType();
             var actions = ReInput.mapping != null 
@@ -196,68 +235,94 @@ namespace Wagenheimer.RewiredHelper.Editor
             if (actions.Count == 0)
             {
                 // Fallback template rows if mapping is empty (e.g. edit mode)
-                CreateHelpRow(contentRect, "UIHorizontal", "Move Selection (Horizontal)", glyphHelperType);
-                CreateHelpRow(contentRect, "UIVertical", "Move Selection (Vertical)", glyphHelperType);
-                CreateHelpRow(contentRect, "UISubmit", "Confirm / Select", glyphHelperType);
-                CreateHelpRow(contentRect, "UICancel", "Back / Cancel", glyphHelperType);
+                CreateHelpRow(contentRect, "UIHorizontal", "Move Selection (Horizontal)", glyphHelperType, false);
+                CreateHelpRow(contentRect, "UIVertical", "Move Selection (Vertical)", glyphHelperType, true);
+                CreateHelpRow(contentRect, "UISubmit", "Confirm / Select", glyphHelperType, false);
+                CreateHelpRow(contentRect, "UICancel", "Back / Cancel", glyphHelperType, true);
             }
             else
             {
-                foreach (var action in actions)
+                for (int i = 0; i < actions.Count; i++)
                 {
-                    CreateHelpRow(contentRect, action.name, action.descriptiveName, glyphHelperType);
+                    CreateHelpRow(contentRect, actions[i].name, actions[i].descriptiveName, glyphHelperType, i % 2 == 1);
                 }
             }
 
             return formGo;
         }
 
-        static void CreateHelpRow(Transform parent, string actionName, string actionDesc, Type glyphHelperType)
+        static void CreateHelpRow(Transform parent, string actionName, string actionDesc, Type glyphHelperType, bool isAlt)
         {
             var rowGo = new GameObject($"Row_{actionName}", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
             var rowRect = (RectTransform)rowGo.transform;
             rowRect.SetParent(parent, false);
-            rowRect.sizeDelta = new Vector2(0, 44);
+            rowRect.sizeDelta = new Vector2(0, 38);
 
             var bgImage = rowGo.GetComponent<Image>();
-            bgImage.color = new Color(0.18f, 0.18f, 0.20f, 0.8f); // Row dark background
+            // Alternating dark backgrounds
+            bgImage.color = isAlt 
+                ? new Color(0.12f, 0.12f, 0.14f, 0.7f) 
+                : new Color(0.15f, 0.15f, 0.17f, 0.8f);
+
+            // Left accent vertical bar (like a tag)
+            var accentBarGo = new GameObject("AccentTag", typeof(RectTransform), typeof(Image));
+            var accentBarRect = (RectTransform)accentBarGo.transform;
+            accentBarRect.SetParent(rowRect, false);
+            accentBarRect.anchorMin = new Vector2(0, 0.5f);
+            accentBarRect.anchorMax = new Vector2(0, 0.5f);
+            accentBarRect.pivot = new Vector2(0, 0.5f);
+            accentBarRect.sizeDelta = new Vector2(3, 26);
+            accentBarRect.anchoredPosition = new Vector2(4, 0);
+            accentBarGo.GetComponent<Image>().color = new Color(0.22f, 0.60f, 1.00f); // Blue accent
 
             var hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 20f;
+            hlg.spacing = 15f;
             hlg.childAlignment = TextAnchor.MiddleCenter;
             hlg.childControlWidth = false;
             hlg.childControlHeight = true;
             hlg.childForceExpandWidth = false;
             hlg.childForceExpandHeight = false;
-            hlg.padding = new RectOffset(20, 20, 5, 5);
+            hlg.padding = new RectOffset(20, 20, 3, 3);
 
-            // Icon Label (Left side)
+            // Icon Label (Left side) - Right aligned for crisp button layout
             var iconGo = new GameObject("Icon", typeof(RectTransform));
             var iconRect = (RectTransform)iconGo.transform;
             iconRect.SetParent(rowRect, false);
-            iconRect.sizeDelta = new Vector2(120, 34);
+            iconRect.sizeDelta = new Vector2(140, 32);
 
             var iconText = iconGo.AddComponent<TextMeshProUGUI>();
             iconText.text = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
-            iconText.fontSize = 20;
+            iconText.fontSize = 18;
             iconText.color = Color.white;
-            iconText.alignment = TextAlignmentOptions.Center;
+            iconText.alignment = TextAlignmentOptions.Right;
 
             if (glyphHelperType != null)
             {
                 iconGo.AddComponent(glyphHelperType);
             }
 
+            // Separator dash in row
+            var divGo = new GameObject("Divider", typeof(RectTransform));
+            var divRect = (RectTransform)divGo.transform;
+            divRect.SetParent(rowRect, false);
+            divRect.sizeDelta = new Vector2(15, 32);
+            var divText = divGo.AddComponent<TextMeshProUGUI>();
+            divText.text = "—";
+            divText.fontSize = 14;
+            divText.color = new Color(0.4f, 0.4f, 0.45f);
+            divText.alignment = TextAlignmentOptions.Center;
+
             // Description Label (Right side)
             var descGo = new GameObject("Description", typeof(RectTransform));
             var descRect = (RectTransform)descGo.transform;
             descRect.SetParent(rowRect, false);
-            descRect.sizeDelta = new Vector2(380, 34);
+            descRect.sizeDelta = new Vector2(320, 32);
 
             var descText = descGo.AddComponent<TextMeshProUGUI>();
-            descText.text = !string.IsNullOrEmpty(actionDesc) ? actionDesc : $"<rewiredAction name=\"{actionName}\">";
-            descText.fontSize = 16;
-            descText.color = new Color(0.85f, 0.85f, 0.88f);
+            descText.text = !string.IsNullOrEmpty(actionDesc) ? actionDesc.ToUpper() : $"<rewiredAction name=\"{actionName}\">";
+            descText.fontSize = 13;
+            descText.fontStyle = FontStyles.Bold;
+            descText.color = new Color(0.75f, 0.75f, 0.8f);
             descText.alignment = TextAlignmentOptions.Left;
         }
 

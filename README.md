@@ -178,22 +178,30 @@ See **Modal Dialog Stack** below.
 ```csharp
 using Wagenheimer.RewiredHelper.UI;
 
-ModalDialogStack.ShowDialog(myDialog, effect: ShowDialogEffect.Fade, onShow: () => { });
+// Show/Hide via code:
+ModalDialogStack.ShowDialog(myDialog);
 ModalDialogStack.CloseDialog(myDialog);
 
 bool anyOpen = ModalDialogStack.IsThereAnyVisible;
 ```
 
-- **Show/hide animation** is a built-in coroutine tween by default — no third-party dependency.
-  To use DOTween (or any other tweener) instead, subclass `ModalDialog` in your own project and
-  override `PlayFadeIn`/`PlayFadeOut`/`PlayMoveIn`/`PlayMoveOut`. Kept opt-in on purpose so the
-  package never forces a DOTween dependency on consumers who don't have it installed.
-- **Sound**: not baked in. Subscribe to `ModalDialog.AfterShow`/`AfterHide` (`UnityEvent`) or the
-  `OnShow`/`OnHide` (`Action`) hooks to play your own audio.
-- **UI blocking during animation**: subscribe to the static `ModalDialog.OnBlockUiRequested`
-  (`Action<float>`) event and forward the duration into your own `IUiBlocker`.
-- **`DefaultModalStackProvider`**: implements `IModalStackProvider` by reading
-  `ModalDialogStack.Modals` — pass it straight to `RewiredInputManager.Configure`.
+### Direct UnityEvent Wiring (No code needed)
+The `ModalDialog` component exposes public instance methods so it can be called directly from any `UnityEvent` (like `OnShowControllerHelp` or a UI button click) from the Inspector:
+- **`dialog.Show()`**: Pushes this dialog onto the active `ModalDialogStack`, triggerring the show animation.
+- **`dialog.Hide()`**: Pops this dialog from the stack, triggerring the close/hide animation.
+
+### Configurations & Advanced Effects
+You can customize transitions directly in the `ModalDialog` Inspector:
+- **`ShowEffect`**:
+  - `Fade`: Classic alpha fade transition.
+  - `Move`: Slides the dialog panel.
+  - `Scale`: Zoom-in pop transition (from `StartScale` to `1.0`).
+  - `FadeAndScale`: Combines alpha fade and zoom-in.
+  - `FadeAndMove`: Combines alpha fade and slide.
+- **`MoveDirection`**: Options to slide from `Up`, `Down`, `Left`, or `Right`. Uses the `RectTransform.anchoredPosition` for resolution-independent layouts.
+- **`StartScale`**: The initial zoom scale for scale-based effects (default: `0.5`).
+- **Timing & Audio**: Configure `ShowHideDialogTime`, or subscribe to `AfterShow`/`AfterHide` (`UnityEvent`) or `OnShow`/`OnHide` (`Action`) hooks to trigger custom audio.
+- **`DefaultModalStackProvider`**: Pass `new DefaultModalStackProvider()` straight to `RewiredInputManager.Configure` to automatically route Escape/Return keys to close the top-most active dialog.
 
 ---
 

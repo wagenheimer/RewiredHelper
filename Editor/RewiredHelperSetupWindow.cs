@@ -17,7 +17,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private static readonly string GlyphHelperTypeName = "Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper";
 
-        // Cores no estilo do CloudSaveAudit/Editor do Unity
+        // Unity Editor / CloudSaveAudit style colors
         private static Color ColBg => EditorGUIUtility.isProSkin
             ? new(0.16f, 0.16f, 0.18f) : new(0.82f, 0.82f, 0.84f);
         private static Color ColCard => EditorGUIUtility.isProSkin
@@ -46,7 +46,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private void OnGUI()
         {
-            // Banner Superior no estilo do CloudSaveAudit
+            // Top Banner
             EditorGUI.DrawRect(new Rect(0, 0, position.width, 54), ColAccent);
             GUILayout.Space(8);
             var bannerStyle = new GUIStyle(EditorStyles.boldLabel)
@@ -67,7 +67,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorGUILayout.LabelField($"{versionText}  ·  Real-time scene configuration scanner", subStyle);
             GUILayout.Space(6);
 
-            // Fundo da janela
+            // Window Background
             EditorGUI.DrawRect(new Rect(0, 54, position.width, position.height - 54), ColBg);
 
             var areaStyle = new GUIStyle { padding = new RectOffset(10, 10, 8, 8) };
@@ -86,15 +86,13 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (_ranScan)
             {
-                // Obter diagnóstico das checagens
+                // Run diagnostic checks
                 var managerComp = DefaultSetupGenerator.FindInputManagerInScene();
                 var hasManager = managerComp != null;
                 var hasHelper = hasManager && managerComp.GetComponent<RewiredInputManager>() != null;
                 var hasEventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null;
                 var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;
 
-                var isUsingTouch = RewiredInputManager.IsUsingTouch;
-                
                 int passed = 0;
                 int total = 4;
 
@@ -105,7 +103,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
                 var pct = (float)passed / total;
 
-                // Barra de progresso visual do CloudSaveAudit
+                // Visual progress bar
                 var barRect = EditorGUILayout.GetControlRect(false, 20);
                 EditorGUI.DrawRect(barRect, new Color(0.15f, 0.15f, 0.15f));
                 var color = pct >= 1f ? ColGreen : pct >= 0.5f ? ColOrange : ColRed;
@@ -156,27 +154,27 @@ namespace Wagenheimer.RewiredHelper.Editor
             // 1. Rewired Input Manager
             var managerComp = DefaultSetupGenerator.FindInputManagerInScene();
             var hasManager = managerComp != null;
-            DrawCardItem("Rewired Input Manager (Nativo)", 
-                hasManager ? "✅ Encontrado na cena ativo." : "❌ Ausente! Mapeamentos e controles não funcionarão.",
-                hasManager, "Criar Manager", () => DefaultSetupGenerator.CreateRewiredInputManager());
+            DrawCardItem("Rewired Input Manager (Native)", 
+                hasManager ? "✅ Found active in the scene." : "❌ Missing! Controller mapping and input will not work.",
+                hasManager, "Create Manager", () => DefaultSetupGenerator.CreateRewiredInputManager());
 
             // 2. Rewired Helper Component
             var hasHelper = hasManager && managerComp.GetComponent<RewiredInputManager>() != null;
             DrawCardItem("Rewired Helper (Component)",
-                hasHelper ? "✅ Componente acoplado ao manager." : "❌ Ausente no manager! O roteamento de UI/Escape não funcionará.",
-                hasHelper, "Configurar", () => DefaultSetupGenerator.CreateRewiredInputManager());
+                hasHelper ? "✅ Component attached to the manager." : "❌ Missing on manager! UI/Escape routing will not work.",
+                hasHelper, "Configure", () => DefaultSetupGenerator.CreateRewiredInputManager());
 
             // 3. Event System
             var hasEventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null;
             DrawCardItem("Rewired Event System",
-                hasEventSystem ? "✅ Event System encontrado na cena." : "❌ Ausente! Necessário para navegação física na UI com controle.",
-                hasEventSystem, "Criar Event System", () => DefaultSetupGenerator.CreateRewiredInputManager());
+                hasEventSystem ? "✅ Event System found in the scene." : "❌ Missing! Required for physical UI controller navigation.",
+                hasEventSystem, "Create Event System", () => DefaultSetupGenerator.CreateRewiredInputManager());
 
             // 4. UI Canvas
             var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;
             DrawCardItem("UI Canvas",
-                hasCanvas ? "✅ Canvas de UI encontrado." : "⚠️ Recomendado ter um Canvas para cursores customizados e modais.",
-                hasCanvas, "Criar Canvas", () => {
+                hasCanvas ? "✅ UI Canvas found." : "⚠️ Recommended to have a UI Canvas for custom cursors and modais.",
+                hasCanvas, "Create Canvas", () => {
                     var go = new GameObject("Canvas", typeof(Canvas), typeof(GraphicRaycaster));
                     var canvas = go.GetComponent<Canvas>();
                     canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -185,8 +183,8 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             // 5. Glyphs Addon
             var hasGlyphs = FindGlyphHelperType() != null;
-            DrawCardItem("Addon Oficial de Glifos do Rewired",
-                hasGlyphs ? "✅ Addon de Glifos detectado no projeto." : "⚠️ Opcional. Instale para usar ícones de controle dinâmicos em textos de UI.",
+            DrawCardItem("Rewired Official Glyphs Addon",
+                hasGlyphs ? "✅ Glyphs Addon detected in the project." : "⚠️ Optional. Install to show dynamic controller icons in UI labels.",
                 hasGlyphs, null, null, isOptional: true);
         }
 
@@ -195,7 +193,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             var color = pass ? ColGreen : (isOptional ? ColOrange : ColRed);
             var cardR = EditorGUILayout.BeginVertical();
             
-            // Desenhar Card com barra lateral colorida (estilo CloudSaveAudit)
+            // Draw Card with colored status sidebar
             EditorGUI.DrawRect(new Rect(cardR.x - 2, cardR.y - 2, cardR.width + 4, cardR.height + 4), ColCard);
             EditorGUI.DrawRect(new Rect(cardR.x - 2, cardR.y - 2, 3, cardR.height + 4), color);
             GUILayout.Space(4);
@@ -216,7 +214,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 if (GUILayout.Button(fixBtnLabel, GUILayout.Width(130), GUILayout.Height(22)))
                 {
                     fixAction.Invoke();
-                    _ranScan = true; // recarrega checagens
+                    _ranScan = true; // Reload checks
                 }
             }
             GUILayout.Space(5);
@@ -230,20 +228,35 @@ namespace Wagenheimer.RewiredHelper.Editor
         private void DrawHelpGuide()
         {
             var headerStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 13, normal = { textColor = ColAccent } };
-            GUILayout.Label("📖 Guia de Inicialização & APIs", headerStyle);
+            GUILayout.Label("📖 Initialization Guide & APIs", headerStyle);
             EditorGUILayout.Space(3);
 
             var docStyle = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = ColDim }, wordWrap = true };
             
             EditorGUILayout.LabelField("• **Bootstrap** (Awake/Start):\n" +
-                "  Configure o helper passando opcionalmente gerenciadores de cutscene/tutoriais, pilhas de modal ou permissões:\n" +
+                "  Configure the helper optionally passing cutscene managers, modal stacks, or input blockers:\n" +
                 "  `RewiredInputManager.Instance.Configure(uiBlocker, modalStack, helpGate);`", docStyle);
             
             EditorGUILayout.Space(2);
-            EditorGUILayout.LabelField("• **Uso de APIs**:\n" +
-                "  - `RewiredInputManager.IsUsingTouch`: verifica se o input atual é touch.\n" +
-                "  - `CurrentControllerType`: Mouse, Joystick (controle), ou Custom (touch).\n" +
-                "  - `OnInputTypeChanged`: evento estático de alteração de controle.", docStyle);
+            EditorGUILayout.LabelField("• **API Usage**:\n" +
+                "  - `RewiredInputManager.IsUsingTouch`: Check if current input source is touch screen.\n" +
+                "  - `RewiredInputManager.CurrentControllerType`: Mouse, Joystick (controller), or Custom (touch).\n" +
+                "  - `RewiredInputManager.OnInputTypeChanged`: Static event invoked when the active input source changes.", docStyle);
+
+            EditorGUILayout.Space(6);
+            GUILayout.Label("✨ Modal Dialog Stack System", headerStyle);
+            EditorGUILayout.Space(3);
+
+            EditorGUILayout.LabelField("• **ModalDialog Component**:\n" +
+                "  Attach `ModalDialog` to any full-screen Canvas panel. It handles overlay black backdrops, " +
+                "  smooth in/out transitions (Fade, Move, Scale, Fade & Move, Fade & Scale), and input blocking.\n" +
+                "  - Call `myDialog.Show()` or `myDialog.Hide()` (instance methods) directly from UnityEvents (like buttons or OnShowControllerHelp).\n" +
+                "  - Or use code: `ModalDialogStack.ShowDialog(myDialog);` / `ModalDialogStack.CloseDialog(myDialog);`", docStyle);
+
+            EditorGUILayout.Space(2);
+            EditorGUILayout.LabelField("• **Auto Routing (Escape / Enter)**:\n" +
+                "  Pass `new DefaultModalStackProvider()` to `RewiredInputManager.Configure()`. The system " +
+                "  will automatically wire the physical Escape and Return keys to tap the top-most active modal's Escape/OK buttons.", docStyle);
         }
 
         private void DrawFooter()

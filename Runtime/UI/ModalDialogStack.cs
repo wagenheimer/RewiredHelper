@@ -64,6 +64,32 @@ namespace Wagenheimer.RewiredHelper.UI
     }
 
     /// <summary>
+    /// Legacy alias kept for compatibility with the original Storm Tale 2 API (<c>Dialogs.ShowDialog</c>).
+    /// Forwards everything to <see cref="ModalDialogStack"/> — prefer calling that directly in new code.
+    /// </summary>
+    [Obsolete("Use ModalDialogStack instead.")]
+    public static class Dialogs
+    {
+        public static List<ModalDialog> Modals => ModalDialogStack.Modals;
+
+        public static bool IsThereAnyVisible => ModalDialogStack.IsThereAnyVisible;
+
+        public static void ShowDialog(GameObject dialog) => ModalDialogStack.ShowDialog(dialog);
+
+        public static void ShowDialog(ModalDialog dialog, float delay = 0f,
+            ShowDialogEffect effect = ShowDialogEffect.Fade, Action onShow = null) =>
+            ModalDialogStack.ShowDialog(dialog, delay, effect, onShow);
+
+        public static void CloseDialog(GameObject dialog, Action onHide = null) =>
+            ModalDialogStack.CloseDialog(dialog, onHide);
+
+        public static void CloseDialog(ModalDialog dialog, Action onHide = null) =>
+            ModalDialogStack.CloseDialog(dialog, onHide);
+
+        public static void CloseModals() => ModalDialogStack.CloseModals();
+    }
+
+    /// <summary>
     /// Ready-to-use <see cref="IModalStackProvider"/> backed by <see cref="ModalDialogStack"/>.
     /// Pass an instance to <c>RewiredInputManager.Configure(modalStack: new DefaultModalStackProvider())</c>.
     /// </summary>

@@ -9,20 +9,20 @@ using Wagenheimer.RewiredHelper;
 namespace Wagenheimer.RewiredHelper.UI
 {
     /// <summary>
-    /// Generic modal dialog stack: tracks which <see cref="ModalDialog"/>s are currently open
+    /// Generic modal dialog stack: tracks which <see cref="Dialog"/>s are currently open
     /// and drives their show/hide animation. Pair with <see cref="DefaultModalStackProvider"/>
     /// to plug this into <see cref="RewiredInputManager.Configure"/>'s <c>modalStack</c> hook so
-    /// Escape/Return prioritize the top modal's <see cref="ModalDialog.EscapeButton"/>/<see cref="ModalDialog.OkButton"/>.
+    /// Escape/Return prioritize the top modal's <see cref="Dialog.EscapeButton"/>/<see cref="Dialog.OkButton"/>.
     /// </summary>
     public static class ModalDialogStack
     {
-        public static List<ModalDialog> Modals { get; } = new();
+        public static List<Dialog> Modals { get; } = new();
 
         public static bool IsThereAnyVisible => Modals.Count > 0;
 
-        public static void ShowDialog(GameObject dialog) => ShowDialog(dialog.GetComponent<ModalDialog>());
+        public static void ShowDialog(GameObject dialog) => ShowDialog(dialog.GetComponent<Dialog>());
 
-        public static void ShowDialog(ModalDialog dialog, float delay = 0f,
+        public static void ShowDialog(Dialog dialog, float delay = 0f,
             ShowDialogEffect effect = ShowDialogEffect.Fade, Action onShow = null)
         {
             if (Modals.Contains(dialog))
@@ -35,9 +35,9 @@ namespace Wagenheimer.RewiredHelper.UI
         }
 
         public static void CloseDialog(GameObject dialog, Action onHide = null) =>
-            CloseDialog(dialog.GetComponent<ModalDialog>(), onHide);
+            CloseDialog(dialog.GetComponent<Dialog>(), onHide);
 
-        public static void CloseDialog(ModalDialog dialog, Action onHide = null)
+        public static void CloseDialog(Dialog dialog, Action onHide = null)
         {
             if (!dialog.gameObject.activeSelf) return;
 
@@ -70,20 +70,20 @@ namespace Wagenheimer.RewiredHelper.UI
     [Obsolete("Use ModalDialogStack instead.")]
     public static class Dialogs
     {
-        public static List<ModalDialog> Modals => ModalDialogStack.Modals;
+        public static List<Dialog> Modals => ModalDialogStack.Modals;
 
         public static bool IsThereAnyVisible => ModalDialogStack.IsThereAnyVisible;
 
         public static void ShowDialog(GameObject dialog) => ModalDialogStack.ShowDialog(dialog);
 
-        public static void ShowDialog(ModalDialog dialog, float delay = 0f,
+        public static void ShowDialog(Dialog dialog, float delay = 0f,
             ShowDialogEffect effect = ShowDialogEffect.Fade, Action onShow = null) =>
             ModalDialogStack.ShowDialog(dialog, delay, effect, onShow);
 
         public static void CloseDialog(GameObject dialog, Action onHide = null) =>
             ModalDialogStack.CloseDialog(dialog, onHide);
 
-        public static void CloseDialog(ModalDialog dialog, Action onHide = null) =>
+        public static void CloseDialog(Dialog dialog, Action onHide = null) =>
             ModalDialogStack.CloseDialog(dialog, onHide);
 
         public static void CloseModals() => ModalDialogStack.CloseModals();

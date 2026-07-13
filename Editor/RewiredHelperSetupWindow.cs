@@ -262,8 +262,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             GUILayout.Label("✨ Modal Dialog Stack System", headerStyle);
             EditorGUILayout.Space(3);
 
-            EditorGUILayout.LabelField("• **ModalDialog Component**:\n" +
-                "  Attach `ModalDialog` to any full-screen Canvas panel. It handles overlay black backdrops, " +
+            EditorGUILayout.LabelField("• **Dialog Component**:\n" +
+                "  Attach `Dialog` to any full-screen Canvas panel. It handles overlay black backdrops, " +
                 "  smooth in/out transitions (Fade, Move, Scale, Fade & Move, Fade & Scale), and input blocking.\n" +
                 "  - Call `myDialog.Show()` or `myDialog.Hide()` (instance methods) directly from UnityEvents (like buttons or OnShowControllerHelp).\n" +
                 "  - Or use code: `ModalDialogStack.ShowDialog(myDialog);` / `ModalDialogStack.CloseDialog(myDialog);`", docStyle);

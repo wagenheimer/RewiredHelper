@@ -34,7 +34,7 @@ namespace Wagenheimer.RewiredHelper.UI
     /// (e.g. OnShowControllerHelp) without requiring custom scripts.
     /// </summary>
     [RequireComponent(typeof(CanvasGroup))]
-    public class ModalDialog : MonoBehaviour
+    public class Dialog : MonoBehaviour
     {
         [Header("Overlay")]
         public Image Black;

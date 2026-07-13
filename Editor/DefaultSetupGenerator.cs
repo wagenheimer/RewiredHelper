@@ -253,8 +253,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             var bgOverlay = formGo.GetComponent<Image>();
             bgOverlay.color = new Color(0f, 0f, 0f, 0.6f); // Semi-transparent black backdrop overlay
 
-            // Add ModalDialog component from the package
-            var modalDialog = formGo.AddComponent<Wagenheimer.RewiredHelper.UI.ModalDialog>();
+            // Add Dialog component from the package
+            var modalDialog = formGo.AddComponent<Wagenheimer.RewiredHelper.UI.Dialog>();
             modalDialog.Black = bgOverlay;
             modalDialog.BlackAlpha = 0.6f;
             modalDialog.ShowEffect = Wagenheimer.RewiredHelper.UI.ShowDialogEffect.Fade;

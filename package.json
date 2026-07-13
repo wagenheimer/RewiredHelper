@@ -1,6 +1,6 @@
 {
   "name": "com.wagenheimer.rewiredhelper",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "displayName": "Rewired Helper",
   "description": "Input-type detection and UI helper layer on top of Rewired: tracks mouse/touch/controller state, drives cursor visibility, routes Escape/Return to the right UI target, and exposes optional hooks (IUiBlocker, IModalStackProvider, IControllerHelpGate) so any game can wire it in without hard dependencies. Includes a ready-to-use modal dialog stack (ModalDialog/ModalDialogStack).",
   "unity": "2021.3",

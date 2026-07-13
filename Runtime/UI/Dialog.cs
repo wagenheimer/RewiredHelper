@@ -30,7 +30,7 @@ namespace Wagenheimer.RewiredHelper.UI
     /// A modal dialog panel: overlay ("Black") + show/hide animation + optional
     /// Escape/OK button wiring for <see cref="ModalDialogStack"/>/<see cref="DefaultModalStackProvider"/>.
     ///
-    /// Exposes public Show() and Hide() methods so it can be wired directly in UnityEvents 
+    /// Exposes public Show() and Hide() methods so it can be wired directly in UnityEvents
     /// (e.g. OnShowControllerHelp) without requiring custom scripts.
     /// </summary>
     [RequireComponent(typeof(CanvasGroup))]
@@ -145,8 +145,18 @@ namespace Wagenheimer.RewiredHelper.UI
             OnShow?.Invoke();
 
             FadeInSpriteRenderers(delay);
-            FadeOverlay(Black, 0, BlackAlpha, FadeBlackTime, delay);
-            FadeOverlay(Black2, 0, BlackAlpha, FadeBlackTime, delay);
+
+            // Para efeitos que movem/escalam o painel (Move, Scale), o Black some (alpha 0) e só
+            // começa a aparecer com um fade rápido assim que a animação de entrada terminar —
+            // evita o overlay encolher/deslizar junto com o painel.
+            bool overlayWaitsForTransform = ShowEffect == ShowDialogEffect.Move || ShowEffect == ShowDialogEffect.Scale;
+            float overlayDelay = delay + (overlayWaitsForTransform ? ShowHideDialogTime : 0f);
+            float overlayDuration = overlayWaitsForTransform ? Mathf.Min(FadeBlackTime, 0.1f) : FadeBlackTime;
+
+            SetOverlayAlphaImmediate(Black, 0);
+            SetOverlayAlphaImmediate(Black2, 0);
+            FadeOverlay(Black, 0, BlackAlpha, overlayDuration, overlayDelay);
+            FadeOverlay(Black2, 0, BlackAlpha, overlayDuration, overlayDelay);
 
             if (_activeTween != null) StopCoroutine(_activeTween);
 
@@ -221,6 +231,14 @@ namespace Wagenheimer.RewiredHelper.UI
 
             foreach (var tmp in _childTextMeshPro.Where(tmp => tmp != null))
                 StartCoroutine(FadeTmpRoutine(tmp, 0, ShowHideDialogTime, FadeBlackTime));
+        }
+
+        private void SetOverlayAlphaImmediate(Image overlay, float alpha)
+        {
+            if (overlay == null) return;
+            overlay.enabled = alpha > 0f;
+            var c = overlay.color;
+            overlay.color = new Color(c.r, c.g, c.b, alpha);
         }
 
         private void FadeOverlay(Image overlay, float from, float to, float duration, float delay)
@@ -303,7 +321,7 @@ namespace Wagenheimer.RewiredHelper.UI
                 _canvasGroup.alpha = 1 - Mathf.SmoothStep(0, 1, t / ShowHideDialogTime);
                 yield return null;
             }
-            _canvasGroup.alpha = 1;
+            _canvasGroup.alpha = 0;
             onComplete?.Invoke();
         }
 
@@ -381,7 +399,7 @@ namespace Wagenheimer.RewiredHelper.UI
             {
                 t += Time.deltaTime;
                 float p = Mathf.SmoothStep(0, 1, t / ShowHideDialogTime);
-                
+
                 if (_rectTransform != null)
                     _rectTransform.anchoredPosition = Vector2.Lerp(_originalAnchoredPosition + offset, _originalAnchoredPosition, p);
                 else

@@ -67,6 +67,12 @@ namespace Wagenheimer.RewiredHelper.Editor
                 EditorGUILayout.PropertyField(_black, new GUIContent("Black", "Primary backdrop image faded in behind the dialog."));
                 EditorGUILayout.PropertyField(_black2, new GUIContent("Black 2", "Optional secondary backdrop, faded in sync with Black."));
                 EditorGUILayout.Slider(_blackAlpha, 0f, 1f, new GUIContent("Black Alpha", "Target opacity of the backdrop overlay while the dialog is open."));
+
+                var effect = (ShowDialogEffect)_showEffect.enumValueIndex;
+                if (effect == ShowDialogEffect.Move || effect == ShowDialogEffect.Scale)
+                {
+                    DrawHintBox("Move/Scale: the overlay stays invisible during the panel animation and fades in quickly right after it finishes.");
+                }
             });
 
             DrawGroup("Modal Buttons", "🔘", ColButtons, () =>

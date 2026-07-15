@@ -71,8 +71,17 @@ substitute it.
 
 ## Quick Start
 
-1. Create an empty GameObject (e.g. `RewiredHelper`) and add `RewiredInputManager` to it.
-2. Call `Configure()` once at startup (see `Samples~/DefaultSetup` for a minimal bootstrap):
+### Code-Free / Auto-Configuration (Recommended)
+
+By default, `RewiredInputManager` has **Auto Configure On Start** and **Use Default Modal Stack** enabled in the Inspector. This means you do not need to write any bootstrapping code! 
+
+1. Add `RewiredInputManager` to a GameObject in your scene.
+2. Assign the `GameCursor` image under *Cursor & Visuals*.
+3. The manager will configure itself on `Start()`.
+
+### Manual Bootstrap / Advanced Setup
+
+If you want to manually configure the manager (e.g., to disable auto-configuration or pass custom stack/blocker providers), uncheck **Auto Configure On Start** and call `Configure()` in `Awake()`:
 
 ```csharp
 using UnityEngine;
@@ -94,6 +103,17 @@ public class GameBootstrap : MonoBehaviour
 3. Assign `GameCursor` (an `Image`) in the Inspector if you use a custom on-screen cursor.
 4. Add `EscapeButton` to any button that should react to Escape, and/or `ReturnEscapeEvent` to
    any panel that should react to Return — see below.
+
+---
+
+## Diagnostics & Premium Inspectors
+
+Rewired Helper features professional, color-coded custom inspectors to speed up your workflow:
+
+- **Scene Diagnostics Window** (**Tools → Wagenheimer → Rewired Helper → Setup Checker & Help**): A real-time scene scanner that validates your setup (detects missing managers, event systems, canvases, game cursors, or glyph addons) and offers **one-click quick-fixes** to generate and auto-wire components.
+- **One-Click Setup Generators**: Directly from the `RewiredInputManager` inspector, you can generate a default Pause Screen or a Controller Help Form.
+- **Player Mouse Auto-Configuration**: The diagnostics window can automatically configure Rewired's Player Mouse settings for joystick cursor movement.
+- **Dialog Inspector**: Features color-coded grouping for Transition Effects, slide directions, timing, and UnityEvents.
 
 ---
 
@@ -183,6 +203,15 @@ ModalDialogStack.ShowDialog(myDialog);
 ModalDialogStack.CloseDialog(myDialog);
 
 bool anyOpen = ModalDialogStack.IsThereAnyVisible;
+```
+
+### Static Alias (`Dialogs`)
+For cleaner code, you can use the static `Dialogs` class as an alias to show and close dialogs:
+```csharp
+using Wagenheimer.RewiredHelper.UI;
+
+Dialogs.ShowDialog(myDialog);
+Dialogs.CloseDialog(myDialog);
 ```
 
 ### Direct UnityEvent Wiring (No code needed)

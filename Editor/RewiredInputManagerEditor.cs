@@ -67,25 +67,29 @@ namespace Wagenheimer.RewiredHelper.Editor
             }, ColAccent);
 
             // 2. Pause & Steam Overlay
-            var steamProp = serializedObject.FindProperty("IsSteamOverlayActive");
             DrawSettingsGroup("Pause & Steam Overlay", "🎮", new[] {
                 serializedObject.FindProperty("GamePaused"),
-                serializedObject.FindProperty("PauseOnSteamOverlay"),
-                steamProp
+                serializedObject.FindProperty("PauseOnSteamOverlay")
             }, new[] {
                 new GUIContent("Game Paused", "GameObject toggled when the game pauses."),
-                new GUIContent("Pause On Steam Overlay", "Automatically pauses the game when Steam overlay opens."),
-                new GUIContent("Is Steam Overlay Active", "Indicates if the Steam overlay is currently active.")
+                new GUIContent("Pause On Steam Overlay", "Automatically pauses the game when Steam overlay opens.")
             }, ColAccent);
 
             // 3. Controller Help Events
             DrawSettingsGroup("Controller Help", "❔", new[] {
-                serializedObject.FindProperty("alreadyShowedControllerHelp"),
                 serializedObject.FindProperty("OnShowControllerHelp")
             }, new[] {
-                new GUIContent("Already Showed Help", "Tracks if the player was already shown the controller help form."),
                 new GUIContent("On Show Controller Help", "Event triggered once the first time physical controller input is detected.")
             }, ColAccent);
+
+            // 4. Runtime Status & State
+            DrawSettingsGroup("Runtime Status & State", "⚙️", new[] {
+                serializedObject.FindProperty("alreadyShowedControllerHelp"),
+                serializedObject.FindProperty("IsSteamOverlayActive")
+            }, new[] {
+                new GUIContent("Already Showed Help", "Tracks if the player was already shown the controller help form."),
+                new GUIContent("Is Steam Overlay Active", "Indicates if the Steam overlay is currently active.")
+            }, ColDim);
 
             serializedObject.ApplyModifiedProperties();
 
@@ -368,8 +372,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             {
                 if (properties[i] != null)
                 {
-                    // Disable editing for IsSteamOverlayActive
-                    if (properties[i].name == "IsSteamOverlayActive")
+                    // Disable editing for runtime status variables
+                    if (properties[i].name == "IsSteamOverlayActive" || properties[i].name == "alreadyShowedControllerHelp")
                     {
                         GUI.enabled = false;
                         EditorGUILayout.PropertyField(properties[i], labels[i]);
@@ -410,15 +414,22 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
             else if (title == "Controller Help")
             {
-                EditorGUILayout.Space(2);
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.Space(15);
-                if (GUILayout.Button("🛠️  Generate Help Form & Wire Event", GUILayout.Height(20)))
+                var eventProp = properties[0]; // OnShowControllerHelp is the first property in this group now
+                var callsProp = eventProp?.FindPropertyRelative("m_PersistentCalls.m_Calls");
+                bool hasListeners = callsProp != null && callsProp.arraySize > 0;
+                
+                if (!hasListeners)
                 {
-                    DefaultSetupGenerator.CreateControllerHelpFormAndWire((RewiredInputManager)serializedObject.targetObject);
+                    EditorGUILayout.Space(2);
+                    EditorGUILayout.BeginHorizontal();
+                    GUILayout.Space(15);
+                    if (GUILayout.Button("🛠️  Generate Help Form & Wire Event", GUILayout.Height(20)))
+                    {
+                        DefaultSetupGenerator.CreateControllerHelpFormAndWire((RewiredInputManager)serializedObject.targetObject);
+                    }
+                    GUILayout.Space(5);
+                    EditorGUILayout.EndHorizontal();
                 }
-                GUILayout.Space(5);
-                EditorGUILayout.EndHorizontal();
             }
 
             GUILayout.Space(5);

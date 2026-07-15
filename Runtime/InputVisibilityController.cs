@@ -19,14 +19,14 @@ namespace Wagenheimer.RewiredHelper
             AlwaysHide
         }
 
-        [Header("Configuração")]
-        [Tooltip("Comportamento de visibilidade baseado no tipo de input")]
+        [Header("Configuration")]
+        [Tooltip("Visibility behavior based on the input type")]
         [SerializeField] private VisibilityMode _visibilityMode = VisibilityMode.HideOnTouchShowOtherwise;
 
-        [Tooltip("Atualizar no Start")]
+        [Tooltip("Update on Start")]
         [SerializeField] private bool _shouldUpdateOnStart = true;
 
-        [Header("Eventos")]
+        [Header("Events")]
         [SerializeField] private UnityEvent<bool> _onVisibilityChanged;
 
         private void Awake() => RewiredInputManager.RegisterVisibilityController(this);

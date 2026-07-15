@@ -15,12 +15,12 @@ namespace Wagenheimer.RewiredHelper
     [MovedFrom(true, sourceClassName: "EscapeButton")]
     public class EscapeButton : MonoBehaviour
     {
-        [Header("Configuração de Evento")]
-        [Tooltip("Evento personalizado disparado em vez do onClick do Button")]
+        [Header("Event Configuration")]
+        [Tooltip("Custom event triggered instead of the Button's onClick")]
         public UnityEvent UnityEvent;
 
         [Range(0, 1000)]
-        [Tooltip("Prioridade do botão de escape (valores mais altos são acionados primeiro)")]
+        [Tooltip("Escape button priority (higher values are triggered first)")]
         public int Priority = 1;
 
         public static List<EscapeButton> ScapeButtonsList { get; private set; } = new List<EscapeButton>();
@@ -52,7 +52,7 @@ namespace Wagenheimer.RewiredHelper
             return false;
         }
 
-        [ContextMenu("Disparar Evento de Depuração")]
+        [ContextMenu("Trigger Debug Event")]
         private void DebugTriggerEvent()
         {
             UnityEvent?.Invoke();

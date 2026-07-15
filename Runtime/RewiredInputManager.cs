@@ -32,25 +32,25 @@ namespace Wagenheimer.RewiredHelper
         #endregion
 
         #region Public Properties
-        [Tooltip("Referência ao jogador do Rewired")]
+        [Tooltip("Reference to the Rewired player")]
         public Rewired.Player Player { get; private set; }
 
-        [Tooltip("Referência ao cursor customizado do jogo")]
+        [Tooltip("Reference to the custom game cursor")]
         public Image GameCursor;
 
-        [Tooltip("GameObject exibido/ocultado ao pausar o jogo (opcional)")]
+        [Tooltip("GameObject shown/hidden when pausing the game (optional)")]
         public GameObject GamePaused;
 
-        [Tooltip("Se verdadeiro, o overlay do Steam pausa o jogo automaticamente")]
+        [Tooltip("If true, the Steam overlay pauses the game automatically")]
         public bool PauseOnSteamOverlay = true;
 
-        /// <summary>Indica se o cursor customizado pode ser exibido.</summary>
+        /// <summary>Indicates whether the custom cursor can be displayed.</summary>
         public static bool CanShowCustomCursor { get; private set; }
 
-        [Tooltip("Habilita/desabilita o cursor customizado standalone. Também pode ser definido em runtime pelo save data do host (ex.: instance.CustomCursorEnabled = save.CustomCursor).")]
+        [Tooltip("Enables/disables the custom cursor for standalone builds. Can also be set at runtime by host save data.")]
         public bool CustomCursorEnabled;
 
-        [Tooltip("Textura usada pelo cursor customizado quando Custom Cursor Enabled está marcado. Pode ser atribuída aqui ou em runtime (ex.: instance.CursorTexture = MyConfig.cursorTexture).")]
+        [Tooltip("Texture used by the custom cursor when Custom Cursor Enabled is checked. Can be assigned here or at runtime.")]
         public Texture2D CursorTexture;
 
         [SerializeField]
@@ -58,20 +58,20 @@ namespace Wagenheimer.RewiredHelper
 
         public bool IsSteamOverlayActive = false;
 
-        [Tooltip("Posição atual do mouse no sistema Rewired")]
+        [Tooltip("Current mouse position in the Rewired system")]
         public static Vector3 RewiredMousePosition { get; private set; }
 
         public static event Action<bool> OnInputTypeChanged;
 
-        /// <summary>Disparado quando o tipo de input/controle muda, para quem precisa re-especializar UI (ex.: localização).</summary>
+        /// <summary>Triggered when the input/controller type changes, for components that need to re-specialize UI (e.g. localization).</summary>
         public static event Action OnInputSpecializationChanged;
 
-        [Tooltip("Segundos desde o último movimento do mouse ou toque.")]
+        [Tooltip("Seconds since the last mouse movement or touch.")]
         public static float SecondsSinceLastMouseOrTouchMove { get; private set; }
 
         public static bool IsUsingTouch => Instance != null && Instance._isUsingTouch;
 
-        /// <summary>Invocado ao invés de abrir um diálogo de ajuda do controle diretamente — o jogo decide o que mostrar.</summary>
+        /// <summary>Invoked instead of opening a controller help dialog directly — the game decides what to show.</summary>
         public UnityEvent OnShowControllerHelp;
 
         [Tooltip("If enabled, the manager will automatically configure itself on Start, using default providers.")]
@@ -80,7 +80,7 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("If AutoConfigureOnStart is enabled, this controls whether the default ModalDialogStack provider is used.")]
         public bool UseDefaultModalStack = true;
 
-        /// <summary>Indica se o Configure() foi chamado com sucesso.</summary>
+        /// <summary>Indicates whether Configure() was successfully called.</summary>
         public bool IsConfigured { get; private set; }
         #endregion
 
@@ -111,8 +111,8 @@ namespace Wagenheimer.RewiredHelper
         #endregion
 
         #region Properties
-        [Tooltip("Controla o último dispositivo de entrada ativo")]
-        public Controller UltimoControleAtivo
+        [Tooltip("Tracks the last active input device")]
+        public Controller LastActiveController
         {
             get => lastActiveController;
             private set
@@ -139,12 +139,13 @@ namespace Wagenheimer.RewiredHelper
         {
             get
             {
-                if (IsConsole && _controllerWasDisconnected && Time.time - _controllerDisconnectedTime < 5f)
-                    return _lastKnownControllerType;
+                if (Instance == null)
+                    return ControllerType.Joystick;
 
-                if (_isUsingTouch) return ControllerType.Custom;
+                if (IsUsingTouch)
+                    return ControllerType.Custom;
 
-                return UltimoControleAtivo?.type ?? _lastKnownControllerType;
+                return LastActiveController?.type ?? _lastKnownControllerType;
             }
         }
         #endregion
@@ -233,7 +234,7 @@ namespace Wagenheimer.RewiredHelper
             if (currentController != null && currentController.type == ControllerType.Joystick)
             {
                 _controllerWasDisconnected = false;
-                UltimoControleAtivo = currentController;
+                LastActiveController = currentController;
                 _lastKnownControllerType = currentController.type;
             }
         }
@@ -378,7 +379,7 @@ namespace Wagenheimer.RewiredHelper
 
             if (_isUsingTouch)
             {
-                if (!IsConsole) UltimoControleAtivo = null;
+                if (!IsConsole) LastActiveController = null;
                 UpdateUIForInputType();
             }
             else
@@ -386,11 +387,11 @@ namespace Wagenheimer.RewiredHelper
                 var currentController = Player.controllers.GetLastActiveController();
 
                 if (currentController != null || !_controllerWasDisconnected)
-                    UltimoControleAtivo = currentController;
+                    LastActiveController = currentController;
 
                 _isUsingTouch = false;
 
-                if (UltimoControleAtivo != null || _controllerWasDisconnected)
+                if (LastActiveController != null || _controllerWasDisconnected)
                     HandleControllerType();
                 else
                     DisableAllCursors();
@@ -439,8 +440,11 @@ namespace Wagenheimer.RewiredHelper
                 ShowControllerHelpIfPossible();
 
             if (GameCursor != null)
-                GameCursor.enabled = CurrentControllerType == ControllerType.Joystick ||
-                                     CanActivateAndroidCursor(UltimoControleAtivo);
+            {
+                bool isAndroidMobile = Application.platform == RuntimePlatform.Android;
+                bool enableCursor = isAndroidMobile && CanActivateAndroidCursor(LastActiveController);
+                GameCursor.enabled = CurrentControllerType == ControllerType.Joystick || enableCursor;
+            }
             Cursor.visible = false;
             CanShowCustomCursor = false;
         }
@@ -521,9 +525,8 @@ namespace Wagenheimer.RewiredHelper
             if (args.controller.type == ControllerType.Joystick)
             {
                 _controllerWasDisconnected = false;
+                LastActiveController = args.controller;
                 _lastKnownControllerType = args.controller.type;
-                UltimoControleAtivo = args.controller;
-
                 OnLastActiveControllerChanged();
                 UpdateUIForInputType();
             }

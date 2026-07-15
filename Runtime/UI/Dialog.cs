@@ -83,7 +83,7 @@ namespace Wagenheimer.RewiredHelper.UI
         protected CanvasGroup _canvasGroup;
         private Coroutine _activeTween;
 
-        // Guarda as posições originais para resetar após animações
+        // Stores original positions to reset after animations
         private Vector3 _originalLocalScale;
         private Vector2 _originalAnchoredPosition;
         private RectTransform _rectTransform;
@@ -110,8 +110,8 @@ namespace Wagenheimer.RewiredHelper.UI
         }
 
         /// <summary>
-        /// Exibe este diálogo colocando-o na pilha de modais ativa (ModalDialogStack).
-        /// Pode ser chamado diretamente de UnityEvents do Inspetor.
+        /// Shows this dialog, placing it on the active modal stack (ModalDialogStack).
+        /// Can be called directly from Inspector UnityEvents.
         /// </summary>
         public void Show()
         {
@@ -119,8 +119,8 @@ namespace Wagenheimer.RewiredHelper.UI
         }
 
         /// <summary>
-        /// Fecha este diálogo removendo-o da pilha de modais ativa (ModalDialogStack).
-        /// Pode ser chamado diretamente de UnityEvents do Inspetor.
+        /// Closes this dialog, removing it from the active modal stack (ModalDialogStack).
+        /// Can be called directly from Inspector UnityEvents.
         /// </summary>
         public void Hide()
         {
@@ -146,9 +146,9 @@ namespace Wagenheimer.RewiredHelper.UI
 
             FadeInSpriteRenderers(delay);
 
-            // Para efeitos que movem/escalam o painel (Move, Scale), o Black some (alpha 0) e só
-            // começa a aparecer com um fade rápido assim que a animação de entrada terminar —
-            // evita o overlay encolher/deslizar junto com o painel.
+            // For effects that move/scale the panel (Move, Scale), the Black overlay is hidden (alpha 0) and only
+            // begins to appear with a quick fade once the entry animation completes —
+            // prevents the overlay from shrinking/sliding along with the panel.
             bool overlayWaitsForTransform = ShowEffect == ShowDialogEffect.Move || ShowEffect == ShowDialogEffect.Scale;
             float overlayDelay = delay + (overlayWaitsForTransform ? ShowHideDialogTime : 0f);
             float overlayDuration = overlayWaitsForTransform ? Mathf.Min(FadeBlackTime, 0.1f) : FadeBlackTime;

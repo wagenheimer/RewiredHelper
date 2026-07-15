@@ -36,14 +36,14 @@ namespace Wagenheimer.RewiredHelper.Editor
             string repoUrl, string gitUrl, string releaseNotes, string skipPrefKey)
         {
             var window = CreateInstance<UpdateAvailableWindow>();
-            window.titleContent = new GUIContent($"{packageDisplayName} — Atualização");
+            window.titleContent = new GUIContent($"{packageDisplayName} — Update");
             window._packageDisplayName = packageDisplayName;
             window._currentVersion = currentVersion;
             window._latestVersion = latestVersion;
             window._repoUrl = repoUrl;
             window._gitUrl = gitUrl;
             window._releaseNotes = string.IsNullOrEmpty(releaseNotes)
-                ? "Sem notas de versão disponíveis — veja o changelog completo no GitHub."
+                ? "No release notes available — see the full changelog on GitHub."
                 : releaseNotes;
             window._skipPrefKey = skipPrefKey;
 
@@ -111,7 +111,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             GUI.DrawTexture(headerRect, _headerTex);
             var innerHeader = new Rect(headerRect.x + 16, headerRect.y + 8, headerRect.width - 32, headerRect.height - 12);
             GUI.BeginGroup(innerHeader);
-            GUI.Label(new Rect(0, 0, innerHeader.width, 20), "Nova versão disponível", _headerTitleStyle);
+            GUI.Label(new Rect(0, 0, innerHeader.width, 20), "New version available", _headerTitleStyle);
             GUI.Label(new Rect(0, 20, innerHeader.width, 16), _packageDisplayName, _headerSubtitleStyle);
             GUI.EndGroup();
 
@@ -131,7 +131,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             GUILayout.BeginHorizontal();
             GUILayout.Space(12);
-            GUILayout.Label("Novidades desta versão", EditorStyles.boldLabel);
+            GUILayout.Label("What's new in this version", EditorStyles.boldLabel);
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
 
@@ -160,12 +160,12 @@ namespace Wagenheimer.RewiredHelper.Editor
                 GUI.backgroundColor = AccentColor;
                 using (new EditorGUI.DisabledScope(_updating))
                 {
-                    if (GUILayout.Button(_updating ? "Atualizando…" : "Atualizar Agora", _primaryButtonStyle, GUILayout.Height(30), GUILayout.MinWidth(140)))
+                    if (GUILayout.Button(_updating ? "Updating..." : "Update Now", _primaryButtonStyle, GUILayout.Height(30), GUILayout.MinWidth(140)))
                         StartUpdate();
                 }
                 GUI.backgroundColor = prevColor;
 
-                if (GUILayout.Button("Ver Changelog", GUILayout.Height(30)))
+                if (GUILayout.Button("View Changelog", GUILayout.Height(30)))
                     Application.OpenURL($"{_repoUrl}/blob/{RepoBranch}/CHANGELOG.md");
                 GUILayout.Space(10);
             }
@@ -174,10 +174,10 @@ namespace Wagenheimer.RewiredHelper.Editor
             using (new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.Space(10);
-                if (GUILayout.Button("Lembrar depois", EditorStyles.miniButton))
+                if (GUILayout.Button("Remind me later", EditorStyles.miniButton))
                     Close();
 
-                if (GUILayout.Button("Ignorar esta versão", EditorStyles.miniButton))
+                if (GUILayout.Button("Skip this version", EditorStyles.miniButton))
                 {
                     EditorPrefs.SetString(_skipPrefKey, _latestVersion);
                     Close();
@@ -221,13 +221,13 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (_addRequest.Status == StatusCode.Success)
             {
-                Debug.Log($"[{_packageDisplayName}] Atualizado para a versão {_addRequest.Result.version}.");
+                Debug.Log($"[{_packageDisplayName}] Updated to version {_addRequest.Result.version}.");
                 Close();
             }
             else
             {
-                _updateError = _addRequest.Error?.message ?? "Falha desconhecida ao atualizar.";
-                Debug.LogError($"[{_packageDisplayName}] Falha ao atualizar: {_updateError}");
+                _updateError = _addRequest.Error?.message ?? "Unknown update failure.";
+                Debug.LogError($"[{_packageDisplayName}] Failed to update: {_updateError}");
                 Repaint();
             }
         }

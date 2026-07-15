@@ -19,9 +19,9 @@ namespace I2.Loc
             if (IsConsolePlatform())
                 return "Controller";
 
-            if (RewiredInputManager.Instance != null && RewiredInputManager.Instance.UltimoControleAtivo != null)
+            if (RewiredInputManager.Instance != null && RewiredInputManager.Instance.LastActiveController != null)
             {
-                return RewiredInputManager.Instance.UltimoControleAtivo.type switch
+                return RewiredInputManager.Instance.LastActiveController.type switch
                 {
                     ControllerType.Mouse => "PC",
                     ControllerType.Joystick => "Controller",

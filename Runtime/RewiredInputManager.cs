@@ -47,11 +47,11 @@ namespace Wagenheimer.RewiredHelper
         /// <summary>Indica se o cursor customizado pode ser exibido.</summary>
         public static bool CanShowCustomCursor { get; private set; }
 
-        /// <summary>Habilita/desabilita o cursor customizado do jogo (definido pelo save data do host).</summary>
-        public bool CustomCursorEnabled { get; set; }
+        [Tooltip("Habilita/desabilita o cursor customizado standalone. Também pode ser definido em runtime pelo save data do host (ex.: instance.CustomCursorEnabled = save.CustomCursor).")]
+        public bool CustomCursorEnabled;
 
-        /// <summary>Textura usada pelo cursor customizado quando <see cref="CustomCursorEnabled"/> é verdadeiro.</summary>
-        public Texture2D CursorTexture { get; set; }
+        [Tooltip("Textura usada pelo cursor customizado quando Custom Cursor Enabled está marcado. Pode ser atribuída aqui ou em runtime (ex.: instance.CursorTexture = MyConfig.cursorTexture).")]
+        public Texture2D CursorTexture;
 
         [SerializeField]
         private bool alreadyShowedControllerHelp;

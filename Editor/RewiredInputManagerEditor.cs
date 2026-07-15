@@ -57,9 +57,13 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             // 1. Cursor & Visuals Settings
             DrawSettingsGroup("Cursor & Visuals", "🖱️", new[] {
-                serializedObject.FindProperty("GameCursor")
+                serializedObject.FindProperty("GameCursor"),
+                serializedObject.FindProperty("CustomCursorEnabled"),
+                serializedObject.FindProperty("CursorTexture")
             }, new[] {
-                new GUIContent("Game Cursor", "UI Image used to render the custom in-game cursor.")
+                new GUIContent("Game Cursor", "UI Image used to render the custom in-game cursor."),
+                new GUIContent("Custom Cursor Enabled", "Enables the standalone OS cursor (Cursor.SetCursor) using Cursor Texture below. Can also be toggled at runtime from your save data."),
+                new GUIContent("Cursor Texture", "Texture used by the standalone custom cursor when Custom Cursor Enabled is checked.")
             }, ColAccent);
 
             // 2. Pause & Steam Overlay
@@ -262,25 +266,25 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private void DrawWarningBox(string msg)
         {
-            DrawStatusBox(msg, ColOrange, "⚠️  Warning");
+            DrawStatusBox(msg, ColOrange, "⚠️", "Warning");
         }
 
         private void DrawHintBox(string msg)
         {
-            DrawStatusBox(msg, ColDim, "💡  Info");
+            DrawStatusBox(msg, ColDim, "💡", "Info");
         }
 
         private void DrawErrorBox(string msg)
         {
-            DrawStatusBox(msg, ColRed, "❌  Error");
+            DrawStatusBox(msg, ColRed, "❌", "Error");
         }
 
         private void DrawSuccessBox(string msg)
         {
-            DrawStatusBox(msg, ColGreen, "✅  Success");
+            DrawStatusBox(msg, ColGreen, "✅", "Success");
         }
 
-        private void DrawStatusBox(string msg, Color statusColor, string tag)
+        private void DrawStatusBox(string msg, Color statusColor, string icon, string tag)
         {
             var r = EditorGUILayout.BeginVertical();
             EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), ColCard);
@@ -289,11 +293,21 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(10);
-            
-            var style = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = ColDim }, wordWrap = true };
-            GUILayout.Label($"<b>{tag}:</b> {msg}", style);
-            
+
+            var titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 11, normal = { textColor = statusColor } };
+            GUILayout.Label($"{icon}  {tag}", titleStyle, GUILayout.ExpandWidth(false));
+
             EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(10);
+
+            var msgStyle = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = ColDim }, wordWrap = true };
+            EditorGUILayout.LabelField(msg, msgStyle);
+
+            GUILayout.Space(5);
+            EditorGUILayout.EndHorizontal();
+
             GUILayout.Space(4);
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(4);

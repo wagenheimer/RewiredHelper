@@ -207,8 +207,10 @@ You can customize transitions directly in the `Dialog` Inspector:
 
 ## Custom Cursor
 
-Set `CustomCursorEnabled` and `CursorTexture` from your own save data/settings — the manager
-swaps the OS cursor on standalone builds when the active device is a mouse:
+Both fields are exposed in the Inspector under **Cursor & Visuals**, so you can assign a default
+`Cursor Texture` and toggle `Custom Cursor Enabled` at design time. They can also be set from your
+own save data/settings at runtime — the manager swaps the OS cursor on standalone builds when the
+active device is a mouse:
 
 ```csharp
 _input.CustomCursorEnabled = MySaveData.CustomCursor;

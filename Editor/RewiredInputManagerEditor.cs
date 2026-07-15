@@ -189,6 +189,9 @@ namespace Wagenheimer.RewiredHelper.Editor
                 DrawWarningBox("Standalone Custom Cursor is enabled, but no Cursor Texture has been assigned!");
             }
 
+            // 4b. Verify Player Mouse (drives the cursor from joystick/controller input)
+            DrawPlayerMouseCheck(manager);
+
             // 5. Verify Runtime Initialization
             if (EditorApplication.isPlaying)
             {
@@ -214,6 +217,45 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
 
             EditorGUILayout.Space(10);
+        }
+
+        /// <summary>
+        /// Checks for Rewired's own Rewired.Components.PlayerMouse — the component that actually
+        /// drives cursor/pointer movement from controller input. Only offers the specific action
+        /// that's actually missing (create it, or bind its Movement axes) instead of re-offering
+        /// to recreate something that already exists.
+        /// </summary>
+        private void DrawPlayerMouseCheck(RewiredInputManager manager)
+        {
+            var playerMouseType = DefaultSetupGenerator.FindPlayerMouseType();
+            var playerMouseComp = DefaultSetupGenerator.FindPlayerMouseInScene(playerMouseType);
+
+            if (playerMouseComp == null)
+            {
+                DrawCheckResult("Player Mouse (Joystick Cursor Movement)", false,
+                    "Rewired's Player Mouse component drives the OS/UI pointer from controller input. Without it, the cursor shows for a joystick but never moves.",
+                    "Create Player Mouse", () => DefaultSetupGenerator.CreatePlayerMouseAndWire(manager));
+                return;
+            }
+
+            var pmSerialized = new SerializedObject(playerMouseComp);
+            var configuredElements = DefaultSetupGenerator.CountConfiguredMouseElements(pmSerialized);
+
+            if (configuredElements == 0)
+            {
+                DrawCheckResult("Player Mouse — Movement Elements", false,
+                    "Player Mouse exists but its Elements list has no axis bound to it, so controller input never reaches it and the cursor stays fixed.",
+                    "Auto-Configure Elements", () => DefaultSetupGenerator.ConfigureMouseMovementElements(playerMouseComp));
+            }
+            else if (configuredElements > 0)
+            {
+                DrawCheckResult("Player Mouse (Joystick Cursor Movement)", true, null, null, null);
+            }
+            else
+            {
+                // -1: couldn't read the Elements field (different Rewired version) — don't claim a false failure.
+                DrawHintBox("Player Mouse detected, but its Elements list couldn't be inspected automatically — verify manually that a horizontal/vertical axis is bound.");
+            }
         }
 
         private void DrawCheckResult(string title, bool pass, string missingDesc, string fixBtnText, Action fixAction)

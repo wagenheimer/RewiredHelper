@@ -193,6 +193,147 @@ namespace Wagenheimer.RewiredHelper.Editor
             Debug.Log("[RewiredHelper] Created custom Game Cursor UI Image (raycastTarget=false) and linked to GameCursor field.");
         }
 
+        const string PlayerMouseTypeName = "Rewired.Components.PlayerMouse";
+
+        internal static Type FindPlayerMouseType()
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(PlayerMouseTypeName);
+                if (type != null) return type;
+            }
+            return null;
+        }
+
+        internal static Component FindPlayerMouseInScene(Type playerMouseType)
+        {
+            return playerMouseType != null ? UnityEngine.Object.FindObjectOfType(playerMouseType) as Component : null;
+        }
+
+        /// <summary>
+        /// Counts axis elements actually bound to a Rewired action inside PlayerMouse's Elements
+        /// list (private serialized field "_elements", verified against Rewired's own shipped
+        /// PlayerMouseUnityUI example). Returns -1 if the field couldn't be found (different
+        /// Rewired version) so callers don't report a false failure.
+        /// </summary>
+        internal static int CountConfiguredMouseElements(SerializedObject playerMouseSerialized)
+        {
+            var groups = playerMouseSerialized.FindProperty("_elements");
+            if (groups == null) return -1;
+
+            int count = 0;
+            for (int i = 0; i < groups.arraySize; i++)
+            {
+                var nested = groups.GetArrayElementAtIndex(i).FindPropertyRelative("_elements");
+                if (nested == null) continue;
+
+                for (int j = 0; j < nested.arraySize; j++)
+                {
+                    var actionIdProp = nested.GetArrayElementAtIndex(j).FindPropertyRelative("_actionId");
+                    if (actionIdProp != null && actionIdProp.intValue >= 0)
+                        count++;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Adds a "Movement" element group bound to the MouseX/MouseY actions (the same action
+        /// names RewiredInputManager already reads via Player.GetAxis) — same shape as Rewired's
+        /// own PlayerMouseUnityUI example. Only appends; never touches existing groups.
+        /// </summary>
+        internal static void ConfigureMouseMovementElements(Component playerMouse)
+        {
+            var so = new SerializedObject(playerMouse);
+            var groups = so.FindProperty("_elements");
+            if (groups == null)
+            {
+                Debug.LogWarning("[RewiredHelper] Could not find Player Mouse's Elements field — Rewired version may differ from the one this was built against.");
+                return;
+            }
+
+            int horizontalId = ResolveActionId("MouseX");
+            int verticalId = ResolveActionId("MouseY");
+
+            int groupIndex = groups.arraySize;
+            groups.arraySize++;
+            var group = groups.GetArrayElementAtIndex(groupIndex);
+            group.FindPropertyRelative("_name").stringValue = "Movement";
+            group.FindPropertyRelative("_elementType").intValue = 101;
+            group.FindPropertyRelative("_enabled").boolValue = true;
+
+            var nested = group.FindPropertyRelative("_elements");
+            nested.arraySize = 2;
+            SetAxisElement(nested.GetArrayElementAtIndex(0), "Horizontal", horizontalId);
+            SetAxisElement(nested.GetArrayElementAtIndex(1), "Vertical", verticalId);
+
+            so.ApplyModifiedProperties();
+            Undo.RegisterCompleteObjectUndo(playerMouse, "Configure Player Mouse Movement");
+            MarkSceneDirty();
+
+            Debug.Log("[RewiredHelper] Added a 'Movement' element group to Player Mouse, bound to the MouseX/MouseY actions.");
+        }
+
+        private static void SetAxisElement(SerializedProperty element, string name, int actionId)
+        {
+            element.FindPropertyRelative("_name").stringValue = name;
+            element.FindPropertyRelative("_elementType").intValue = 2; // Axis
+            element.FindPropertyRelative("_enabled").boolValue = true;
+            element.FindPropertyRelative("_actionId").intValue = actionId;
+            element.FindPropertyRelative("_coordinateMode").intValue = 1; // Relative
+            element.FindPropertyRelative("_absoluteToRelativeSensitivity").floatValue = 600f;
+            element.FindPropertyRelative("_repeatRate").floatValue = 4f;
+        }
+
+        private static int ResolveActionId(string actionName)
+        {
+            var action = ReInput.mapping != null ? ReInput.mapping.GetAction(actionName) : null;
+            return action != null ? action.id : -1;
+        }
+
+        internal static void CreatePlayerMouseAndWire(RewiredInputManager manager)
+        {
+            var type = FindPlayerMouseType();
+            if (type == null)
+            {
+                Debug.LogWarning("[RewiredHelper] Rewired.Components.PlayerMouse type not found — check your Rewired installation.");
+                return;
+            }
+
+            var go = new GameObject("PlayerMouse_Player0");
+            var comp = go.AddComponent(type);
+            Undo.RegisterCreatedObjectUndo(go, "Create Player Mouse");
+
+            var so = new SerializedObject(comp);
+            SetIfPresent(so, "_rewiredInputManager", FindInputManagerInScene());
+            SetIfPresent(so, "_playerId", 0);
+            SetIfPresent(so, "_pointerSpeed", 1f);
+            SetIfPresent(so, "_useHardwarePointerPosition", true);
+            SetIfPresent(so, "_clampToMovementArea", true);
+            SetIfPresent(so, "_defaultToCenter", true);
+            so.ApplyModifiedProperties();
+
+            ConfigureMouseMovementElements(comp);
+
+            Selection.activeGameObject = go;
+            MarkSceneDirty();
+            Debug.Log("[RewiredHelper] Created Player Mouse (Rewired.Components.PlayerMouse) with Movement elements bound to MouseX/MouseY.");
+        }
+
+        private static void SetIfPresent(SerializedObject so, string propertyName, object value)
+        {
+            var prop = so.FindProperty(propertyName);
+            if (prop == null) return;
+
+            switch (value)
+            {
+                case bool b: prop.boolValue = b; break;
+                case int i: prop.intValue = i; break;
+                case float f: prop.floatValue = f; break;
+                case Component c: prop.objectReferenceValue = c; break;
+            }
+        }
+
         private static GameObject CreatePauseScreen(Transform parent)
         {
             var pauseGo = new GameObject("PauseScreen", typeof(RectTransform), typeof(Image));

@@ -217,6 +217,16 @@ _input.CustomCursorEnabled = MySaveData.CustomCursor;
 _input.CursorTexture = MyConfig.cursorTexture;
 ```
 
+**Testing in the Editor:** the standalone cursor path runs whenever `UNITY_STANDALONE` *or*
+`UNITY_EDITOR` is defined, so Play Mode always exercises it regardless of the active Build Target
+(e.g. it still works when the target platform is Android/iOS). If the cursor still doesn't change:
+- Make sure `Custom Cursor Enabled` is checked and `Cursor Texture` is assigned.
+- Check the texture's **Import Settings** — `Cursor.SetCursor` silently no-ops on a compressed or
+  non-readable texture. Use the **Cursor** texture type preset (or Advanced → uncompressed RGBA32,
+  no mipmaps) so the OS can actually read the pixels.
+- The active input device must be `Mouse` — moving a connected controller/joystick switches
+  `CurrentControllerType` away from `Mouse` and disables the OS cursor entirely.
+
 ---
 
 ## Steam Overlay Pause

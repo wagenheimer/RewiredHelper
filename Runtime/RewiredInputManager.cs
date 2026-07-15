@@ -449,7 +449,10 @@ namespace Wagenheimer.RewiredHelper
         {
 #if UNITY_SWITCH && !UNITY_EDITOR
             HandleJoystickOrCustomController();
-#elif UNITY_STANDALONE
+#elif UNITY_STANDALONE || UNITY_EDITOR
+            // UNITY_EDITOR is included so the standalone cursor path can be tested in Play Mode
+            // regardless of the active Build Target (e.g. Android/iOS), where UNITY_STANDALONE
+            // isn't defined and this would otherwise silently fall back to the OS default cursor.
             ConfigureStandaloneCursor();
 #else
             ConfigureDefaultCursor();

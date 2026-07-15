@@ -468,11 +468,29 @@ namespace Wagenheimer.RewiredHelper.Editor
             descRect.sizeDelta = new Vector2(320, 32);
 
             var descText = descGo.AddComponent<TextMeshProUGUI>();
-            descText.text = !string.IsNullOrEmpty(actionDesc) ? actionDesc.ToUpper() : $"<rewiredAction name=\"{actionName}\">";
+            // Rewired's <rewiredAction> tag needs a glyph/companion component to expand — none is
+            // attached here, so TMP silently drops it and the label renders blank when the action
+            // has no Descriptive Name set in the Rewired Input Manager. Fall back to a readable,
+            // always-visible label derived from the action's short name instead.
+            descText.text = !string.IsNullOrEmpty(actionDesc) ? actionDesc.ToUpper() : NicifyActionName(actionName);
             descText.fontSize = 13;
             descText.fontStyle = FontStyles.Bold;
             descText.color = new Color(0.75f, 0.75f, 0.8f);
             descText.alignment = TextAlignmentOptions.Left;
+        }
+
+        static string NicifyActionName(string actionName)
+        {
+            if (string.IsNullOrEmpty(actionName)) return "";
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < actionName.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(actionName[i]) && !char.IsUpper(actionName[i - 1]))
+                    sb.Append(' ');
+                sb.Append(actionName[i]);
+            }
+            return sb.ToString().ToUpper();
         }
 
         static Type FindGlyphHelperType()

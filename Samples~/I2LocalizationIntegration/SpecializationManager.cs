@@ -23,10 +23,11 @@ namespace I2.Loc
             {
                 return RewiredInputManager.Instance.LastActiveController.type switch
                 {
+                    ControllerType.Keyboard => "PC",
                     ControllerType.Mouse => "PC",
                     ControllerType.Joystick => "Controller",
                     ControllerType.Custom => "Controller",
-                    _ => "Controller"
+                    _ => "PC"
                 };
             }
 

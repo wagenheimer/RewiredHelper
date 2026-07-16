@@ -395,6 +395,17 @@ namespace Wagenheimer.RewiredHelper
             {
                 var currentController = Player.controllers.GetLastActiveController();
 
+                bool mouseActive = Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || 
+                                   Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_INPUT_THRESHOLD ||
+                                   Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
+
+                if (mouseActive)
+                {
+                    var mouseController = ReInput.controllers.GetController(ControllerType.Mouse, 0);
+                    if (mouseController != null)
+                        currentController = mouseController;
+                }
+
                 if (currentController != null || !_controllerWasDisconnected)
                     LastActiveController = currentController;
 

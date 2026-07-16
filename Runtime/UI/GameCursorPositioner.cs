@@ -31,6 +31,15 @@ namespace Wagenheimer.RewiredHelper.UI
 
             if (!canvas)
                 canvas = GetComponentInParent<Canvas>();
+
+            // Ensure the cursor is always rendered on top of all other UI by adding a high-sorting Canvas component
+            var sortingCanvas = GetComponent<Canvas>();
+            if (!sortingCanvas)
+            {
+                sortingCanvas = gameObject.AddComponent<Canvas>();
+            }
+            sortingCanvas.overrideSorting = true;
+            sortingCanvas.sortingOrder = 1000;
         }
 
         public void SetScreenPosition(Vector2 screenPosition)

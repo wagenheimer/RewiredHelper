@@ -249,6 +249,10 @@ namespace Wagenheimer.RewiredHelper.Editor
             img.raycastTarget = false; // MUST be false so it doesn't block UI clicks!
             img.color = Color.white;
 
+            var cursorCanvas = cursorGo.AddComponent<Canvas>();
+            cursorCanvas.overrideSorting = true;
+            cursorCanvas.sortingOrder = 1000;
+
             cursorGo.AddComponent<Wagenheimer.RewiredHelper.UI.GameCursorPositioner>();
 
             Undo.RegisterCreatedObjectUndo(cursorGo, "Create Game Cursor");

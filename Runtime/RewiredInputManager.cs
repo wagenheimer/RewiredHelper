@@ -243,9 +243,8 @@ namespace Wagenheimer.RewiredHelper
 
 
 
-        private void OnLastActiveControllerChangedCallback(Player player, Controller controller)
+        private void OnLastActiveControllerChangedCallback(Controller controller)
         {
-            if (player.id != 0) return;
             if (controller == null) return;
 
             if (controller.type == ControllerType.Joystick)

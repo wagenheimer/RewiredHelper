@@ -602,7 +602,12 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (glyphHelperType != null)
             {
-                iconGo.AddComponent(glyphHelperType);
+                var glyphHelper = iconGo.AddComponent(glyphHelperType);
+                var textProp = glyphHelperType.GetProperty("text");
+                if (textProp != null)
+                {
+                    textProp.SetValue(glyphHelper, $"<rewiredElement playerId=0 actionName=\"{actionName}\">");
+                }
             }
 
             // Separator dash in row

@@ -567,11 +567,23 @@ namespace Wagenheimer.RewiredHelper.Editor
             accentBarRect.anchoredPosition = new Vector2(4, 0);
             accentBarGo.GetComponent<Image>().color = new Color(0.22f, 0.60f, 1.00f); // Blue accent
 
+            // Exclude the accent tag from the row's HorizontalLayoutGroup — it's a fixed decorative
+            // overlay positioned via anchoredPosition above, not a flow column. Without this, the
+            // layout group sweeps it up as its first child and repositions/resizes it, fighting the
+            // manual placement.
+            var accentLayoutElement = accentBarGo.AddComponent<LayoutElement>();
+            accentLayoutElement.ignoreLayout = true;
+
             var hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
             hlg.spacing = 15f;
             hlg.childAlignment = TextAnchor.MiddleCenter;
             hlg.childControlWidth = false;
-            hlg.childControlHeight = true;
+            // false, not true: Icon/Divider/Description already carry an explicit sizeDelta.y (32)
+            // that fits the row. Letting the layout group drive height instead makes it query the
+            // row's own computed height — which, nested under Content's VerticalLayoutGroup +
+            // ContentSizeFitter, resolves to 0 on the first pass and collapses every row to nothing
+            // (row exists in the hierarchy but renders with zero height).
+            hlg.childControlHeight = false;
             hlg.childForceExpandWidth = false;
             hlg.childForceExpandHeight = false;
             hlg.padding = new RectOffset(20, 20, 3, 3);

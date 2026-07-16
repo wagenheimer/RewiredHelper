@@ -79,7 +79,7 @@ namespace Wagenheimer.RewiredHelper.UI
         /// </summary>
         private List<ActionInfo> ResolveActions()
         {
-            var list = new List<ActionInfo>();
+            var rawList = new List<ActionInfo>();
             var managerActions = GetActionsFromManagerInScene();
 
             if (actionNames != null && actionNames.Count > 0)
@@ -99,12 +99,10 @@ namespace Wagenheimer.RewiredHelper.UI
                         if (!string.IsNullOrEmpty(found.DescriptiveName))
                             desc = found.DescriptiveName;
                     }
-                    list.Add(new ActionInfo { Name = name, DescriptiveName = desc });
+                    rawList.Add(new ActionInfo { Name = name, DescriptiveName = desc });
                 }
-                return list;
             }
-
-            if (ReInput.isReady && ReInput.mapping != null)
+            else if (ReInput.isReady && ReInput.mapping != null)
             {
                 var actions = ReInput.mapping.Actions
                     .Where(a => a.type == InputActionType.Button)
@@ -113,19 +111,54 @@ namespace Wagenheimer.RewiredHelper.UI
 
                 foreach (var a in actions)
                 {
-                    list.Add(new ActionInfo { Name = a.name, DescriptiveName = a.descriptiveName });
+                    rawList.Add(new ActionInfo { Name = a.name, DescriptiveName = a.descriptiveName });
                 }
             }
             else
             {
-                // In Design Time, populate with all actions found in the scene's Rewired Input Manager
                 foreach (var action in managerActions)
                 {
-                    list.Add(action);
+                    rawList.Add(action);
                 }
             }
 
-            return list;
+            var groupedList = new List<ActionInfo>();
+            var processedNames = new HashSet<string>();
+
+            for (int i = 0; i < rawList.Count; i++)
+            {
+                var current = rawList[i];
+                if (processedNames.Contains(current.Name)) continue;
+
+                if (current.Name.EndsWith("X", StringComparison.OrdinalIgnoreCase))
+                {
+                    string baseName = current.Name.Substring(0, current.Name.Length - 1);
+                    string yName = baseName + "Y";
+
+                    var matchingY = rawList.FirstOrDefault(a => string.Equals(a.Name, yName, StringComparison.OrdinalIgnoreCase));
+                    if (!string.IsNullOrEmpty(matchingY.Name))
+                    {
+                        processedNames.Add(current.Name);
+                        processedNames.Add(matchingY.Name);
+
+                        string groupName = current.Name + "+" + matchingY.Name;
+                        string groupDesc = !string.IsNullOrEmpty(baseName) ? baseName : "MOVEMENT";
+
+                        if (groupDesc.Equals("Mouse", StringComparison.OrdinalIgnoreCase))
+                            groupDesc = "MOVIMENTO";
+                        else if (groupDesc.Equals("Move", StringComparison.OrdinalIgnoreCase))
+                            groupDesc = "MOVER";
+
+                        groupedList.Add(new ActionInfo { Name = groupName, DescriptiveName = groupDesc.ToUpper() });
+                        continue;
+                    }
+                }
+
+                processedNames.Add(current.Name);
+                groupedList.Add(current);
+            }
+
+            return groupedList;
         }
 
         private List<ActionInfo> GetActionsFromManagerInScene()
@@ -185,7 +218,7 @@ namespace Wagenheimer.RewiredHelper.UI
 
             var rowRect = (RectTransform)rowGo.transform;
             rowRect.SetParent(transform, false);
-            rowRect.sizeDelta = new Vector2(0, 38);
+            rowRect.sizeDelta = new Vector2(265, 44);
 
             var bgImage = rowGo.GetComponent<Image>();
             bgImage.color = isAlt
@@ -206,22 +239,37 @@ namespace Wagenheimer.RewiredHelper.UI
             accentLayoutElement.ignoreLayout = true;
 
             var hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 15f;
+            hlg.spacing = 8f;
             hlg.childAlignment = TextAnchor.MiddleCenter;
             hlg.childControlWidth = false;
             hlg.childControlHeight = false;
             hlg.childForceExpandWidth = false;
             hlg.childForceExpandHeight = false;
-            hlg.padding = new RectOffset(20, 20, 3, 3);
+            hlg.padding = new RectOffset(10, 10, 3, 3);
 
             var iconGo = new GameObject("Icon", typeof(RectTransform));
             var iconRect = (RectTransform)iconGo.transform;
             iconRect.SetParent(rowRect, false);
-            iconRect.sizeDelta = new Vector2(140, 32);
+            iconRect.sizeDelta = new Vector2(90, 36);
 
             var iconText = iconGo.AddComponent<TextMeshProUGUI>();
-            iconText.text = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
-            iconText.fontSize = 18;
+            string formattedText = "";
+            if (actionName.Contains("+"))
+            {
+                var parts = actionName.Split('+');
+                foreach (var part in parts)
+                {
+                    if (formattedText.Length > 0) formattedText += " ";
+                    formattedText += $"<rewiredElement playerId=0 actionName=\"{part}\">";
+                }
+            }
+            else
+            {
+                formattedText = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+            }
+
+            iconText.text = formattedText;
+            iconText.fontSize = 24;
             iconText.color = Color.white;
             iconText.alignment = TextAlignmentOptions.Right;
 
@@ -230,13 +278,13 @@ namespace Wagenheimer.RewiredHelper.UI
                 var glyphHelper = iconGo.AddComponent(glyphHelperType);
                 var textProp = glyphHelperType.GetProperty("text");
                 if (textProp != null)
-                    textProp.SetValue(glyphHelper, $"<rewiredElement playerId=0 actionName=\"{actionName}\">");
+                    textProp.SetValue(glyphHelper, formattedText);
             }
 
             var divGo = new GameObject("Divider", typeof(RectTransform));
             var divRect = (RectTransform)divGo.transform;
             divRect.SetParent(rowRect, false);
-            divRect.sizeDelta = new Vector2(15, 32);
+            divRect.sizeDelta = new Vector2(10, 36);
             var divText = divGo.AddComponent<TextMeshProUGUI>();
             divText.text = "—";
             divText.fontSize = 14;
@@ -246,7 +294,7 @@ namespace Wagenheimer.RewiredHelper.UI
             var descGo = new GameObject("Description", typeof(RectTransform));
             var descRect = (RectTransform)descGo.transform;
             descRect.SetParent(rowRect, false);
-            descRect.sizeDelta = new Vector2(320, 32);
+            descRect.sizeDelta = new Vector2(130, 36);
 
             var descText = descGo.AddComponent<TextMeshProUGUI>();
             descText.text = !string.IsNullOrEmpty(actionDesc) ? actionDesc.ToUpper() : NicifyActionName(actionName);

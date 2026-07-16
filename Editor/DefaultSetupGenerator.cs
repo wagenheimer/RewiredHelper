@@ -552,7 +552,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             viewportRect.sizeDelta = Vector2.zero;
 
             // Content Container
-            var contentGo = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            var contentGo = new GameObject("Content", typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
             var contentRect = (RectTransform)contentGo.transform;
             contentRect.SetParent(viewportRect, false);
             contentRect.anchorMin = new Vector2(0, 1);
@@ -560,14 +560,14 @@ namespace Wagenheimer.RewiredHelper.Editor
             contentRect.pivot = new Vector2(0.5f, 1);
             contentRect.sizeDelta = new Vector2(0, 0);
 
-            var vlg = contentGo.GetComponent<VerticalLayoutGroup>();
-            vlg.spacing = 6f;
-            vlg.childAlignment = TextAnchor.UpperCenter;
-            vlg.childControlWidth = true;
-            vlg.childControlHeight = false;
-            vlg.childForceExpandWidth = true;
-            vlg.childForceExpandHeight = false;
-            vlg.padding = new RectOffset(10, 10, 10, 10);
+            var glg = contentGo.GetComponent<GridLayoutGroup>();
+            glg.cellSize = new Vector2(265, 48);
+            glg.spacing = new Vector2(10, 8);
+            glg.startCorner = GridLayoutGroup.Corner.UpperLeft;
+            glg.startAxis = GridLayoutGroup.Axis.Horizontal;
+            glg.childAlignment = TextAnchor.UpperCenter;
+            glg.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            glg.constraintCount = 2;
 
             var csf = contentGo.GetComponent<ContentSizeFitter>();
             csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;

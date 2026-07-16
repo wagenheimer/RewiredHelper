@@ -258,16 +258,24 @@ namespace Wagenheimer.RewiredHelper.Editor
                 // Verify Player Mouse Events are wired to GameCursor
                 if (manager.GameCursor != null)
                 {
+                    var positioner = manager.GameCursor.GetComponent<Wagenheimer.RewiredHelper.UI.GameCursorPositioner>();
+                    DrawCheckResult("Game Cursor Positioner", positioner != null,
+                        "GameCursorPositioner converts the Player Mouse screen position into the Canvas's local space. Without it, the cursor only lines up correctly on a Screen Space - Overlay Canvas with a 1:1 Canvas Scaler.",
+                        "Add Positioner", () => manager.GameCursor.gameObject.AddComponent<Wagenheimer.RewiredHelper.UI.GameCursorPositioner>());
+
                     var onScreenPos = pmSerialized.FindProperty("_onScreenPositionChanged");
                     var onEnabled = pmSerialized.FindProperty("_onEnabledStateChanged");
-                    bool posWired = IsEventWired(onScreenPos);
+                    bool posWiredToPositioner = IsEventWiredTo(onScreenPos, positioner, "SetScreenPosition");
                     bool enabledWired = IsEventWired(onEnabled);
 
-                    if (!posWired || !enabledWired)
+                    if (!posWiredToPositioner || !enabledWired)
                     {
-                        DrawCheckResult("Player Mouse Events — Wiring", false,
-                            "The Player Mouse events (On Screen Position Changed, On Enabled State Changed) are not wired to control the Game Cursor. The joystick cursor will not move or show/hide on screen.",
-                            "Wire Events", () => DefaultSetupGenerator.WirePlayerMouseEvents(manager, playerMouseComp));
+                        var reason = !posWiredToPositioner
+                            ? "On Screen Position Changed isn't wired to GameCursorPositioner.SetScreenPosition (it may still be bound directly to RectTransform.anchoredPosition, which only works on a Screen Space - Overlay Canvas with a 1:1 Canvas Scaler — otherwise the cursor drifts off-screen)."
+                            : "On Enabled State Changed is not wired to control the Game Cursor's visibility.";
+
+                        DrawCheckResult("Player Mouse Events — Wiring", false, reason,
+                            "Fix Wiring", () => DefaultSetupGenerator.WirePlayerMouseEvents(manager, playerMouseComp));
                     }
                     else
                     {
@@ -473,6 +481,28 @@ namespace Wagenheimer.RewiredHelper.Editor
                     return type;
             }
             return null;
+        }
+
+        /// <summary>
+        /// Unlike <see cref="IsEventWired"/> (any non-null listener), this checks the event is
+        /// wired to a *specific* target/method — used to tell a correct GameCursorPositioner
+        /// binding apart from a stale direct-to-anchoredPosition one left by an older setup.
+        /// </summary>
+        private static bool IsEventWiredTo(SerializedProperty eventProp, UnityEngine.Object target, string methodName)
+        {
+            if (eventProp == null || target == null) return false;
+            var calls = eventProp.FindPropertyRelative("m_PersistentCalls.m_Calls");
+            if (calls == null) return false;
+
+            for (int i = 0; i < calls.arraySize; i++)
+            {
+                var call = calls.GetArrayElementAtIndex(i);
+                var callTarget = call.FindPropertyRelative("m_Target").objectReferenceValue;
+                var callMethod = call.FindPropertyRelative("m_MethodName").stringValue;
+                if (callTarget == target && callMethod == methodName)
+                    return true;
+            }
+            return false;
         }
 
         private static bool IsEventWired(SerializedProperty eventProp)

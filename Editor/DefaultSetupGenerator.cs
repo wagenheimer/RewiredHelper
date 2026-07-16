@@ -175,6 +175,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             img.raycastTarget = false; // MUST be false so it doesn't block UI clicks!
             img.color = Color.white;
 
+            cursorGo.AddComponent<Wagenheimer.RewiredHelper.UI.GameCursorPositioner>();
+
             Undo.RegisterCreatedObjectUndo(cursorGo, "Create Game Cursor");
 
             if (serializedObject != null)
@@ -667,6 +669,34 @@ namespace Wagenheimer.RewiredHelper.Editor
             return canvas;
         }
 
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Verify && Fix Game Cursor Wiring", priority = 13)]
+        internal static void VerifyAndFixGameCursorWiring()
+        {
+            var manager = FindInputManagerInScene()?.GetComponent<RewiredInputManager>();
+            if (manager == null)
+            {
+                Debug.LogWarning("[RewiredHelper] No RewiredInputManager found in the scene — nothing to fix.");
+                return;
+            }
+
+            if (manager.GameCursor == null)
+            {
+                Debug.LogWarning("[RewiredHelper] RewiredInputManager.GameCursor isn't assigned — assign it first (or run Create Rewired Input Manager's cursor step).");
+                return;
+            }
+
+            var playerMouseType = FindPlayerMouseType();
+            var playerMouse = FindPlayerMouseInScene(playerMouseType);
+            if (playerMouse == null)
+            {
+                Debug.LogWarning("[RewiredHelper] No Rewired.Components.PlayerMouse found in the scene — nothing to re-wire.");
+                return;
+            }
+
+            WirePlayerMouseEvents(manager, playerMouse);
+            Debug.Log("[RewiredHelper] Verified Game Cursor wiring — GameCursorPositioner is present and PlayerMouse's screen-position event points at it.");
+        }
+
         internal static void WirePlayerMouseEvents(RewiredInputManager manager, Component playerMouse)
         {
             if (manager == null || playerMouse == null || manager.GameCursor == null)
@@ -677,24 +707,35 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             var so = new SerializedObject(playerMouse);
 
-            // On Screen Position Changed — wire to RectTransform.set_anchoredPosition(Vector2)
+            // On Screen Position Changed — wire to GameCursorPositioner.SetScreenPosition(Vector2).
+            // NOT bound to RectTransform.anchoredPosition directly: PlayerMouse reports raw screen
+            // pixels, which only line up with anchoredPosition when the Canvas is Screen Space -
+            // Overlay AND its Canvas Scaler is 1:1 with the real resolution. Any other setup
+            // (Screen Space - Camera, World Space, or a scaled reference resolution) needs the
+            // screen point converted through the Canvas first, which the positioner does.
+            var positioner = manager.GameCursor.GetComponent<Wagenheimer.RewiredHelper.UI.GameCursorPositioner>();
+            if (positioner == null)
+            {
+                positioner = manager.GameCursor.gameObject.AddComponent<Wagenheimer.RewiredHelper.UI.GameCursorPositioner>();
+                Undo.RegisterCreatedObjectUndo(positioner, "Add Game Cursor Positioner");
+                Debug.Log("[RewiredHelper] Added missing GameCursorPositioner to Game Cursor.");
+            }
+
             var screenPosCalls = so.FindProperty("_onScreenPositionChanged.m_PersistentCalls.m_Calls");
             if (screenPosCalls != null)
             {
-                var setterMethod = typeof(RectTransform).GetProperty("anchoredPosition").GetSetMethod();
-                if (setterMethod != null)
+                const string methodName = "SetScreenPosition";
+                PruneNullSerializedListeners(screenPosCalls);
+                RemoveSerializedListenersToOtherTargets(screenPosCalls, positioner);
+                if (!HasSerializedListener(screenPosCalls, positioner, methodName))
                 {
-                    PruneNullSerializedListeners(screenPosCalls);
-                    if (!HasSerializedListener(screenPosCalls, manager.GameCursor.rectTransform, setterMethod.Name))
-                    {
-                        AppendSerializedListener(
-                            screenPosCalls,
-                            target: manager.GameCursor.rectTransform,
-                            assemblyTypeName: $"{typeof(RectTransform).FullName}, UnityEngine",
-                            methodName: setterMethod.Name,
-                            mode: 0 // EventDefined (dynamic — matches the Vector2 the event passes)
-                        );
-                    }
+                    AppendSerializedListener(
+                        screenPosCalls,
+                        target: positioner,
+                        assemblyTypeName: $"{typeof(Wagenheimer.RewiredHelper.UI.GameCursorPositioner).FullName}, {typeof(Wagenheimer.RewiredHelper.UI.GameCursorPositioner).Assembly.GetName().Name}",
+                        methodName: methodName,
+                        mode: 0 // EventDefined (dynamic — matches the Vector2 the event passes)
+                    );
                 }
             }
 
@@ -746,6 +787,21 @@ namespace Wagenheimer.RewiredHelper.Editor
             {
                 var target = callsArray.GetArrayElementAtIndex(i).FindPropertyRelative("m_Target").objectReferenceValue;
                 if (target == null)
+                    callsArray.DeleteArrayElementAtIndex(i);
+            }
+        }
+
+        /// <summary>
+        /// Strips any persistent listener that doesn't target <paramref name="keepTarget"/> — used
+        /// to clear out a stale direct-to-anchoredPosition binding left over from an older wiring
+        /// (or an earlier RewiredHelper version) before re-adding the correct one.
+        /// </summary>
+        private static void RemoveSerializedListenersToOtherTargets(SerializedProperty callsArray, UnityEngine.Object keepTarget)
+        {
+            for (int i = callsArray.arraySize - 1; i >= 0; i--)
+            {
+                var target = callsArray.GetArrayElementAtIndex(i).FindPropertyRelative("m_Target").objectReferenceValue;
+                if (target != keepTarget)
                     callsArray.DeleteArrayElementAtIndex(i);
             }
         }

@@ -29,25 +29,11 @@ namespace Wagenheimer.RewiredHelper.UI
         [Tooltip("If true, the rows will be cleared and rebuilt automatically on Awake. Disable this if you want to customize rows in Design Time.")]
         [SerializeField] private bool rebuildOnAwake = true;
 
-        [Tooltip("If true, glyph tags will force joystick/gamepad elements only, preventing keyboard keys from rendering.")]
-        [SerializeField] private bool gamepadOnly = true;
-
-        [Tooltip("Action names that are exempt from the Gamepad Only setting (e.g. they can still show keyboard glyphs like Escape).")]
-        [SerializeField] private List<string> gamepadOnlyExclusions = new List<string> { "BackButton", "MenuButton" };
-
         public bool RebuildOnAwake
         {
             get => rebuildOnAwake;
             set => rebuildOnAwake = value;
         }
-
-        public bool GamepadOnly
-        {
-            get => gamepadOnly;
-            set => gamepadOnly = value;
-        }
-
-        public List<string> GamepadOnlyExclusions => gamepadOnlyExclusions;
 
         public List<string> ActionNames => actionNames;
 
@@ -274,16 +260,12 @@ namespace Wagenheimer.RewiredHelper.UI
                 foreach (var part in parts)
                 {
                     if (formattedText.Length > 0) formattedText += " ";
-                    formattedText += ShouldForceGamepad(part) 
-                        ? $"<rewiredElement playerId=0 controllerType=\"Joystick\" actionName=\"{part}\">"
-                        : $"<rewiredElement playerId=0 actionName=\"{part}\">";
+                    formattedText += $"<rewiredElement playerId=0 actionName=\"{part}\">";
                 }
             }
             else
             {
-                formattedText = ShouldForceGamepad(actionName)
-                    ? $"<rewiredElement playerId=0 controllerType=\"Joystick\" actionName=\"{actionName}\">"
-                    : $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+                formattedText = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
             }
 
             iconText.text = formattedText;
@@ -320,13 +302,6 @@ namespace Wagenheimer.RewiredHelper.UI
             descText.fontStyle = FontStyles.Bold;
             descText.color = new Color(0.75f, 0.75f, 0.8f);
             descText.alignment = TextAlignmentOptions.Left;
-        }
-
-        private bool ShouldForceGamepad(string actionName)
-        {
-            if (!gamepadOnly) return false;
-            if (gamepadOnlyExclusions != null && gamepadOnlyExclusions.Contains(actionName)) return false;
-            return true;
         }
 
         private static string NicifyActionName(string actionName)

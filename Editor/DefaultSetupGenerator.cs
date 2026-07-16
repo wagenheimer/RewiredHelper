@@ -473,6 +473,12 @@ namespace Wagenheimer.RewiredHelper.Editor
             viewportRect.sizeDelta = Vector2.zero;
             viewportGo.GetComponent<Image>().color = new Color(0, 0, 0, 0); // Transparent mask
             viewportGo.GetComponent<Mask>().showMaskGraphic = false;
+            // CanvasRenderer.cullTransparentMesh defaults to true, which skips the draw call for a
+            // fully transparent (alpha 0) graphic as a perf optimization. For a Mask, that draw call
+            // is what writes the stencil ref — skip it and the stencil is never written, so every
+            // child (which only draws where stencil == ref) gets clipped out entirely and renders
+            // nothing, even though the GameObjects exist in the hierarchy.
+            viewportGo.GetComponent<CanvasRenderer>().cullTransparentMesh = false;
 
             // Content Container
             var contentGo = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));

@@ -226,7 +226,77 @@ namespace Wagenheimer.RewiredHelper.Editor
                     "Add Glyph Provider", () => DefaultSetupGenerator.EnsureGlyphProvider(manager.gameObject));
             }
 
+            // 7. Verify I2 Localization Integration
+            var i2ManagerType = FindTypeByName("I2.Loc.LocalizationManager");
+            if (i2ManagerType != null)
+            {
+                bool isPartial = false;
+                string specPath = "Assets/I2/Localization/Scripts/Configurables/SpecializationManager.cs";
+                if (System.IO.File.Exists(specPath))
+                {
+                    string content = System.IO.File.ReadAllText(specPath);
+                    isPartial = content.Contains("partial class SpecializationManager");
+                }
+                else
+                {
+                    isPartial = true; // File not found at expected path, assume partial to avoid false alarm
+                }
+
+                if (!isPartial)
+                {
+                    DrawErrorBox("I2 Localization: SpecializationManager.cs is not declared as a 'partial' class. Open '" + specPath + "' and add the 'partial' keyword (e.g. 'public partial class SpecializationManager') so that the Rewired Helper integration can compile.");
+                }
+                else
+                {
+                    var hasI2Integration = FindTypeByName("Wagenheimer.RewiredHelper.Integration.I2SpecializationImportedMarker") != null;
+                    DrawCheckResult("I2 Localization Integration", hasI2Integration,
+                        "I2 Localization detected, but the integration specialization helper is not imported. Import it to enable automatic controller glyphs in localized texts.",
+                        "Import Integration", () => ImportI2IntegrationSample());
+                }
+            }
+
             EditorGUILayout.Space(10);
+        }
+
+        private static void ImportI2IntegrationSample()
+        {
+            string sourcePath = "Packages/com.wagenheimer.rewiredhelper/Samples~/I2LocalizationIntegration/SpecializationManager.cs";
+            string destDir = "Assets/Samples/Rewired Helper/I2 Localization Integration";
+            string destPath = System.IO.Path.Combine(destDir, "SpecializationManager.cs");
+
+            try
+            {
+                if (!System.IO.Directory.Exists(destDir))
+                {
+                    System.IO.Directory.CreateDirectory(destDir);
+                }
+
+                if (System.IO.File.Exists(sourcePath))
+                {
+                    System.IO.File.Copy(sourcePath, destPath, true);
+                    AssetDatabase.ImportAsset(destPath, ImportAssetOptions.ForceUpdate);
+                    AssetDatabase.Refresh();
+                    Debug.Log("[RewiredHelper] Imported I2 Localization Integration successfully!");
+                }
+                else
+                {
+                    Debug.LogError($"[RewiredHelper] Integration source file not found at: {sourcePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[RewiredHelper] Failed to import I2 Localization Integration: {ex.Message}");
+            }
+        }
+
+        private static Type FindTypeByName(string typeName)
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(typeName);
+                if (type != null) return type;
+            }
+            return null;
         }
 
         /// <summary>

@@ -384,11 +384,14 @@ namespace Wagenheimer.RewiredHelper.UI
                 var action = ReInput.mapping.GetAction(actionName);
                 if (action == null) return false;
 
-                // Check all keyboard maps assigned to player 0 for any element mapping to this action.
                 var player = ReInput.players.GetPlayer(0);
                 if (player == null) return false;
 
-                foreach (var map in player.controllers.maps.GetMaps(ControllerType.Keyboard))
+                // GetMaps overload that accepts a Controller object (not ControllerType enum).
+                var keyboard = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
+                if (keyboard == null) return false;
+
+                foreach (var map in player.controllers.maps.GetMaps(keyboard))
                 {
                     if (map.GetFirstElementMapWithAction(action.id, false) != null)
                         return true;

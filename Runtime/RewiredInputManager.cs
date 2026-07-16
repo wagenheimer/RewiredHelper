@@ -425,10 +425,18 @@ namespace Wagenheimer.RewiredHelper
 
                 if (mouseActive || keyboardActive)
                 {
+                    if (!_lastInputWasPC)
+                    {
+                        Debug.Log($"[RewiredHelper] Switched to PC input. mouseActive={mouseActive}, keyboardActive={keyboardActive}");
+                    }
                     _lastInputWasPC = true;
                 }
                 else if (joystickActive)
                 {
+                    if (_lastInputWasPC)
+                    {
+                        Debug.Log("[RewiredHelper] Switched to Joystick input.");
+                    }
                     _lastInputWasPC = false;
                 }
 
@@ -452,8 +460,14 @@ namespace Wagenheimer.RewiredHelper
                     }
                 }
 
+                var previousController = LastActiveController;
                 if (currentController != null || !_controllerWasDisconnected)
                     LastActiveController = currentController;
+
+                if (LastActiveController != previousController)
+                {
+                    Debug.Log($"[RewiredHelper] LastActiveController changed to: {(LastActiveController != null ? LastActiveController.name : "null")} (Type: {(LastActiveController != null ? LastActiveController.type.ToString() : "None")})");
+                }
 
                 _isUsingTouch = false;
 

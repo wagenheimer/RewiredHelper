@@ -207,11 +207,19 @@ namespace Wagenheimer.RewiredHelper
         }
 #endif
 
+        private bool _isDelegateRegistered = false;
+
         private void Update()
         {
             if (Player == null && ReInput.isReady)
             {
                 InitializePlayer();
+            }
+
+            if (ReInput.isReady && !_isDelegateRegistered)
+            {
+                ReInput.controllers.AddLastActiveControllerChangedDelegate(OnLastActiveControllerChangedCallback);
+                _isDelegateRegistered = true;
             }
 
             SecondsSinceLastMouseOrTouchMove = Time.time - _lastMouseOrTouchMoveTime;
@@ -231,6 +239,37 @@ namespace Wagenheimer.RewiredHelper
                 (GamePaused == null || !GamePaused.activeSelf))
                 PauseGame(true);
 #endif
+        }
+
+        private void OnDestroy()
+        {
+            if (_isDelegateRegistered && ReInput.isReady)
+            {
+                ReInput.controllers.RemoveLastActiveControllerChangedDelegate(OnLastActiveControllerChangedCallback);
+            }
+        }
+
+        private void OnLastActiveControllerChangedCallback(Player player, Controller controller)
+        {
+            if (player.id != 0) return;
+            if (controller == null) return;
+
+            if (controller.type == ControllerType.Joystick)
+            {
+                _lastInputWasPC = false;
+                LastActiveController = controller;
+                Debug.Log($"[RewiredHelper] Switched to Joystick: {controller.name}");
+            }
+            else if (controller.type == ControllerType.Keyboard || controller.type == ControllerType.Mouse)
+            {
+                _lastInputWasPC = true;
+                var keyboardController = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
+                if (keyboardController != null)
+                {
+                    LastActiveController = keyboardController;
+                }
+                Debug.Log($"[RewiredHelper] Switched to PC input: {controller.name}");
+            }
         }
 
         private void CheckForControllerReconnection()
@@ -365,18 +404,6 @@ namespace Wagenheimer.RewiredHelper
 
         private bool _lastInputWasPC = true;
 
-        private bool HasJoystickAxisInput(Joystick joystick)
-        {
-            if (joystick == null) return false;
-            int axisCount = joystick.axisCount;
-            for (int i = 0; i < axisCount; i++)
-            {
-                if (Mathf.Abs(joystick.Axes[i].value) > 0.15f)
-                    return true;
-            }
-            return false;
-        }
-
         private void HandleInputSystem()
         {
             if (ReInput.touch == null) return;
@@ -407,66 +434,9 @@ namespace Wagenheimer.RewiredHelper
             }
             else
             {
-                bool mouseActive = Mathf.Abs(Input.GetAxis("Mouse X")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || 
-                                   Mathf.Abs(Input.GetAxis("Mouse Y")) > MOUSE_MOVEMENT_INPUT_THRESHOLD ||
-                                   Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
-
-                bool keyboardActive = Input.anyKey;
-
-                bool joystickActive = false;
-                foreach (var joystick in Player.controllers.Joysticks)
+                if (LastActiveController == null && ReInput.isReady)
                 {
-                    if (joystick.GetAnyButton() || HasJoystickAxisInput(joystick))
-                    {
-                        joystickActive = true;
-                        break;
-                    }
-                }
-
-                if (mouseActive || keyboardActive)
-                {
-                    if (!_lastInputWasPC)
-                    {
-                        Debug.Log($"[RewiredHelper] Switched to PC input. mouseActive={mouseActive}, keyboardActive={keyboardActive}");
-                    }
-                    _lastInputWasPC = true;
-                }
-                else if (joystickActive)
-                {
-                    if (_lastInputWasPC)
-                    {
-                        Debug.Log("[RewiredHelper] Switched to Joystick input.");
-                    }
-                    _lastInputWasPC = false;
-                }
-
-                Controller currentController = null;
-                if (_lastInputWasPC)
-                {
-                    var keyboardController = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
-                    if (keyboardController != null)
-                        currentController = keyboardController;
-                }
-                else
-                {
-                    currentController = Player.controllers.GetLastActiveController();
-                    if (currentController == null || currentController.type != ControllerType.Joystick)
-                    {
-                        foreach (var j in Player.controllers.Joysticks)
-                        {
-                            currentController = j;
-                            break;
-                        }
-                    }
-                }
-
-                var previousController = LastActiveController;
-                if (currentController != null || !_controllerWasDisconnected)
-                    LastActiveController = currentController;
-
-                if (LastActiveController != previousController)
-                {
-                    Debug.Log($"[RewiredHelper] LastActiveController changed to: {(LastActiveController != null ? LastActiveController.name : "null")} (Type: {(LastActiveController != null ? LastActiveController.type.ToString() : "None")})");
+                    LastActiveController = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
                 }
 
                 _isUsingTouch = false;

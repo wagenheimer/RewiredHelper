@@ -365,13 +365,13 @@ namespace Wagenheimer.RewiredHelper
 
         private bool _lastInputWasPC = false;
 
-        private bool HasJoystickAxisInput(Controller joystick)
+        private bool HasJoystickAxisInput(Joystick joystick)
         {
             if (joystick == null) return false;
             int axisCount = joystick.axisCount;
             for (int i = 0; i < axisCount; i++)
             {
-                if (Mathf.Abs(joystick.GetAxisValue(i)) > 0.15f)
+                if (Mathf.Abs(joystick.Axes[i].value) > 0.15f)
                     return true;
             }
             return false;
@@ -411,7 +411,7 @@ namespace Wagenheimer.RewiredHelper
                                    Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_INPUT_THRESHOLD ||
                                    Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
 
-                bool keyboardActive = ReInput.controllers.keyboard.GetAnyButton();
+                bool keyboardActive = Input.anyKey;
 
                 bool joystickActive = false;
                 foreach (var joystick in Player.controllers.Joysticks)

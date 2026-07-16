@@ -679,76 +679,38 @@ namespace Wagenheimer.RewiredHelper.Editor
             var onScreenPosField = type.GetField("_onScreenPositionChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
             var onEnabledField = type.GetField("_onEnabledStateChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
 
+            // On Screen Position Changed — wire to RectTransform.set_anchoredPosition(Vector2)
             if (onScreenPosField != null)
             {
-                var onScreenPosEvent = (UnityEngine.Events.UnityEventBase)onScreenPosField.GetValue(playerMouse);
-                if (onScreenPosEvent != null)
+                var ev = onScreenPosField.GetValue(playerMouse) as UnityEngine.Events.UnityEventBase;
+                if (ev != null)
                 {
-                    // Clean up empty/broken listeners first
-                    for (int i = onScreenPosEvent.GetPersistentEventCount() - 1; i >= 0; i--)
-                    {
-                        var t = onScreenPosEvent.GetPersistentTarget(i);
-                        if (t == null)
-                            UnityEditor.Events.UnityEventTools.RemovePersistentListener(onScreenPosEvent, i);
-                    }
+                    PruneNullListeners(ev);
 
                     var setterMethod = typeof(RectTransform).GetProperty("anchoredPosition").GetSetMethod();
-                    if (setterMethod != null)
+                    if (setterMethod != null && !HasListener(ev, manager.GameCursor.rectTransform, setterMethod.Name))
                     {
-                        bool alreadyExists = false;
-                        for (int i = 0; i < onScreenPosEvent.GetPersistentEventCount(); i++)
-                        {
-                            var t = onScreenPosEvent.GetPersistentTarget(i);
-                            var m = onScreenPosEvent.GetPersistentMethodName(i);
-                            if (t == manager.GameCursor.rectTransform && m == setterMethod.Name)
-                            {
-                                alreadyExists = true;
-                                break;
-                            }
-                        }
-
-                        if (!alreadyExists)
-                        {
-                            var action = (UnityEngine.Events.UnityAction<Vector2>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<Vector2>), manager.GameCursor.rectTransform, setterMethod);
-                            UnityEditor.Events.UnityEventTools.AddPersistentListener(onScreenPosEvent, action);
-                        }
+                        var action = System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<Vector2>), manager.GameCursor.rectTransform, setterMethod);
+                        // Call UnityEventTools.AddPersistentListener<T>(UnityEvent<T>, UnityAction<T>) via reflection
+                        // to avoid compile-time dependency on Rewired's concrete event type
+                        AddPersistentListenerReflected<Vector2>(ev, (UnityEngine.Events.UnityAction<Vector2>)action);
                     }
                 }
             }
 
+            // On Enabled State Changed — wire to GameObject.SetActive(bool)
             if (onEnabledField != null)
             {
-                var onEnabledEvent = (UnityEngine.Events.UnityEventBase)onEnabledField.GetValue(playerMouse);
-                if (onEnabledEvent != null)
+                var ev = onEnabledField.GetValue(playerMouse) as UnityEngine.Events.UnityEventBase;
+                if (ev != null)
                 {
-                    // Clean up empty/broken listeners first
-                    for (int i = onEnabledEvent.GetPersistentEventCount() - 1; i >= 0; i--)
-                    {
-                        var t = onEnabledEvent.GetPersistentTarget(i);
-                        if (t == null)
-                            UnityEditor.Events.UnityEventTools.RemovePersistentListener(onEnabledEvent, i);
-                    }
+                    PruneNullListeners(ev);
 
                     var methodInfo = typeof(GameObject).GetMethod("SetActive", new Type[] { typeof(bool) });
-                    if (methodInfo != null)
+                    if (methodInfo != null && !HasListener(ev, manager.GameCursor.gameObject, methodInfo.Name))
                     {
-                        bool alreadyExists = false;
-                        for (int i = 0; i < onEnabledEvent.GetPersistentEventCount(); i++)
-                        {
-                            var t = onEnabledEvent.GetPersistentTarget(i);
-                            var m = onEnabledEvent.GetPersistentMethodName(i);
-                            if (t == manager.GameCursor.gameObject && m == methodInfo.Name)
-                            {
-                                alreadyExists = true;
-                                break;
-                            }
-                        }
-
-                        if (!alreadyExists)
-                        {
-                            var action = (UnityEngine.Events.UnityAction<bool>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<bool>), manager.GameCursor.gameObject, methodInfo);
-                            UnityEditor.Events.UnityEventTools.AddPersistentListener(onEnabledEvent, action);
-                        }
+                        var action = (UnityEngine.Events.UnityAction<bool>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<bool>), manager.GameCursor.gameObject, methodInfo);
+                        AddPersistentListenerReflected<bool>(ev, action);
                     }
                 }
             }
@@ -756,6 +718,49 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorUtility.SetDirty(playerMouse);
             MarkSceneDirty();
             Debug.Log("[RewiredHelper] Player Mouse events auto-wired to Game Cursor (anchoredPosition & SetActive).");
+        }
+
+        private static void PruneNullListeners(UnityEngine.Events.UnityEventBase ev)
+        {
+            for (int i = ev.GetPersistentEventCount() - 1; i >= 0; i--)
+            {
+                if (ev.GetPersistentTarget(i) == null)
+                    UnityEditor.Events.UnityEventTools.RemovePersistentListener(ev, i);
+            }
+        }
+
+        private static bool HasListener(UnityEngine.Events.UnityEventBase ev, UnityEngine.Object target, string methodName)
+        {
+            for (int i = 0; i < ev.GetPersistentEventCount(); i++)
+            {
+                if (ev.GetPersistentTarget(i) == target && ev.GetPersistentMethodName(i) == methodName)
+                    return true;
+            }
+            return false;
+        }
+
+        private static void AddPersistentListenerReflected<T>(UnityEngine.Events.UnityEventBase ev, UnityEngine.Events.UnityAction<T> action)
+        {
+            // UnityEventTools.AddPersistentListener(UnityEvent<T>, UnityAction<T>) is only accessible
+            // via the concrete generic type. We call it through reflection to decouple from Rewired's
+            // internal event subclass at compile time.
+            var addMethod = typeof(UnityEditor.Events.UnityEventTools)
+                .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                .FirstOrDefault(m =>
+                {
+                    if (m.Name != "AddPersistentListener" || !m.IsGenericMethodDefinition) return false;
+                    var p = m.GetParameters();
+                    return p.Length == 2 && p[0].ParameterType.IsGenericType && p[1].ParameterType.IsGenericType;
+                });
+
+            if (addMethod == null)
+            {
+                Debug.LogWarning("[RewiredHelper] Could not find UnityEventTools.AddPersistentListener<T> — check Unity version compatibility.");
+                return;
+            }
+
+            var genericMethod = addMethod.MakeGenericMethod(typeof(T));
+            genericMethod.Invoke(null, new object[] { ev, action });
         }
 
         static void MarkSceneDirty()

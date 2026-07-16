@@ -181,7 +181,21 @@ namespace Wagenheimer.RewiredHelper
             InitializePlayer();
 
             if (IsConsole)
+            {
                 _lastKnownControllerType = ControllerType.Joystick;
+            }
+            else
+            {
+                // Default to Keyboard/PC on startup so any popup showing before first input
+                // shows keyboard glyphs instead of joystick glyphs.
+                _lastKnownControllerType = ControllerType.Keyboard;
+                _lastInputWasPC = true;
+                if (ReInput.isReady)
+                {
+                    var kb = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
+                    if (kb != null) lastActiveController = kb; // assign backing field directly to avoid event before register
+                }
+            }
 
             _lastMouseOrTouchMoveTime = Time.time;
 
@@ -431,9 +445,28 @@ namespace Wagenheimer.RewiredHelper
             }
             else
             {
+                // Ensure there is always a default controller set.
                 if (LastActiveController == null && ReInput.isReady)
                 {
                     LastActiveController = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
+                }
+
+                // Hybrid polling: if the mouse is moving/clicked while a joystick is the tracked
+                // controller, switch back to Keyboard. The Rewired delegate only fires for button
+                // presses, not continuous mouse movement, so we need this as a fallback.
+                if (!IsConsole && LastActiveController != null && LastActiveController.type == ControllerType.Joystick)
+                {
+                    bool mouseMoving = Mathf.Abs(Input.GetAxis("Mouse X")) > MOUSE_MOVEMENT_INPUT_THRESHOLD ||
+                                      Mathf.Abs(Input.GetAxis("Mouse Y")) > MOUSE_MOVEMENT_INPUT_THRESHOLD;
+                    bool mouseClicked = Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
+                    bool anyKeyPressed = Input.anyKeyDown;
+
+                    if (mouseMoving || mouseClicked || anyKeyPressed)
+                    {
+                        _lastInputWasPC = true;
+                        var kb = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
+                        if (kb != null) LastActiveController = kb;
+                    }
                 }
 
                 _isUsingTouch = false;

@@ -51,8 +51,17 @@ namespace Wagenheimer.RewiredHelper.UI
             }
             else
             {
-                UpdateExistingRows();
+                // Delay 1 frame: RewiredInputManager.Start() sets the initial controller (Keyboard)
+                // during Start(), but this Awake may run before that. Waiting ensures we read the
+                // correct CurrentControllerType when generating the first tags.
+                StartCoroutine(UpdateExistingRowsNextFrame());
             }
+        }
+
+        private System.Collections.IEnumerator UpdateExistingRowsNextFrame()
+        {
+            yield return null;
+            UpdateExistingRows();
         }
 
         private void OnEnable()
@@ -350,12 +359,45 @@ namespace Wagenheimer.RewiredHelper.UI
             }
             else
             {
+                // Mouse/Scroll named actions always use Mouse binding.
                 if (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return $"<rewiredElement playerId=0 controllerType=\"Mouse\" actionName=\"{actionName}\">";
                 }
-                return $"<rewiredElement playerId=0 controllerType=\"Keyboard\" actionName=\"{actionName}\">";
+
+                // For other PC actions, only force Keyboard if the action actually has a keyboard binding.
+                // If not, let Rewired auto-detect to avoid silent fallback to Joystick glyph.
+                if (ReInput.isReady && HasKeyboardBinding(actionName))
+                {
+                    return $"<rewiredElement playerId=0 controllerType=\"Keyboard\" actionName=\"{actionName}\">";
+                }
+
+                return $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+            }
+        }
+
+        private bool HasKeyboardBinding(string actionName)
+        {
+            try
+            {
+                var action = ReInput.mapping.GetAction(actionName);
+                if (action == null) return false;
+
+                // Check all keyboard maps assigned to player 0 for any element mapping to this action.
+                var player = ReInput.players.GetPlayer(0);
+                if (player == null) return false;
+
+                foreach (var map in player.controllers.maps.GetMaps(ControllerType.Keyboard))
+                {
+                    if (map.GetFirstElementMapWithAction(action.id, false) != null)
+                        return true;
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -422,25 +464,35 @@ namespace Wagenheimer.RewiredHelper.UI
                 string typeToUse = targetType;
                 if (string.IsNullOrEmpty(typeToUse))
                 {
-                    if (!string.IsNullOrEmpty(actionName) && 
+                    if (!string.IsNullOrEmpty(actionName) &&
                         (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
                          actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0))
                     {
                         typeToUse = "Mouse";
                     }
-                    else
+                    else if (!string.IsNullOrEmpty(actionName) && ReInput.isReady && HasKeyboardBinding(actionName))
                     {
                         typeToUse = "Keyboard";
                     }
+                    // If no keyboard binding exists, remove controllerType entirely so Rewired auto-detects.
+                    // typeToUse stays empty → handled below
                 }
 
-                if (System.Text.RegularExpressions.Regex.IsMatch(tag, @"\bcontrollerType\s*=\s*""[^""]*"""))
+                if (!string.IsNullOrEmpty(typeToUse))
                 {
-                    tag = System.Text.RegularExpressions.Regex.Replace(tag, @"\bcontrollerType\s*=\s*""[^""]*""", $"controllerType=\"{typeToUse}\"");
+                    if (System.Text.RegularExpressions.Regex.IsMatch(tag, @"\bcontrollerType\s*=\s*""[^""]*"""))
+                    {
+                        tag = System.Text.RegularExpressions.Regex.Replace(tag, @"\bcontrollerType\s*=\s*""[^""]*""", $"controllerType=\"{typeToUse}\"");
+                    }
+                    else
+                    {
+                        tag = tag.Insert("<rewiredElement".Length, $" controllerType=\"{typeToUse}\"");
+                    }
                 }
                 else
                 {
-                    tag = tag.Insert("<rewiredElement".Length, $" controllerType=\"{typeToUse}\"");
+                    // Remove any existing controllerType so Rewired falls back to its own tracking.
+                    tag = System.Text.RegularExpressions.Regex.Replace(tag, @"\s*\bcontrollerType\s*=\s*""[^""]*""", "");
                 }
 
                 return tag;

@@ -87,7 +87,7 @@ namespace Wagenheimer.RewiredHelper.UI
                 foreach (var name in actionNames)
                 {
                     string desc = name;
-                    if (ReInput.mapping != null)
+                    if (ReInput.isReady && ReInput.mapping != null)
                     {
                         var action = ReInput.mapping.GetAction(name);
                         if (action != null)
@@ -104,7 +104,7 @@ namespace Wagenheimer.RewiredHelper.UI
                 return list;
             }
 
-            if (ReInput.mapping != null)
+            if (ReInput.isReady && ReInput.mapping != null)
             {
                 var actions = ReInput.mapping.Actions
                     .Where(a => a.type == InputActionType.Button)

@@ -675,46 +675,47 @@ namespace Wagenheimer.RewiredHelper.Editor
                 return;
             }
 
-            var type = playerMouse.GetType();
-            var onScreenPosField = type.GetField("_onScreenPositionChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-            var onEnabledField = type.GetField("_onEnabledStateChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            var so = new SerializedObject(playerMouse);
 
             // On Screen Position Changed — wire to RectTransform.set_anchoredPosition(Vector2)
-            if (onScreenPosField != null)
+            var screenPosCalls = so.FindProperty("_onScreenPositionChanged.m_PersistentCalls.m_Calls");
+            if (screenPosCalls != null)
             {
-                var ev = onScreenPosField.GetValue(playerMouse) as UnityEngine.Events.UnityEventBase;
-                if (ev != null)
+                var setterMethod = typeof(RectTransform).GetProperty("anchoredPosition").GetSetMethod();
+                if (setterMethod != null)
                 {
-                    PruneNullListeners(ev);
-
-                    var setterMethod = typeof(RectTransform).GetProperty("anchoredPosition").GetSetMethod();
-                    if (setterMethod != null && !HasListener(ev, manager.GameCursor.rectTransform, setterMethod.Name))
+                    PruneNullSerializedListeners(screenPosCalls);
+                    if (!HasSerializedListener(screenPosCalls, manager.GameCursor.rectTransform, setterMethod.Name))
                     {
-                        var action = System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<Vector2>), manager.GameCursor.rectTransform, setterMethod);
-                        // Call UnityEventTools.AddPersistentListener<T>(UnityEvent<T>, UnityAction<T>) via reflection
-                        // to avoid compile-time dependency on Rewired's concrete event type
-                        AddPersistentListenerReflected<Vector2>(ev, (UnityEngine.Events.UnityAction<Vector2>)action);
+                        AppendSerializedListener(
+                            screenPosCalls,
+                            target: manager.GameCursor.rectTransform,
+                            assemblyTypeName: $"{typeof(RectTransform).FullName}, UnityEngine",
+                            methodName: setterMethod.Name,
+                            mode: 0 // EventDefined (dynamic — matches the Vector2 the event passes)
+                        );
                     }
                 }
             }
 
             // On Enabled State Changed — wire to GameObject.SetActive(bool)
-            if (onEnabledField != null)
+            var enabledCalls = so.FindProperty("_onEnabledStateChanged.m_PersistentCalls.m_Calls");
+            if (enabledCalls != null)
             {
-                var ev = onEnabledField.GetValue(playerMouse) as UnityEngine.Events.UnityEventBase;
-                if (ev != null)
+                PruneNullSerializedListeners(enabledCalls);
+                if (!HasSerializedListener(enabledCalls, manager.GameCursor.gameObject, "SetActive"))
                 {
-                    PruneNullListeners(ev);
-
-                    var methodInfo = typeof(GameObject).GetMethod("SetActive", new Type[] { typeof(bool) });
-                    if (methodInfo != null && !HasListener(ev, manager.GameCursor.gameObject, methodInfo.Name))
-                    {
-                        var action = (UnityEngine.Events.UnityAction<bool>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<bool>), manager.GameCursor.gameObject, methodInfo);
-                        AddPersistentListenerReflected<bool>(ev, action);
-                    }
+                    AppendSerializedListener(
+                        enabledCalls,
+                        target: manager.GameCursor.gameObject,
+                        assemblyTypeName: $"{typeof(GameObject).FullName}, UnityEngine",
+                        methodName: "SetActive",
+                        mode: 0 // EventDefined (dynamic — matches the bool the event passes)
+                    );
                 }
             }
 
+            so.ApplyModifiedProperties();
             EditorUtility.SetDirty(playerMouse);
             MarkSceneDirty();
             Debug.Log("[RewiredHelper] Player Mouse events auto-wired to Game Cursor (anchoredPosition & SetActive).");
@@ -737,6 +738,53 @@ namespace Wagenheimer.RewiredHelper.Editor
                     return true;
             }
             return false;
+        }
+
+        private static void PruneNullSerializedListeners(SerializedProperty callsArray)
+        {
+            for (int i = callsArray.arraySize - 1; i >= 0; i--)
+            {
+                var target = callsArray.GetArrayElementAtIndex(i).FindPropertyRelative("m_Target").objectReferenceValue;
+                if (target == null)
+                    callsArray.DeleteArrayElementAtIndex(i);
+            }
+        }
+
+        private static bool HasSerializedListener(SerializedProperty callsArray, UnityEngine.Object target, string methodName)
+        {
+            for (int i = 0; i < callsArray.arraySize; i++)
+            {
+                var el = callsArray.GetArrayElementAtIndex(i);
+                var t = el.FindPropertyRelative("m_Target").objectReferenceValue;
+                var m = el.FindPropertyRelative("m_MethodName").stringValue;
+                if (t == target && m == methodName)
+                    return true;
+            }
+            return false;
+        }
+
+        private static void AppendSerializedListener(SerializedProperty callsArray, UnityEngine.Object target, string assemblyTypeName, string methodName, int mode)
+        {
+            callsArray.arraySize++;
+            var call = callsArray.GetArrayElementAtIndex(callsArray.arraySize - 1);
+
+            call.FindPropertyRelative("m_Target").objectReferenceValue = target;
+            call.FindPropertyRelative("m_TargetAssemblyTypeName").stringValue = assemblyTypeName;
+            call.FindPropertyRelative("m_MethodName").stringValue = methodName;
+            call.FindPropertyRelative("m_Mode").intValue = mode;
+            call.FindPropertyRelative("m_CallState").intValue = 2; // EditorAndRuntime
+
+            // Zero-out argument fields (avoid leftover junk from array expansion)
+            var args = call.FindPropertyRelative("m_Arguments");
+            if (args != null)
+            {
+                args.FindPropertyRelative("m_ObjectArgument").objectReferenceValue = null;
+                args.FindPropertyRelative("m_ObjectArgumentAssemblyTypeName").stringValue = "UnityEngine.Object, UnityEngine";
+                args.FindPropertyRelative("m_IntArgument").intValue = 0;
+                args.FindPropertyRelative("m_FloatArgument").floatValue = 0f;
+                args.FindPropertyRelative("m_StringArgument").stringValue = string.Empty;
+                args.FindPropertyRelative("m_BoolArgument").boolValue = false;
+            }
         }
 
         private static void AddPersistentListenerReflected<T>(UnityEngine.Events.UnityEventBase ev, UnityEngine.Events.UnityAction<T> action)

@@ -51,6 +51,24 @@ namespace Wagenheimer.RewiredHelper.UI
             }
         }
 
+        private void OnEnable()
+        {
+            RewiredInputManager.OnInputSpecializationChanged += OnInputSpecializationChanged;
+        }
+
+        private void OnDisable()
+        {
+            RewiredInputManager.OnInputSpecializationChanged -= OnInputSpecializationChanged;
+        }
+
+        private void OnInputSpecializationChanged()
+        {
+            if (Application.isPlaying)
+            {
+                Rebuild();
+            }
+        }
+
         public void Rebuild()
         {
             for (int i = transform.childCount - 1; i >= 0; i--)
@@ -309,12 +327,25 @@ namespace Wagenheimer.RewiredHelper.UI
 
         private string GetTagForAction(string actionName)
         {
-            if (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (RewiredInputManager.Instance == null)
             {
-                return $"<rewiredElement playerId=0 controllerType=\"Mouse\" actionName=\"{actionName}\">";
+                return $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
             }
-            return $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+
+            var currentType = RewiredInputManager.Instance.CurrentControllerType;
+            if (currentType == ControllerType.Joystick)
+            {
+                return $"<rewiredElement playerId=0 controllerType=\"Joystick\" actionName=\"{actionName}\">";
+            }
+            else
+            {
+                if (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return $"<rewiredElement playerId=0 controllerType=\"Mouse\" actionName=\"{actionName}\">";
+                }
+                return $"<rewiredElement playerId=0 controllerType=\"Keyboard\" actionName=\"{actionName}\">";
+            }
         }
 
         private static string NicifyActionName(string actionName)

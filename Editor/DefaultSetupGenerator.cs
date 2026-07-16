@@ -667,6 +667,56 @@ namespace Wagenheimer.RewiredHelper.Editor
             return canvas;
         }
 
+        internal static void WirePlayerMouseEvents(RewiredInputManager manager, Component playerMouse)
+        {
+            if (manager == null || playerMouse == null || manager.GameCursor == null)
+            {
+                Debug.LogWarning("[RewiredHelper] Cannot wire Player Mouse events: make sure Game Cursor is assigned first.");
+                return;
+            }
+
+            var so = new SerializedObject(playerMouse);
+            var onScreenPos = so.FindProperty("onScreenPositionChanged");
+            var onEnabled = so.FindProperty("onEnabledStateChanged");
+
+            if (onScreenPos != null)
+            {
+                AddDynamicPersistentListener(onScreenPos, manager.GameCursor.rectTransform, "set_anchoredPosition");
+            }
+
+            if (onEnabled != null)
+            {
+                AddDynamicPersistentListener(onEnabled, manager.GameCursor.gameObject, "SetActive");
+            }
+
+            so.ApplyModifiedProperties();
+            MarkSceneDirty();
+            Debug.Log("[RewiredHelper] Player Mouse events auto-wired to Game Cursor (anchoredPosition & SetActive).");
+        }
+
+        private static void AddDynamicPersistentListener(SerializedProperty eventProp, UnityEngine.Object target, string methodName)
+        {
+            var calls = eventProp.FindPropertyRelative("m_PersistentCalls.m_Calls");
+            if (calls == null) return;
+
+            // Check if it's already wired to this target and method
+            for (int i = 0; i < calls.arraySize; i++)
+            {
+                var call = calls.GetArrayElementAtIndex(i);
+                var t = call.FindPropertyRelative("m_Target").objectReferenceValue;
+                var m = call.FindPropertyRelative("m_MethodName").stringValue;
+                if (t == target && m == methodName)
+                    return; // Already registered
+            }
+
+            calls.arraySize++;
+            var newCall = calls.GetArrayElementAtIndex(calls.arraySize - 1);
+            newCall.FindPropertyRelative("m_Target").objectReferenceValue = target;
+            newCall.FindPropertyRelative("m_MethodName").stringValue = methodName;
+            newCall.FindPropertyRelative("m_Mode").intValue = 1; // EventDefined (dynamic call)
+            newCall.FindPropertyRelative("m_CallState").intValue = 2; // EditorAndRuntime
+        }
+
         static void MarkSceneDirty()
         {
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());

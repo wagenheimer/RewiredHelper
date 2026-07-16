@@ -254,6 +254,26 @@ namespace Wagenheimer.RewiredHelper.Editor
             else if (configuredElements > 0)
             {
                 DrawCheckResult("Player Mouse (Joystick Cursor Movement)", true, null, null, null);
+
+                // Verify Player Mouse Events are wired to GameCursor
+                if (manager.GameCursor != null)
+                {
+                    var onScreenPos = pmSerialized.FindProperty("onScreenPositionChanged");
+                    var onEnabled = pmSerialized.FindProperty("onEnabledStateChanged");
+                    bool posWired = onScreenPos != null && onScreenPos.FindPropertyRelative("m_PersistentCalls.m_Calls")?.arraySize > 0;
+                    bool enabledWired = onEnabled != null && onEnabled.FindPropertyRelative("m_PersistentCalls.m_Calls")?.arraySize > 0;
+
+                    if (!posWired || !enabledWired)
+                    {
+                        DrawCheckResult("Player Mouse Events — Wiring", false,
+                            "The Player Mouse events (On Screen Position Changed, On Enabled State Changed) are not wired to control the Game Cursor. The joystick cursor will not move or show/hide on screen.",
+                            "Wire Events", () => DefaultSetupGenerator.WirePlayerMouseEvents(manager, playerMouseComp));
+                    }
+                    else
+                    {
+                        DrawCheckResult("Player Mouse Events — Wiring", true, null, null, null);
+                    }
+                }
             }
             else
             {

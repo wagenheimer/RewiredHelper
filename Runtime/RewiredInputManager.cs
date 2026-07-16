@@ -363,7 +363,7 @@ namespace Wagenheimer.RewiredHelper
         private const float MOUSE_MOVEMENT_TIME_THRESHOLD = 0.01f;
         private const float MOUSE_MOVEMENT_INPUT_THRESHOLD = 0.1f;
 
-        private bool _lastInputWasPC = false;
+        private bool _lastInputWasPC = true;
 
         private bool HasJoystickAxisInput(Joystick joystick)
         {
@@ -391,10 +391,10 @@ namespace Wagenheimer.RewiredHelper
             }
             else
             {
-                if (Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_TIME_THRESHOLD || Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_TIME_THRESHOLD)
+                if (Mathf.Abs(Input.GetAxis("Mouse X")) > MOUSE_MOVEMENT_TIME_THRESHOLD || Mathf.Abs(Input.GetAxis("Mouse Y")) > MOUSE_MOVEMENT_TIME_THRESHOLD)
                     _lastMouseOrTouchMoveTime = Time.time;
 
-                if (Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_INPUT_THRESHOLD)
+                if (Mathf.Abs(Input.GetAxis("Mouse X")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || Mathf.Abs(Input.GetAxis("Mouse Y")) > MOUSE_MOVEMENT_INPUT_THRESHOLD)
                     lastInputWasTouch = false;
             }
 
@@ -407,8 +407,8 @@ namespace Wagenheimer.RewiredHelper
             }
             else
             {
-                bool mouseActive = Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || 
-                                   Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_INPUT_THRESHOLD ||
+                bool mouseActive = Mathf.Abs(Input.GetAxis("Mouse X")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || 
+                                   Mathf.Abs(Input.GetAxis("Mouse Y")) > MOUSE_MOVEMENT_INPUT_THRESHOLD ||
                                    Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
 
                 bool keyboardActive = Input.anyKey;

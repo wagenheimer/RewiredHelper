@@ -209,13 +209,18 @@ namespace Wagenheimer.RewiredHelper
 
         private void Update()
         {
+            if (Player == null && ReInput.isReady)
+            {
+                InitializePlayer();
+            }
+
             SecondsSinceLastMouseOrTouchMove = Time.time - _lastMouseOrTouchMoveTime;
 
             UpdateCursorPosition();
             HandleInputSystem();
             HandleEscapeButtons();
 
-            if (_controllerWasDisconnected && Time.time - _controllerDisconnectedTime > CONTROLLER_RECONNECT_DELAY)
+            if (_controllerWasDisconnected && Player != null && Time.time - _controllerDisconnectedTime > CONTROLLER_RECONNECT_DELAY)
                 CheckForControllerReconnection();
 
             if (GamePaused != null && GamePaused.activeSelf && anyButton)
@@ -230,6 +235,7 @@ namespace Wagenheimer.RewiredHelper
 
         private void CheckForControllerReconnection()
         {
+            if (Player == null) return;
             var currentController = Player.controllers.GetLastActiveController();
             if (currentController != null && currentController.type == ControllerType.Joystick)
             {
@@ -246,9 +252,13 @@ namespace Wagenheimer.RewiredHelper
 
             _modalStack.PruneInactiveTop();
 
-            if (Input.GetKeyDown(KeyCode.Escape) ||
-                Player.GetButtonDown("MenuButton") ||
-                Player.GetButtonDown("BackButton"))
+            bool escapePressed = Input.GetKeyDown(KeyCode.Escape);
+            if (Player != null)
+            {
+                escapePressed |= Player.GetButtonDown("MenuButton") || Player.GetButtonDown("BackButton");
+            }
+
+            if (escapePressed)
             {
                 if (_modalStack.ModalCount > 0 && _modalStack.TryGetTopEscapeButton(out var escapeButton) &&
                     escapeButton != null && escapeButton.interactable && escapeButton.gameObject.activeSelf &&

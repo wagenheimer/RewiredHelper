@@ -147,7 +147,10 @@ namespace Wagenheimer.RewiredHelper.UI
             if (manager != null)
             {
                 var so = new UnityEditor.SerializedObject(manager);
-                var actionsProp = so.FindProperty("actions");
+                var actionsProp = so.FindProperty("_userData.actions");
+                if (actionsProp == null)
+                    actionsProp = so.FindProperty("actions");
+
                 if (actionsProp != null && actionsProp.isArray)
                 {
                     for (int i = 0; i < actionsProp.arraySize; i++)

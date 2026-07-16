@@ -29,10 +29,19 @@ namespace Wagenheimer.RewiredHelper.UI
         [Tooltip("If true, the rows will be cleared and rebuilt automatically on Awake. Disable this if you want to customize rows in Design Time.")]
         [SerializeField] private bool rebuildOnAwake = true;
 
+        [Tooltip("If true, glyph tags will force joystick/gamepad elements only, preventing keyboard keys from rendering.")]
+        [SerializeField] private bool gamepadOnly = true;
+
         public bool RebuildOnAwake
         {
             get => rebuildOnAwake;
             set => rebuildOnAwake = value;
+        }
+
+        public bool GamepadOnly
+        {
+            get => gamepadOnly;
+            set => gamepadOnly = value;
         }
 
         public List<string> ActionNames => actionNames;
@@ -260,12 +269,16 @@ namespace Wagenheimer.RewiredHelper.UI
                 foreach (var part in parts)
                 {
                     if (formattedText.Length > 0) formattedText += " ";
-                    formattedText += $"<rewiredElement playerId=0 actionName=\"{part}\">";
+                    formattedText += gamepadOnly 
+                        ? $"<rewiredElement playerId=0 controllerType=\"Joystick\" actionName=\"{part}\">"
+                        : $"<rewiredElement playerId=0 actionName=\"{part}\">";
                 }
             }
             else
             {
-                formattedText = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+                formattedText = gamepadOnly
+                    ? $"<rewiredElement playerId=0 controllerType=\"Joystick\" actionName=\"{actionName}\">"
+                    : $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
             }
 
             iconText.text = formattedText;

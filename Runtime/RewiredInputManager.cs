@@ -261,8 +261,7 @@ namespace Wagenheimer.RewiredHelper
             if (escapePressed)
             {
                 if (_modalStack.ModalCount > 0 && _modalStack.TryGetTopEscapeButton(out var escapeButton) &&
-                    escapeButton != null && escapeButton.interactable && escapeButton.gameObject.activeSelf &&
-                    escapeButton.onClick.GetPersistentEventCount() > 0)
+                    escapeButton != null && escapeButton.interactable && escapeButton.gameObject.activeSelf)
                 {
                     escapeButton.onClick.Invoke();
                 }
@@ -275,7 +274,7 @@ namespace Wagenheimer.RewiredHelper
             if (Input.GetKeyDown(KeyCode.Return))
             {
                 if (_modalStack.ModalCount > 0 && _modalStack.TryGetTopOkButton(out var okButton) &&
-                    okButton != null && okButton.interactable && okButton.onClick.GetPersistentEventCount() > 0)
+                    okButton != null && okButton.interactable && okButton.gameObject.activeSelf)
                 {
                     okButton.onClick.Invoke();
                 }

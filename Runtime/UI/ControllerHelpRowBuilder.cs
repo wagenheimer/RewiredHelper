@@ -22,6 +22,10 @@ namespace Wagenheimer.RewiredHelper.UI
     {
         const string GlyphHelperTypeName = "Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper";
 
+        [Tooltip("Rewired action names to show as rows, in this order. Leave empty to show every " +
+            "Button-type action in the current Rewired mapping (the default, zero-config behavior).")]
+        [SerializeField] private List<string> actionNames = new List<string>();
+
         private void Awake()
         {
             Rebuild();
@@ -33,12 +37,42 @@ namespace Wagenheimer.RewiredHelper.UI
                 Destroy(transform.GetChild(i).gameObject);
 
             var glyphHelperType = FindGlyphHelperType();
-            var actions = ReInput.mapping != null
-                ? ReInput.mapping.Actions.Where(a => a.type == InputActionType.Button).OrderBy(a => a.categoryId).ThenBy(a => a.name).ToList()
-                : new List<InputAction>();
+            var actions = ResolveActions();
 
             for (int i = 0; i < actions.Count; i++)
                 CreateRow(actions[i].name, actions[i].descriptiveName, glyphHelperType, i % 2 == 1);
+        }
+
+        /// <summary>
+        /// Uses the curated <see cref="actionNames"/> list, in that order, when set — letting a
+        /// consumer hand-pick and reorder which actions show (e.g. to drop keyboard/mouse actions
+        /// like "MouseLeftButton" out of a gamepad-only help screen). Falls back to every Button-type
+        /// action in the live mapping when the list is empty, so the component still works with zero
+        /// configuration.
+        /// </summary>
+        private List<InputAction> ResolveActions()
+        {
+            if (ReInput.mapping == null) return new List<InputAction>();
+
+            if (actionNames != null && actionNames.Count > 0)
+            {
+                var resolved = new List<InputAction>(actionNames.Count);
+                foreach (var name in actionNames)
+                {
+                    var action = ReInput.mapping.GetAction(name);
+                    if (action != null)
+                        resolved.Add(action);
+                    else
+                        Debug.LogWarning($"[RewiredHelper] ControllerHelpRowBuilder: no Rewired action named \"{name}\" — skipping row.");
+                }
+                return resolved;
+            }
+
+            return ReInput.mapping.Actions
+                .Where(a => a.type == InputActionType.Button)
+                .OrderBy(a => a.categoryId)
+                .ThenBy(a => a.name)
+                .ToList();
         }
 
         private void CreateRow(string actionName, string actionDesc, Type glyphHelperType, bool isAlt)

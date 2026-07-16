@@ -218,6 +218,12 @@ namespace Wagenheimer.RewiredHelper.Editor
             else
             {
                 DrawSuccessBox("Rewired Glyphs Addon detected and active!");
+
+                var glyphProviderType = DefaultSetupGenerator.FindGlyphProviderType();
+                var hasGlyphProvider = glyphProviderType != null && manager.GetComponent(glyphProviderType) != null;
+                DrawCheckResult("Glyph Provider", hasGlyphProvider,
+                    "Without a Glyph Provider on the Rewired Input Manager, ReInput.glyphs.glyphProvider is never set, so every <rewiredElement> glyph tag falls back to plain text instead of an icon.",
+                    "Add Glyph Provider", () => DefaultSetupGenerator.EnsureGlyphProvider(manager.gameObject));
             }
 
             EditorGUILayout.Space(10);

@@ -84,8 +84,87 @@ namespace Wagenheimer.RewiredHelper.Editor
                 }
             }
 
+            EnsureGlyphProvider(managerGo);
+
             Selection.activeGameObject = managerGo;
             MarkSceneDirty();
+        }
+
+        const string GlyphProviderTypeName = "Rewired.Glyphs.GlyphProvider";
+        const string GlyphSetCollectionTypeName = "Rewired.Glyphs.GlyphSetCollection";
+
+        internal static Type FindGlyphProviderType() => FindTypeByName(GlyphProviderTypeName);
+        internal static Type FindGlyphSetCollectionType() => FindTypeByName(GlyphSetCollectionTypeName);
+
+        private static Type FindTypeByName(string typeName)
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(typeName);
+                if (type != null) return type;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Adds Rewired's Glyph Provider (if the Glyphs addon is installed) and assigns a
+        /// GlyphSetCollection asset found in the project, if any. Without a Glyph Provider,
+        /// ReInput.glyphs.glyphProvider is never set and every glyph tag falls back to plain text —
+        /// this is the single most common reason "the icons don't show up".
+        /// </summary>
+        internal static void EnsureGlyphProvider(GameObject managerGo)
+        {
+            var glyphProviderType = FindGlyphProviderType();
+            if (glyphProviderType == null) return; // Glyphs addon not installed — nothing to do
+
+            var existing = managerGo.GetComponent(glyphProviderType);
+            bool created = existing == null;
+            if (created)
+            {
+                existing = Undo.AddComponent(managerGo, glyphProviderType);
+            }
+
+            var so = new SerializedObject(existing);
+            var collectionsProp = so.FindProperty("_glyphSetCollections");
+            if (collectionsProp != null && collectionsProp.arraySize == 0)
+            {
+                var collectionType = FindGlyphSetCollectionType();
+                if (collectionType != null)
+                {
+                    // Prefer the shortest matching asset path: per-controller sub-collections (e.g.
+                    // "...(_Joysticks/_Templates/_KeyboardMouse).asset") are aggregated *inside* a
+                    // root collection asset, so the root's name is naturally the shortest — assigning
+                    // a sub-collection directly alongside the root would double-count its entries and
+                    // log "duplicate glyph key" errors.
+                    string bestPath = null;
+                    foreach (var guid in AssetDatabase.FindAssets($"t:{collectionType.Name}"))
+                    {
+                        var path = AssetDatabase.GUIDToAssetPath(guid);
+                        if (bestPath == null || path.Length < bestPath.Length)
+                            bestPath = path;
+                    }
+
+                    if (bestPath != null)
+                    {
+                        var collectionAsset = AssetDatabase.LoadAssetAtPath(bestPath, collectionType);
+                        collectionsProp.arraySize = 1;
+                        collectionsProp.GetArrayElementAtIndex(0).objectReferenceValue = collectionAsset;
+                        so.ApplyModifiedProperties();
+                        Debug.Log($"[RewiredHelper] Assigned Glyph Set Collection '{bestPath}' to Glyph Provider.");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[RewiredHelper] Glyph Provider added, but no GlyphSetCollection asset was found. " +
+                            "Install Rewired's Glyphs pack (Window > Rewired > Extras > Glyphs > Install) and assign a collection manually.");
+                    }
+                }
+            }
+
+            if (created)
+            {
+                Undo.RegisterCompleteObjectUndo(managerGo, "Add Glyph Provider");
+                Debug.Log("[RewiredHelper] Added Glyph Provider to Rewired Input Manager so controller glyph icons can render.");
+            }
         }
 
         [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Controller Help Form", priority = 12)]
@@ -459,21 +538,18 @@ namespace Wagenheimer.RewiredHelper.Editor
             scrollRectTransform.offsetMin = new Vector2(20, 50); // Leave room for footer
             scrollRectTransform.offsetMax = new Vector2(-20, -75); // Offset top for header
 
-            // Viewport
-            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            // Viewport — RectMask2D instead of Mask+Image: Mask clips via a stencil buffer that a
+            // fully transparent Image writes to, and depending on Unity version/render pipeline that
+            // write can get skipped or discarded at the shader level even with cullTransparentMesh
+            // disabled, silently clipping every child out instead of nothing. RectMask2D clips
+            // purely via the shader's _ClipRect, with no Graphic/stencil involved, so it can't hit
+            // that failure mode.
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
             var viewportRect = (RectTransform)viewportGo.transform;
             viewportRect.SetParent(scrollRectTransform, false);
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
             viewportRect.sizeDelta = Vector2.zero;
-            viewportGo.GetComponent<Image>().color = new Color(0, 0, 0, 0); // Transparent mask
-            viewportGo.GetComponent<Mask>().showMaskGraphic = false;
-            // CanvasRenderer.cullTransparentMesh defaults to true, which skips the draw call for a
-            // fully transparent (alpha 0) graphic as a perf optimization. For a Mask, that draw call
-            // is what writes the stencil ref — skip it and the stencil is never written, so every
-            // child (which only draws where stencil == ref) gets clipped out entirely and renders
-            // nothing, even though the GameObjects exist in the hierarchy.
-            viewportGo.GetComponent<CanvasRenderer>().cullTransparentMesh = false;
 
             // Content Container
             var contentGo = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));

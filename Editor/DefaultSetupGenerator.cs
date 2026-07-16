@@ -526,11 +526,12 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (actions.Count == 0)
             {
-                // Fallback template rows if mapping is empty (e.g. edit mode)
-                CreateHelpRow(contentRect, "UIHorizontal", "Move Selection (Horizontal)", glyphHelperType, false);
-                CreateHelpRow(contentRect, "UIVertical", "Move Selection (Vertical)", glyphHelperType, true);
-                CreateHelpRow(contentRect, "UISubmit", "Confirm / Select", glyphHelperType, false);
-                CreateHelpRow(contentRect, "UICancel", "Back / Cancel", glyphHelperType, true);
+                // Fallback template rows if mapping is empty (e.g. edit mode). These names are
+                // placeholders, not real Rewired actions, so hasRealAction: false below.
+                CreateHelpRow(contentRect, "UIHorizontal", "Move Selection (Horizontal)", glyphHelperType, false, hasRealAction: false);
+                CreateHelpRow(contentRect, "UIVertical", "Move Selection (Vertical)", glyphHelperType, true, hasRealAction: false);
+                CreateHelpRow(contentRect, "UISubmit", "Confirm / Select", glyphHelperType, false, hasRealAction: false);
+                CreateHelpRow(contentRect, "UICancel", "Back / Cancel", glyphHelperType, true, hasRealAction: false);
             }
             else
             {
@@ -543,7 +544,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             return formGo;
         }
 
-        static void CreateHelpRow(Transform parent, string actionName, string actionDesc, Type glyphHelperType, bool isAlt)
+        static void CreateHelpRow(Transform parent, string actionName, string actionDesc, Type glyphHelperType, bool isAlt, bool hasRealAction = true)
         {
             var rowGo = new GameObject($"Row_{actionName}", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
             var rowRect = (RectTransform)rowGo.transform;
@@ -595,19 +596,32 @@ namespace Wagenheimer.RewiredHelper.Editor
             iconRect.sizeDelta = new Vector2(140, 32);
 
             var iconText = iconGo.AddComponent<TextMeshProUGUI>();
-            iconText.text = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
             iconText.fontSize = 18;
             iconText.color = Color.white;
             iconText.alignment = TextAlignmentOptions.Right;
 
-            if (glyphHelperType != null)
+            if (hasRealAction)
             {
-                var glyphHelper = iconGo.AddComponent(glyphHelperType);
-                var textProp = glyphHelperType.GetProperty("text");
-                if (textProp != null)
+                iconText.text = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+
+                if (glyphHelperType != null)
                 {
-                    textProp.SetValue(glyphHelper, $"<rewiredElement playerId=0 actionName=\"{actionName}\">");
+                    var glyphHelper = iconGo.AddComponent(glyphHelperType);
+                    var textProp = glyphHelperType.GetProperty("text");
+                    if (textProp != null)
+                    {
+                        textProp.SetValue(glyphHelper, $"<rewiredElement playerId=0 actionName=\"{actionName}\">");
+                    }
                 }
+            }
+            else
+            {
+                // Fallback template rows (used when ReInput.mapping was empty at generation time,
+                // e.g. edit mode) use placeholder names like "UIHorizontal" that don't necessarily
+                // exist as real Rewired actions. Binding the glyph tag to a nonexistent action makes
+                // UnityUITextMeshProGlyphHelper throw "Invalid Action name" every frame — so skip the
+                // tag and the glyph helper entirely and just label the column generically.
+                iconText.text = "GAMEPAD";
             }
 
             // Separator dash in row

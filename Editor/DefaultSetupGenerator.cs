@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using Rewired;
 using TMPro;
 using UnityEditor;
@@ -18,18 +17,14 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// hand-authored .prefab file, which this package's CI can't validate compiles or instantiates
     /// correctly) — save the result as a prefab in your own project once you're happy with it.
     ///
-    /// The controller-help form is populated using Rewired's own official glyph system
-    /// (Window > Rewired > Extras > Glyphs > Install → installs the icon sets and
-    /// Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper) if the consumer has installed it —
-    /// this package cannot bundle that addon itself since it ships under Rewired's own commercial
-    /// license, not this package's MIT one. Referenced via reflection so this package compiles
-    /// whether or not the addon is present. If it isn't found, the form is still created with
-    /// placeholder text pointing at that install menu.
+    /// The controller-help form's row list is populated at runtime by
+    /// <see cref="Wagenheimer.RewiredHelper.UI.ControllerHelpRowBuilder"/> (attached to its
+    /// "Content" container here), not baked at edit time — <c>ReInput.mapping.Actions</c> is only
+    /// populated once Rewired is initialized, so edit-time generation would either see stale data
+    /// or, before Play mode has ever run, nothing at all.
     /// </summary>
     internal static class DefaultSetupGenerator
     {
-        const string GlyphHelperTypeName = "Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper";
-
         const string InputManagerPrefabPath = "Packages/com.wagenheimer.rewiredhelper/Runtime/Prefabs/Rewired Input Manager.prefab";
         const string EventSystemPrefabPath = "Packages/com.wagenheimer.rewiredhelper/Runtime/Prefabs/Rewired Event System.prefab";
         const string FormControllerPrefabPath = "Packages/com.wagenheimer.rewiredhelper/Runtime/Prefabs/formController.prefab";
@@ -524,164 +519,15 @@ namespace Wagenheimer.RewiredHelper.Editor
             footerText.fontStyle = FontStyles.Bold;
             footerText.alignment = TextAlignmentOptions.Center;
 
-            // 4. Generate Rows
-            var glyphHelperType = FindGlyphHelperType();
-            var actions = ReInput.mapping != null 
-                ? ReInput.mapping.Actions.Where(a => a.type == InputActionType.Button).OrderBy(a => a.categoryId).ThenBy(a => a.name).ToList()
-                : new System.Collections.Generic.List<InputAction>();
-
-            if (actions.Count == 0)
-            {
-                // Fallback template rows if mapping is empty (e.g. edit mode). These names are
-                // placeholders, not real Rewired actions, so hasRealAction: false below.
-                CreateHelpRow(contentRect, "UIHorizontal", "Move Selection (Horizontal)", glyphHelperType, false, hasRealAction: false);
-                CreateHelpRow(contentRect, "UIVertical", "Move Selection (Vertical)", glyphHelperType, true, hasRealAction: false);
-                CreateHelpRow(contentRect, "UISubmit", "Confirm / Select", glyphHelperType, false, hasRealAction: false);
-                CreateHelpRow(contentRect, "UICancel", "Back / Cancel", glyphHelperType, true, hasRealAction: false);
-            }
-            else
-            {
-                for (int i = 0; i < actions.Count; i++)
-                {
-                    CreateHelpRow(contentRect, actions[i].name, actions[i].descriptiveName, glyphHelperType, i % 2 == 1);
-                }
-            }
+            // 4. Rows are built at runtime (see Wagenheimer.RewiredHelper.UI.ControllerHelpRowBuilder)
+            // instead of baked here, because ReInput.mapping.Actions is only populated once Rewired
+            // is initialized (normally Play mode) — generating rows at edit time means either stale
+            // data or, if the mapping was empty, placeholder rows with fake action names and no
+            // glyphs. The runtime component clears and rebuilds from the live action map on Awake
+            // every time the game starts, so it always matches the current Rewired configuration.
+            contentGo.AddComponent<Wagenheimer.RewiredHelper.UI.ControllerHelpRowBuilder>();
 
             return formGo;
-        }
-
-        static void CreateHelpRow(Transform parent, string actionName, string actionDesc, Type glyphHelperType, bool isAlt, bool hasRealAction = true)
-        {
-            var rowGo = new GameObject($"Row_{actionName}", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
-            var rowRect = (RectTransform)rowGo.transform;
-            rowRect.SetParent(parent, false);
-            rowRect.sizeDelta = new Vector2(0, 38);
-
-            var bgImage = rowGo.GetComponent<Image>();
-            // Alternating dark backgrounds
-            bgImage.color = isAlt 
-                ? new Color(0.12f, 0.12f, 0.14f, 0.7f) 
-                : new Color(0.15f, 0.15f, 0.17f, 0.8f);
-
-            // Left accent vertical bar (like a tag)
-            var accentBarGo = new GameObject("AccentTag", typeof(RectTransform), typeof(Image));
-            var accentBarRect = (RectTransform)accentBarGo.transform;
-            accentBarRect.SetParent(rowRect, false);
-            accentBarRect.anchorMin = new Vector2(0, 0.5f);
-            accentBarRect.anchorMax = new Vector2(0, 0.5f);
-            accentBarRect.pivot = new Vector2(0, 0.5f);
-            accentBarRect.sizeDelta = new Vector2(3, 26);
-            accentBarRect.anchoredPosition = new Vector2(4, 0);
-            accentBarGo.GetComponent<Image>().color = new Color(0.22f, 0.60f, 1.00f); // Blue accent
-
-            // Exclude the accent tag from the row's HorizontalLayoutGroup — it's a fixed decorative
-            // overlay positioned via anchoredPosition above, not a flow column. Without this, the
-            // layout group sweeps it up as its first child and repositions/resizes it, fighting the
-            // manual placement.
-            var accentLayoutElement = accentBarGo.AddComponent<LayoutElement>();
-            accentLayoutElement.ignoreLayout = true;
-
-            var hlg = rowGo.GetComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 15f;
-            hlg.childAlignment = TextAnchor.MiddleCenter;
-            hlg.childControlWidth = false;
-            // false, not true: Icon/Divider/Description already carry an explicit sizeDelta.y (32)
-            // that fits the row. Letting the layout group drive height instead makes it query the
-            // row's own computed height — which, nested under Content's VerticalLayoutGroup +
-            // ContentSizeFitter, resolves to 0 on the first pass and collapses every row to nothing
-            // (row exists in the hierarchy but renders with zero height).
-            hlg.childControlHeight = false;
-            hlg.childForceExpandWidth = false;
-            hlg.childForceExpandHeight = false;
-            hlg.padding = new RectOffset(20, 20, 3, 3);
-
-            // Icon Label (Left side) - Right aligned for crisp button layout
-            var iconGo = new GameObject("Icon", typeof(RectTransform));
-            var iconRect = (RectTransform)iconGo.transform;
-            iconRect.SetParent(rowRect, false);
-            iconRect.sizeDelta = new Vector2(140, 32);
-
-            var iconText = iconGo.AddComponent<TextMeshProUGUI>();
-            iconText.fontSize = 18;
-            iconText.color = Color.white;
-            iconText.alignment = TextAlignmentOptions.Right;
-
-            if (hasRealAction)
-            {
-                iconText.text = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
-
-                if (glyphHelperType != null)
-                {
-                    var glyphHelper = iconGo.AddComponent(glyphHelperType);
-                    var textProp = glyphHelperType.GetProperty("text");
-                    if (textProp != null)
-                    {
-                        textProp.SetValue(glyphHelper, $"<rewiredElement playerId=0 actionName=\"{actionName}\">");
-                    }
-                }
-            }
-            else
-            {
-                // Fallback template rows (used when ReInput.mapping was empty at generation time,
-                // e.g. edit mode) use placeholder names like "UIHorizontal" that don't necessarily
-                // exist as real Rewired actions. Binding the glyph tag to a nonexistent action makes
-                // UnityUITextMeshProGlyphHelper throw "Invalid Action name" every frame — so skip the
-                // tag and the glyph helper entirely and just label the column generically.
-                iconText.text = "GAMEPAD";
-            }
-
-            // Separator dash in row
-            var divGo = new GameObject("Divider", typeof(RectTransform));
-            var divRect = (RectTransform)divGo.transform;
-            divRect.SetParent(rowRect, false);
-            divRect.sizeDelta = new Vector2(15, 32);
-            var divText = divGo.AddComponent<TextMeshProUGUI>();
-            divText.text = "—";
-            divText.fontSize = 14;
-            divText.color = new Color(0.4f, 0.4f, 0.45f);
-            divText.alignment = TextAlignmentOptions.Center;
-
-            // Description Label (Right side)
-            var descGo = new GameObject("Description", typeof(RectTransform));
-            var descRect = (RectTransform)descGo.transform;
-            descRect.SetParent(rowRect, false);
-            descRect.sizeDelta = new Vector2(320, 32);
-
-            var descText = descGo.AddComponent<TextMeshProUGUI>();
-            // Rewired's <rewiredAction> tag needs a glyph/companion component to expand — none is
-            // attached here, so TMP silently drops it and the label renders blank when the action
-            // has no Descriptive Name set in the Rewired Input Manager. Fall back to a readable,
-            // always-visible label derived from the action's short name instead.
-            descText.text = !string.IsNullOrEmpty(actionDesc) ? actionDesc.ToUpper() : NicifyActionName(actionName);
-            descText.fontSize = 13;
-            descText.fontStyle = FontStyles.Bold;
-            descText.color = new Color(0.75f, 0.75f, 0.8f);
-            descText.alignment = TextAlignmentOptions.Left;
-        }
-
-        static string NicifyActionName(string actionName)
-        {
-            if (string.IsNullOrEmpty(actionName)) return "";
-
-            var sb = new StringBuilder();
-            for (int i = 0; i < actionName.Length; i++)
-            {
-                if (i > 0 && char.IsUpper(actionName[i]) && !char.IsUpper(actionName[i - 1]))
-                    sb.Append(' ');
-                sb.Append(actionName[i]);
-            }
-            return sb.ToString().ToUpper();
-        }
-
-        static Type FindGlyphHelperType()
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var type = assembly.GetType(GlyphHelperTypeName);
-                if (type != null)
-                    return type;
-            }
-            return null;
         }
 
         static Canvas FindOrCreateCanvas()

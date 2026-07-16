@@ -675,46 +675,50 @@ namespace Wagenheimer.RewiredHelper.Editor
                 return;
             }
 
-            var so = new SerializedObject(playerMouse);
-            var onScreenPos = so.FindProperty("_onScreenPositionChanged");
-            var onEnabled = so.FindProperty("_onEnabledStateChanged");
+            var type = playerMouse.GetType();
+            var onScreenPosField = type.GetField("_onScreenPositionChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            var onEnabledField = type.GetField("_onEnabledStateChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
 
-            if (onScreenPos != null)
+            if (onScreenPosField != null)
             {
-                AddDynamicPersistentListener(onScreenPos, manager.GameCursor.rectTransform, "set_anchoredPosition");
+                var onScreenPosEvent = (UnityEngine.Events.UnityEvent<Vector2>)onScreenPosField.GetValue(playerMouse);
+                if (onScreenPosEvent != null)
+                {
+                    // Clean up empty/broken listeners first
+                    for (int i = onScreenPosEvent.GetPersistentEventCount() - 1; i >= 0; i--)
+                    {
+                        var t = onScreenPosEvent.GetPersistentTarget(i);
+                        if (t == null)
+                            UnityEditor.Events.UnityEventTools.RemovePersistentListener(onScreenPosEvent, i);
+                    }
+
+                    var setterMethod = typeof(RectTransform).GetProperty("anchoredPosition").GetSetMethod();
+                    var action = (UnityEngine.Events.UnityAction<Vector2>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<Vector2>), manager.GameCursor.rectTransform, setterMethod);
+                    UnityEditor.Events.UnityEventTools.AddPersistentListener(onScreenPosEvent, action);
+                }
             }
 
-            if (onEnabled != null)
+            if (onEnabledField != null)
             {
-                AddDynamicPersistentListener(onEnabled, manager.GameCursor.gameObject, "SetActive");
+                var onEnabledEvent = (UnityEngine.Events.UnityEvent<bool>)onEnabledField.GetValue(playerMouse);
+                if (onEnabledEvent != null)
+                {
+                    // Clean up empty/broken listeners first
+                    for (int i = onEnabledEvent.GetPersistentEventCount() - 1; i >= 0; i--)
+                    {
+                        var t = onEnabledEvent.GetPersistentTarget(i);
+                        if (t == null)
+                            UnityEditor.Events.UnityEventTools.RemovePersistentListener(onEnabledEvent, i);
+                    }
+
+                    var action = new UnityEngine.Events.UnityAction<bool>(manager.GameCursor.gameObject.SetActive);
+                    UnityEditor.Events.UnityEventTools.AddPersistentListener(onEnabledEvent, action);
+                }
             }
 
-            so.ApplyModifiedProperties();
+            EditorUtility.SetDirty(playerMouse);
             MarkSceneDirty();
             Debug.Log("[RewiredHelper] Player Mouse events auto-wired to Game Cursor (anchoredPosition & SetActive).");
-        }
-
-        private static void AddDynamicPersistentListener(SerializedProperty eventProp, UnityEngine.Object target, string methodName)
-        {
-            var calls = eventProp.FindPropertyRelative("m_PersistentCalls.m_Calls");
-            if (calls == null) return;
-
-            // Check if it's already wired to this target and method
-            for (int i = 0; i < calls.arraySize; i++)
-            {
-                var call = calls.GetArrayElementAtIndex(i);
-                var t = call.FindPropertyRelative("m_Target").objectReferenceValue;
-                var m = call.FindPropertyRelative("m_MethodName").stringValue;
-                if (t == target && m == methodName)
-                    return; // Already registered
-            }
-
-            calls.arraySize++;
-            var newCall = calls.GetArrayElementAtIndex(calls.arraySize - 1);
-            newCall.FindPropertyRelative("m_Target").objectReferenceValue = target;
-            newCall.FindPropertyRelative("m_MethodName").stringValue = methodName;
-            newCall.FindPropertyRelative("m_Mode").intValue = 1; // EventDefined (dynamic call)
-            newCall.FindPropertyRelative("m_CallState").intValue = 2; // EditorAndRuntime
         }
 
         static void MarkSceneDirty()

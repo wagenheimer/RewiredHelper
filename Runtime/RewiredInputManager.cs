@@ -401,9 +401,9 @@ namespace Wagenheimer.RewiredHelper
 
                 if (mouseActive)
                 {
-                    var mouseController = ReInput.controllers.GetController(ControllerType.Mouse, 0);
-                    if (mouseController != null)
-                        currentController = mouseController;
+                    var keyboardController = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
+                    if (keyboardController != null)
+                        currentController = keyboardController;
                 }
 
                 if (currentController != null || !_controllerWasDisconnected)

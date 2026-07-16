@@ -268,7 +268,6 @@ namespace Wagenheimer.RewiredHelper.UI
                 formattedText = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
             }
 
-            iconText.text = formattedText;
             iconText.fontSize = 24;
             iconText.color = Color.white;
             iconText.alignment = TextAlignmentOptions.Right;
@@ -279,6 +278,10 @@ namespace Wagenheimer.RewiredHelper.UI
                 var textProp = glyphHelperType.GetProperty("text");
                 if (textProp != null)
                     textProp.SetValue(glyphHelper, formattedText);
+            }
+            else
+            {
+                iconText.text = formattedText;
             }
 
             var divGo = new GameObject("Divider", typeof(RectTransform));

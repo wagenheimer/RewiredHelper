@@ -241,13 +241,7 @@ namespace Wagenheimer.RewiredHelper
 #endif
         }
 
-        private void OnDestroy()
-        {
-            if (_isDelegateRegistered && ReInput.isReady)
-            {
-                ReInput.controllers.RemoveLastActiveControllerChangedDelegate(OnLastActiveControllerChangedCallback);
-            }
-        }
+
 
         private void OnLastActiveControllerChangedCallback(Player player, Controller controller)
         {
@@ -356,6 +350,10 @@ namespace Wagenheimer.RewiredHelper
         private void OnDestroy()
         {
             UnsubscribeFromEvents();
+            if (_isDelegateRegistered && ReInput.isReady)
+            {
+                ReInput.controllers.RemoveLastActiveControllerChangedDelegate(OnLastActiveControllerChangedCallback);
+            }
             if (Instance == this) Instance = null;
         }
         #endregion

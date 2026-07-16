@@ -49,6 +49,10 @@ namespace Wagenheimer.RewiredHelper.UI
             {
                 Rebuild();
             }
+            else
+            {
+                UpdateExistingRows();
+            }
         }
 
         private void OnEnable()
@@ -65,7 +69,14 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             if (Application.isPlaying)
             {
-                Rebuild();
+                if (rebuildOnAwake)
+                {
+                    Rebuild();
+                }
+                else
+                {
+                    UpdateExistingRows();
+                }
             }
         }
 
@@ -371,6 +382,69 @@ namespace Wagenheimer.RewiredHelper.UI
                     return type;
             }
             return null;
+        }
+
+        private void UpdateExistingRows()
+        {
+            var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
+            foreach (var txt in texts)
+            {
+                string originalText = txt.text;
+                if (string.IsNullOrEmpty(originalText) || !originalText.Contains("<rewiredElement")) continue;
+
+                string updatedText = UpdateControllerTypeInTags(originalText);
+                if (updatedText != originalText)
+                {
+                    txt.text = updatedText;
+                }
+            }
+        }
+
+        private string UpdateControllerTypeInTags(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            if (RewiredInputManager.Instance == null) return text;
+
+            var currentType = RewiredInputManager.Instance.CurrentControllerType;
+            string targetType = currentType == ControllerType.Joystick ? "Joystick" : "";
+
+            return System.Text.RegularExpressions.Regex.Replace(text, @"<rewiredElement\b[^>]*>", match =>
+            {
+                string tag = match.Value;
+
+                string actionName = "";
+                var actionMatch = System.Text.RegularExpressions.Regex.Match(tag, @"\bactionName\s*=\s*""([^""]*)""");
+                if (actionMatch.Success)
+                {
+                    actionName = actionMatch.Groups[1].Value;
+                }
+
+                string typeToUse = targetType;
+                if (string.IsNullOrEmpty(typeToUse))
+                {
+                    if (!string.IsNullOrEmpty(actionName) && 
+                        (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        typeToUse = "Mouse";
+                    }
+                    else
+                    {
+                        typeToUse = "Keyboard";
+                    }
+                }
+
+                if (System.Text.RegularExpressions.Regex.IsMatch(tag, @"\bcontrollerType\s*=\s*""[^""]*"""))
+                {
+                    tag = System.Text.RegularExpressions.Regex.Replace(tag, @"\bcontrollerType\s*=\s*""[^""]*""", $"controllerType=\"{typeToUse}\"");
+                }
+                else
+                {
+                    tag = tag.Insert("<rewiredElement".Length, $" controllerType=\"{typeToUse}\"");
+                }
+
+                return tag;
+            });
         }
     }
 }

@@ -260,12 +260,12 @@ namespace Wagenheimer.RewiredHelper.UI
                 foreach (var part in parts)
                 {
                     if (formattedText.Length > 0) formattedText += " ";
-                    formattedText += $"<rewiredElement playerId=0 actionName=\"{part}\">";
+                    formattedText += GetTagForAction(part);
                 }
             }
             else
             {
-                formattedText = $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+                formattedText = GetTagForAction(actionName);
             }
 
             iconText.fontSize = 24;
@@ -305,6 +305,16 @@ namespace Wagenheimer.RewiredHelper.UI
             descText.fontStyle = FontStyles.Bold;
             descText.color = new Color(0.75f, 0.75f, 0.8f);
             descText.alignment = TextAlignmentOptions.Left;
+        }
+
+        private string GetTagForAction(string actionName)
+        {
+            if (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return $"<rewiredElement playerId=0 controllerType=\"Mouse\" actionName=\"{actionName}\">";
+            }
+            return $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
         }
 
         private static string NicifyActionName(string actionName)

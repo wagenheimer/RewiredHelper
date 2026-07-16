@@ -363,6 +363,20 @@ namespace Wagenheimer.RewiredHelper
         private const float MOUSE_MOVEMENT_TIME_THRESHOLD = 0.01f;
         private const float MOUSE_MOVEMENT_INPUT_THRESHOLD = 0.1f;
 
+        private bool _lastInputWasPC = false;
+
+        private bool HasJoystickAxisInput(Controller joystick)
+        {
+            if (joystick == null) return false;
+            int axisCount = joystick.axisCount;
+            for (int i = 0; i < axisCount; i++)
+            {
+                if (Mathf.Abs(joystick.GetAxisValue(i)) > 0.15f)
+                    return true;
+            }
+            return false;
+        }
+
         private void HandleInputSystem()
         {
             if (ReInput.touch == null) return;
@@ -393,17 +407,49 @@ namespace Wagenheimer.RewiredHelper
             }
             else
             {
-                var currentController = Player.controllers.GetLastActiveController();
-
                 bool mouseActive = Mathf.Abs(Player.GetAxis("MouseX")) > MOUSE_MOVEMENT_INPUT_THRESHOLD || 
                                    Mathf.Abs(Player.GetAxis("MouseY")) > MOUSE_MOVEMENT_INPUT_THRESHOLD ||
                                    Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
 
-                if (mouseActive)
+                bool keyboardActive = ReInput.controllers.keyboard.GetAnyButton();
+
+                bool joystickActive = false;
+                foreach (var joystick in Player.controllers.Joysticks)
+                {
+                    if (joystick.GetAnyButton() || HasJoystickAxisInput(joystick))
+                    {
+                        joystickActive = true;
+                        break;
+                    }
+                }
+
+                if (mouseActive || keyboardActive)
+                {
+                    _lastInputWasPC = true;
+                }
+                else if (joystickActive)
+                {
+                    _lastInputWasPC = false;
+                }
+
+                Controller currentController = null;
+                if (_lastInputWasPC)
                 {
                     var keyboardController = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
                     if (keyboardController != null)
                         currentController = keyboardController;
+                }
+                else
+                {
+                    currentController = Player.controllers.GetLastActiveController();
+                    if (currentController == null || currentController.type != ControllerType.Joystick)
+                    {
+                        foreach (var j in Player.controllers.Joysticks)
+                        {
+                            currentController = j;
+                            break;
+                        }
+                    }
                 }
 
                 if (currentController != null || !_controllerWasDisconnected)

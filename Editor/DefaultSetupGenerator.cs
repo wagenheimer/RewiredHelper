@@ -681,7 +681,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (onScreenPosField != null)
             {
-                var onScreenPosEvent = (UnityEngine.Events.UnityEvent<Vector2>)onScreenPosField.GetValue(playerMouse);
+                var onScreenPosEvent = (UnityEngine.Events.UnityEventBase)onScreenPosField.GetValue(playerMouse);
                 if (onScreenPosEvent != null)
                 {
                     // Clean up empty/broken listeners first
@@ -693,14 +693,32 @@ namespace Wagenheimer.RewiredHelper.Editor
                     }
 
                     var setterMethod = typeof(RectTransform).GetProperty("anchoredPosition").GetSetMethod();
-                    var action = (UnityEngine.Events.UnityAction<Vector2>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<Vector2>), manager.GameCursor.rectTransform, setterMethod);
-                    UnityEditor.Events.UnityEventTools.AddPersistentListener(onScreenPosEvent, action);
+                    if (setterMethod != null)
+                    {
+                        bool alreadyExists = false;
+                        for (int i = 0; i < onScreenPosEvent.GetPersistentEventCount(); i++)
+                        {
+                            var t = onScreenPosEvent.GetPersistentTarget(i);
+                            var m = onScreenPosEvent.GetPersistentMethodName(i);
+                            if (t == manager.GameCursor.rectTransform && m == setterMethod.Name)
+                            {
+                                alreadyExists = true;
+                                break;
+                            }
+                        }
+
+                        if (!alreadyExists)
+                        {
+                            var action = (UnityEngine.Events.UnityAction<Vector2>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<Vector2>), manager.GameCursor.rectTransform, setterMethod);
+                            UnityEditor.Events.UnityEventTools.AddPersistentListener(onScreenPosEvent, action);
+                        }
+                    }
                 }
             }
 
             if (onEnabledField != null)
             {
-                var onEnabledEvent = (UnityEngine.Events.UnityEvent<bool>)onEnabledField.GetValue(playerMouse);
+                var onEnabledEvent = (UnityEngine.Events.UnityEventBase)onEnabledField.GetValue(playerMouse);
                 if (onEnabledEvent != null)
                 {
                     // Clean up empty/broken listeners first
@@ -711,8 +729,27 @@ namespace Wagenheimer.RewiredHelper.Editor
                             UnityEditor.Events.UnityEventTools.RemovePersistentListener(onEnabledEvent, i);
                     }
 
-                    var action = new UnityEngine.Events.UnityAction<bool>(manager.GameCursor.gameObject.SetActive);
-                    UnityEditor.Events.UnityEventTools.AddPersistentListener(onEnabledEvent, action);
+                    var methodInfo = typeof(GameObject).GetMethod("SetActive", new Type[] { typeof(bool) });
+                    if (methodInfo != null)
+                    {
+                        bool alreadyExists = false;
+                        for (int i = 0; i < onEnabledEvent.GetPersistentEventCount(); i++)
+                        {
+                            var t = onEnabledEvent.GetPersistentTarget(i);
+                            var m = onEnabledEvent.GetPersistentMethodName(i);
+                            if (t == manager.GameCursor.gameObject && m == methodInfo.Name)
+                            {
+                                alreadyExists = true;
+                                break;
+                            }
+                        }
+
+                        if (!alreadyExists)
+                        {
+                            var action = (UnityEngine.Events.UnityAction<bool>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<bool>), manager.GameCursor.gameObject, methodInfo);
+                            UnityEditor.Events.UnityEventTools.AddPersistentListener(onEnabledEvent, action);
+                        }
+                    }
                 }
             }
 

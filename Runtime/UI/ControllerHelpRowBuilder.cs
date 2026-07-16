@@ -26,21 +26,48 @@ namespace Wagenheimer.RewiredHelper.UI
             "Button-type action in the current Rewired mapping (the default, zero-config behavior).")]
         [SerializeField] private List<string> actionNames = new List<string>();
 
+        [Tooltip("If true, the rows will be cleared and rebuilt automatically on Awake. Disable this if you want to customize rows in Design Time.")]
+        [SerializeField] private bool rebuildOnAwake = true;
+
+        public bool RebuildOnAwake
+        {
+            get => rebuildOnAwake;
+            set => rebuildOnAwake = value;
+        }
+
+        public List<string> ActionNames => actionNames;
+
+        private struct ActionInfo
+        {
+            public string Name;
+            public string DescriptiveName;
+        }
+
         private void Awake()
         {
-            Rebuild();
+            if (rebuildOnAwake)
+            {
+                Rebuild();
+            }
         }
 
         public void Rebuild()
         {
             for (int i = transform.childCount - 1; i >= 0; i--)
-                Destroy(transform.GetChild(i).gameObject);
+            {
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                    UnityEditor.Undo.DestroyObjectImmediate(transform.GetChild(i).gameObject);
+                else
+#endif
+                    Destroy(transform.GetChild(i).gameObject);
+            }
 
             var glyphHelperType = FindGlyphHelperType();
             var actions = ResolveActions();
 
             for (int i = 0; i < actions.Count; i++)
-                CreateRow(actions[i].name, actions[i].descriptiveName, glyphHelperType, i % 2 == 1);
+                CreateRow(actions[i].Name, actions[i].DescriptiveName, glyphHelperType, i % 2 == 1);
         }
 
         /// <summary>
@@ -50,34 +77,109 @@ namespace Wagenheimer.RewiredHelper.UI
         /// action in the live mapping when the list is empty, so the component still works with zero
         /// configuration.
         /// </summary>
-        private List<InputAction> ResolveActions()
+        private List<ActionInfo> ResolveActions()
         {
-            if (ReInput.mapping == null) return new List<InputAction>();
+            var list = new List<ActionInfo>();
+            var managerActions = GetActionsFromManagerInScene();
 
             if (actionNames != null && actionNames.Count > 0)
             {
-                var resolved = new List<InputAction>(actionNames.Count);
                 foreach (var name in actionNames)
                 {
-                    var action = ReInput.mapping.GetAction(name);
-                    if (action != null)
-                        resolved.Add(action);
+                    string desc = name;
+                    if (ReInput.mapping != null)
+                    {
+                        var action = ReInput.mapping.GetAction(name);
+                        if (action != null)
+                            desc = action.descriptiveName;
+                    }
                     else
-                        Debug.LogWarning($"[RewiredHelper] ControllerHelpRowBuilder: no Rewired action named \"{name}\" — skipping row.");
+                    {
+                        var found = managerActions.FirstOrDefault(a => a.Name == name);
+                        if (!string.IsNullOrEmpty(found.DescriptiveName))
+                            desc = found.DescriptiveName;
+                    }
+                    list.Add(new ActionInfo { Name = name, DescriptiveName = desc });
                 }
-                return resolved;
+                return list;
             }
 
-            return ReInput.mapping.Actions
-                .Where(a => a.type == InputActionType.Button)
-                .OrderBy(a => a.categoryId)
-                .ThenBy(a => a.name)
-                .ToList();
+            if (ReInput.mapping != null)
+            {
+                var actions = ReInput.mapping.Actions
+                    .Where(a => a.type == InputActionType.Button)
+                    .OrderBy(a => a.categoryId)
+                    .ThenBy(a => a.name);
+
+                foreach (var a in actions)
+                {
+                    list.Add(new ActionInfo { Name = a.name, DescriptiveName = a.descriptiveName });
+                }
+            }
+            else
+            {
+                // In Design Time, populate with all actions found in the scene's Rewired Input Manager
+                foreach (var action in managerActions)
+                {
+                    list.Add(action);
+                }
+            }
+
+            return list;
+        }
+
+        private List<ActionInfo> GetActionsFromManagerInScene()
+        {
+            var list = new List<ActionInfo>();
+
+#if UNITY_EDITOR
+            UnityEngine.Component manager = null;
+            foreach (var go in UnityEngine.Object.FindObjectsOfType<GameObject>())
+            {
+                var comp = go.GetComponent("InputManager");
+                if (comp != null && comp.GetType().FullName == "Rewired.InputManager")
+                {
+                    manager = comp;
+                    break;
+                }
+            }
+
+            if (manager != null)
+            {
+                var so = new UnityEditor.SerializedObject(manager);
+                var actionsProp = so.FindProperty("actions");
+                if (actionsProp != null && actionsProp.isArray)
+                {
+                    for (int i = 0; i < actionsProp.arraySize; i++)
+                    {
+                        var element = actionsProp.GetArrayElementAtIndex(i);
+                        var nameProp = element.FindPropertyRelative("_name");
+                        var descProp = element.FindPropertyRelative("_descriptiveName");
+                        if (nameProp != null)
+                        {
+                            list.Add(new ActionInfo
+                            {
+                                Name = nameProp.stringValue,
+                                DescriptiveName = descProp != null && !string.IsNullOrEmpty(descProp.stringValue) 
+                                    ? descProp.stringValue 
+                                    : nameProp.stringValue
+                            });
+                        }
+                    }
+                }
+            }
+#endif
+            return list;
         }
 
         private void CreateRow(string actionName, string actionDesc, Type glyphHelperType, bool isAlt)
         {
             var rowGo = new GameObject($"Row_{actionName}", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                UnityEditor.Undo.RegisterCreatedObjectUndo(rowGo, "Create Help Row");
+#endif
+
             var rowRect = (RectTransform)rowGo.transform;
             rowRect.SetParent(transform, false);
             rowRect.sizeDelta = new Vector2(0, 38);

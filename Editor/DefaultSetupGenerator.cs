@@ -676,8 +676,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
 
             var so = new SerializedObject(playerMouse);
-            var onScreenPos = so.FindProperty("onScreenPositionChanged");
-            var onEnabled = so.FindProperty("onEnabledStateChanged");
+            var onScreenPos = so.FindProperty("_onScreenPositionChanged");
+            var onEnabled = so.FindProperty("_onEnabledStateChanged");
 
             if (onScreenPos != null)
             {

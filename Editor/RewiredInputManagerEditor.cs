@@ -258,8 +258,8 @@ namespace Wagenheimer.RewiredHelper.Editor
                 // Verify Player Mouse Events are wired to GameCursor
                 if (manager.GameCursor != null)
                 {
-                    var onScreenPos = pmSerialized.FindProperty("onScreenPositionChanged");
-                    var onEnabled = pmSerialized.FindProperty("onEnabledStateChanged");
+                    var onScreenPos = pmSerialized.FindProperty("_onScreenPositionChanged");
+                    var onEnabled = pmSerialized.FindProperty("_onEnabledStateChanged");
                     bool posWired = onScreenPos != null && onScreenPos.FindPropertyRelative("m_PersistentCalls.m_Calls")?.arraySize > 0;
                     bool enabledWired = onEnabled != null && onEnabled.FindPropertyRelative("m_PersistentCalls.m_Calls")?.arraySize > 0;
 

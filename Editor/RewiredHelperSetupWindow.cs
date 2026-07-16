@@ -201,6 +201,57 @@ namespace Wagenheimer.RewiredHelper.Editor
             DrawCardItem("Rewired Official Glyphs Addon",
                 hasGlyphs ? "✅ Glyphs Addon detected in the project." : "⚠️ Optional. Install to show dynamic controller icons in UI labels.",
                 hasGlyphs, null, null, isOptional: true);
+
+            // 6. I2 Localization Integration
+            bool hasI2 = FindTypeByName("I2.Loc.LocalizationManager") != null;
+            if (hasI2)
+            {
+                bool hasI2Integration = FindTypeByName("Wagenheimer.RewiredHelper.Integration.I2SpecializationImportedMarker") != null;
+                DrawCardItem("I2 Localization Integration",
+                    hasI2Integration ? "✅ I2 Localization Integration is imported and active." : "⚠️ I2 Localization detected, but the integration specialization helper is not imported.",
+                    hasI2Integration, "Import Integration", () => ImportI2IntegrationSample(), isOptional: true);
+            }
+        }
+
+        private static void ImportI2IntegrationSample()
+        {
+            string sourcePath = "Packages/com.wagenheimer.rewiredhelper/Samples~/I2LocalizationIntegration/SpecializationManager.cs";
+            string destDir = "Assets/Samples/Rewired Helper/I2 Localization Integration";
+            string destPath = Path.Combine(destDir, "SpecializationManager.cs");
+
+            try
+            {
+                if (!Directory.Exists(destDir))
+                {
+                    Directory.CreateDirectory(destDir);
+                }
+
+                if (File.Exists(sourcePath))
+                {
+                    File.Copy(sourcePath, destPath, true);
+                    AssetDatabase.ImportAsset(destPath, ImportAssetOptions.ForceUpdate);
+                    AssetDatabase.Refresh();
+                    Debug.Log("[RewiredHelper] Imported I2 Localization Integration successfully!");
+                }
+                else
+                {
+                    Debug.LogError($"[RewiredHelper] Integration source file not found at: {sourcePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[RewiredHelper] Failed to import I2 Localization Integration: {ex.Message}");
+            }
+        }
+
+        private static Type FindTypeByName(string typeName)
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(typeName);
+                if (type != null) return type;
+            }
+            return null;
         }
 
         private void DrawCardItem(string title, string desc, bool pass, string fixBtnLabel, Action fixAction, bool isOptional = false)

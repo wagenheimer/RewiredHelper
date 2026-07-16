@@ -52,3 +52,9 @@ namespace I2.Loc
         }
     }
 }
+
+namespace Wagenheimer.RewiredHelper.Integration
+{
+    // Marker type used by the Editor Setup Checker to detect if this integration is imported.
+    internal struct I2SpecializationImportedMarker {}
+}

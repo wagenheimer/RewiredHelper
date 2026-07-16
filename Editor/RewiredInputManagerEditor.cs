@@ -260,8 +260,8 @@ namespace Wagenheimer.RewiredHelper.Editor
                 {
                     var onScreenPos = pmSerialized.FindProperty("_onScreenPositionChanged");
                     var onEnabled = pmSerialized.FindProperty("_onEnabledStateChanged");
-                    bool posWired = onScreenPos != null && onScreenPos.FindPropertyRelative("m_PersistentCalls.m_Calls")?.arraySize > 0;
-                    bool enabledWired = onEnabled != null && onEnabled.FindPropertyRelative("m_PersistentCalls.m_Calls")?.arraySize > 0;
+                    bool posWired = IsEventWired(onScreenPos);
+                    bool enabledWired = IsEventWired(onEnabled);
 
                     if (!posWired || !enabledWired)
                     {
@@ -473,6 +473,23 @@ namespace Wagenheimer.RewiredHelper.Editor
                     return type;
             }
             return null;
+        }
+
+        private static bool IsEventWired(SerializedProperty eventProp)
+        {
+            if (eventProp == null) return false;
+            var calls = eventProp.FindPropertyRelative("m_PersistentCalls.m_Calls");
+            if (calls == null || calls.arraySize == 0) return false;
+
+            for (int i = 0; i < calls.arraySize; i++)
+            {
+                var call = calls.GetArrayElementAtIndex(i);
+                var target = call.FindPropertyRelative("m_Target").objectReferenceValue;
+                var methodName = call.FindPropertyRelative("m_MethodName").stringValue;
+                if (target != null && !string.IsNullOrEmpty(methodName))
+                    return true;
+            }
+            return false;
         }
     }
 }

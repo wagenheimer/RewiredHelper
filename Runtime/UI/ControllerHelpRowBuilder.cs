@@ -44,6 +44,33 @@ namespace Wagenheimer.RewiredHelper.UI
             public string DescriptiveName;
         }
 
+        // Rewired's own internal "last active controller" tracking (separate from ours, and not
+        // filterable via isRewiredElementAllowedHandler for its text-fallback path) still
+        // re-resolves a Mouse-named row's glyph the instant any keyboard key is pressed, even
+        // though ApplyElementFilter correctly excludes Joystick candidates. Rather than fight that
+        // internal refresh, we just re-assert the correct tag on top of it every frame, in
+        // LateUpdate — which runs after Rewired's own Update-based tick — so any wrong flash gets
+        // overwritten before the frame is presented.
+        private readonly List<(UnityEngine.Object glyphHelper, PropertyInfo textProp, string text)> _pinnedMouseRows =
+            new List<(UnityEngine.Object, PropertyInfo, string)>();
+
+        private void LateUpdate()
+        {
+            for (int i = 0; i < _pinnedMouseRows.Count; i++)
+            {
+                var (glyphHelper, textProp, text) = _pinnedMouseRows[i];
+                if (glyphHelper == null) continue;
+                textProp.SetValue(glyphHelper, text);
+            }
+        }
+
+        private static bool IsMouseNamedAction(string actionName)
+        {
+            return !string.IsNullOrEmpty(actionName) &&
+                (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
         private void Awake()
         {
             if (rebuildOnAwake)
@@ -100,6 +127,8 @@ namespace Wagenheimer.RewiredHelper.UI
 
         public void Rebuild()
         {
+            _pinnedMouseRows.Clear();
+
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
 #if UNITY_EDITOR
@@ -327,7 +356,11 @@ namespace Wagenheimer.RewiredHelper.UI
                 ApplyElementFilter(glyphHelper, glyphHelperType);
                 var textProp = glyphHelperType.GetProperty("text");
                 if (textProp != null)
+                {
                     textProp.SetValue(glyphHelper, formattedText);
+                    if (IsMouseNamedAction(actionName))
+                        _pinnedMouseRows.Add((glyphHelper, textProp, formattedText));
+                }
             }
             else
             {
@@ -394,18 +427,29 @@ namespace Wagenheimer.RewiredHelper.UI
 
         private void UpdateExistingRows()
         {
+            _pinnedMouseRows.Clear();
+
             // Rows baked at design time (e.g. a hand-curated ControllerHelpForm prefab with
             // rebuildOnAwake off) never had ApplyElementFilter run on their glyph helper — that
             // only happens in CreateRow, for freshly generated rows. Attach it here too so
             // pre-existing rows also exclude Joystick bindings on PC and resolve correctly.
             var glyphHelperType = FindGlyphHelperType();
+            var textProp = glyphHelperType?.GetProperty("text");
             if (glyphHelperType != null)
             {
                 foreach (var txt in GetComponentsInChildren<TextMeshProUGUI>(true))
                 {
                     var glyphHelper = txt.GetComponent(glyphHelperType);
-                    if (glyphHelper != null)
-                        ApplyElementFilter(glyphHelper, glyphHelperType);
+                    if (glyphHelper == null) continue;
+
+                    ApplyElementFilter(glyphHelper, glyphHelperType);
+
+                    string tagText = textProp?.GetValue(glyphHelper) as string;
+                    if (string.IsNullOrEmpty(tagText)) continue;
+
+                    var actionMatch = System.Text.RegularExpressions.Regex.Match(tagText, @"\bactionName\s*=\s*""([^""]*)""");
+                    if (actionMatch.Success && IsMouseNamedAction(actionMatch.Groups[1].Value) && textProp != null)
+                        _pinnedMouseRows.Add((glyphHelper, textProp, tagText));
                 }
             }
 

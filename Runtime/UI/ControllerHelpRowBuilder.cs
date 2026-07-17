@@ -308,8 +308,14 @@ namespace Wagenheimer.RewiredHelper.UI
                 var parts = actionName.Split('+');
                 foreach (var part in parts)
                 {
+                    string partText = GetTagForAction(part);
+                    // Both halves of a grouped action (e.g. "MouseX+MouseY") commonly resolve to
+                    // the same static Mouse label — avoid rendering it twice.
+                    if (partText == MouseFallbackLabel && formattedText.Contains(MouseFallbackLabel))
+                        continue;
+
                     if (formattedText.Length > 0) formattedText += " ";
-                    formattedText += GetTagForAction(part);
+                    formattedText += partText;
                 }
             }
             else
@@ -370,11 +376,14 @@ namespace Wagenheimer.RewiredHelper.UI
             }
             else
             {
-                // Mouse/Scroll named actions always use Mouse binding.
+                // Mouse/Scroll named actions always use Mouse binding. Rendered as a plain static
+                // label (see MouseFallbackLabel) rather than a live tag — without an icon glyph
+                // theme, Rewired's text fallback describes whatever device last produced input,
+                // ignoring this controllerType, so a dynamic tag would flicker on any keypress.
                 if (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    return $"<rewiredElement playerId=0 controllerType=\"Mouse\" actionName=\"{actionName}\">";
+                    return MouseFallbackLabel;
                 }
 
                 // For other PC actions, only force Keyboard if the action actually has a keyboard binding.
@@ -383,11 +392,8 @@ namespace Wagenheimer.RewiredHelper.UI
                     return $"<rewiredElement playerId=0 controllerType=\"Keyboard\" actionName=\"{actionName}\">";
                 }
 
-                // No keyboard binding — force Mouse rather than leaving controllerType unset.
-                // Rewired's own auto-detect wanders to Joystick as soon as any key is pressed
-                // (the last-active controller becomes Keyboard, which has no binding for this
-                // action, so it falls back to whichever other controller does — Joystick).
-                return $"<rewiredElement playerId=0 controllerType=\"Mouse\" actionName=\"{actionName}\">";
+                // No keyboard binding — same static-Mouse-label reasoning as above.
+                return MouseFallbackLabel;
             }
         }
 
@@ -447,10 +453,8 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             var glyphHelperType = FindGlyphHelperType();
             var textProp = glyphHelperType?.GetProperty("text");
-            Debug.Log($"[RewiredHelper] UpdateExistingRows: glyphHelperType={(glyphHelperType != null ? glyphHelperType.FullName : "null")}, currentType={(RewiredInputManager.Instance != null ? RewiredInputManager.Instance.CurrentControllerType.ToString() : "no-instance")}");
 
             var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
-            Debug.Log($"[RewiredHelper] UpdateExistingRows: found {texts.Length} TextMeshProUGUI under {name}");
             foreach (var txt in texts)
             {
                 // The glyph helper (when present) owns the authoritative tag text and re-renders
@@ -464,7 +468,6 @@ namespace Wagenheimer.RewiredHelper.UI
                 if (string.IsNullOrEmpty(originalText) || !originalText.Contains("<rewiredElement")) continue;
 
                 string updatedText = UpdateControllerTypeInTags(originalText);
-                Debug.Log($"[RewiredHelper] Row '{txt.gameObject.name}': glyphHelper={(glyphHelper != null)} | before='{originalText}' | after='{updatedText}'");
                 if (updatedText != originalText)
                 {
                     if (glyphHelper != null && textProp != null)
@@ -599,6 +602,8 @@ namespace Wagenheimer.RewiredHelper.UI
             }
         }
 
+        private const string MouseFallbackLabel = "Mouse";
+
         private string UpdateControllerTypeInTags(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
@@ -607,7 +612,7 @@ namespace Wagenheimer.RewiredHelper.UI
             var currentType = RewiredInputManager.Instance.CurrentControllerType;
             string targetType = currentType == ControllerType.Joystick ? "Joystick" : "";
 
-            return System.Text.RegularExpressions.Regex.Replace(text, @"<rewiredElement\b[^>]*>", match =>
+            string replaced = System.Text.RegularExpressions.Regex.Replace(text, @"<rewiredElement\b[^>]*>", match =>
             {
                 string tag = match.Value;
 
@@ -633,14 +638,21 @@ namespace Wagenheimer.RewiredHelper.UI
                     }
                     else
                     {
-                        // No keyboard binding for this action on PC. Leaving controllerType
-                        // unset lets Rewired auto-detect against its own last-active-controller
-                        // tracking, which wanders to Joystick as soon as ANY key is pressed
-                        // (Escape included) since Joystick is usually the only other controller
-                        // with a real binding for the action. Force Mouse instead — we're
-                        // definitively in a non-Joystick (PC) context here.
+                        // No keyboard binding for this action on PC.
                         typeToUse = "Mouse";
                     }
+                }
+
+                // Without an icon glyph theme installed, Rewired's own text fallback for a
+                // <rewiredElement> tag describes whatever physical device most recently produced
+                // input, ignoring the controllerType attribute we set here — so a Mouse-forced row
+                // still flickers to a keyboard/joystick-flavored label the instant a key is
+                // pressed elsewhere. Render Mouse as a plain, static label instead of a live tag so
+                // it can't drift. Keyboard/Joystick keep the dynamic tag since those correctly
+                // reflect the actual bound key/button in practice.
+                if (typeToUse == "Mouse")
+                {
+                    return MouseFallbackLabel;
                 }
 
                 if (System.Text.RegularExpressions.Regex.IsMatch(tag, @"\bcontrollerType\s*=\s*""[^""]*"""))
@@ -654,6 +666,13 @@ namespace Wagenheimer.RewiredHelper.UI
 
                 return tag;
             });
+
+            // A grouped row (e.g. "MouseX+MouseY") produces two tags joined by a space; if both
+            // resolve to the static Mouse label, collapse the duplicate into one.
+            return System.Text.RegularExpressions.Regex.Replace(
+                replaced,
+                $@"\b{System.Text.RegularExpressions.Regex.Escape(MouseFallbackLabel)}(\s+{System.Text.RegularExpressions.Regex.Escape(MouseFallbackLabel)}\b)+",
+                MouseFallbackLabel);
         }
     }
 }

@@ -308,14 +308,8 @@ namespace Wagenheimer.RewiredHelper.UI
                 var parts = actionName.Split('+');
                 foreach (var part in parts)
                 {
-                    string partText = GetTagForAction(part);
-                    // Both halves of a grouped action (e.g. "MouseX+MouseY") commonly resolve to
-                    // the same static Mouse label — avoid rendering it twice.
-                    if (partText == MouseFallbackLabel && formattedText.Contains(MouseFallbackLabel))
-                        continue;
-
                     if (formattedText.Length > 0) formattedText += " ";
-                    formattedText += partText;
+                    formattedText += GetTagForAction(part);
                 }
             }
             else
@@ -330,6 +324,7 @@ namespace Wagenheimer.RewiredHelper.UI
             if (glyphHelperType != null)
             {
                 var glyphHelper = iconGo.AddComponent(glyphHelperType);
+                ApplyElementFilter(glyphHelper, glyphHelperType);
                 var textProp = glyphHelperType.GetProperty("text");
                 if (textProp != null)
                     textProp.SetValue(glyphHelper, formattedText);
@@ -362,66 +357,14 @@ namespace Wagenheimer.RewiredHelper.UI
             descText.alignment = TextAlignmentOptions.Left;
         }
 
+        // Rewired's <rewiredElement> tag has no "controllerType" attribute (its real attributes
+        // are type/playerId/playerName/actionId/actionName/actionRange/resultIndex) — an explicit
+        // controllerType here is silently ignored. Resolution is instead steered by excluding
+        // unwanted controller-map bindings via isRewiredElementAllowedHandler (see
+        // ApplyElementFilter/IsRewiredElementAllowed), so a plain tag is all that's needed here.
         private string GetTagForAction(string actionName)
         {
-            if (RewiredInputManager.Instance == null)
-            {
-                return $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
-            }
-
-            var currentType = RewiredInputManager.Instance.CurrentControllerType;
-            if (currentType == ControllerType.Joystick)
-            {
-                return $"<rewiredElement playerId=0 controllerType=\"Joystick\" actionName=\"{actionName}\">";
-            }
-            else
-            {
-                // Mouse/Scroll named actions always use Mouse binding. Rendered as a plain static
-                // label (see MouseFallbackLabel) rather than a live tag — without an icon glyph
-                // theme, Rewired's text fallback describes whatever device last produced input,
-                // ignoring this controllerType, so a dynamic tag would flicker on any keypress.
-                if (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return MouseFallbackLabel;
-                }
-
-                // For other PC actions, only force Keyboard if the action actually has a keyboard binding.
-                if (ReInput.isReady && HasKeyboardBinding(actionName))
-                {
-                    return $"<rewiredElement playerId=0 controllerType=\"Keyboard\" actionName=\"{actionName}\">";
-                }
-
-                // No keyboard binding — same static-Mouse-label reasoning as above.
-                return MouseFallbackLabel;
-            }
-        }
-
-        private bool HasKeyboardBinding(string actionName)
-        {
-            try
-            {
-                var action = ReInput.mapping.GetAction(actionName);
-                if (action == null) return false;
-
-                var player = ReInput.players.GetPlayer(0);
-                if (player == null) return false;
-
-                // GetMaps overload that accepts a Controller object (not ControllerType enum).
-                var keyboard = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
-                if (keyboard == null) return false;
-
-                foreach (var map in player.controllers.maps.GetMaps(keyboard))
-                {
-                    if (map.GetFirstElementMapWithAction(action.id, false) != null)
-                        return true;
-                }
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
+            return $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
         }
 
         private static string NicifyActionName(string actionName)
@@ -451,29 +394,18 @@ namespace Wagenheimer.RewiredHelper.UI
 
         private void UpdateExistingRows()
         {
+            // Rows baked at design time (e.g. a hand-curated ControllerHelpForm prefab with
+            // rebuildOnAwake off) never had ApplyElementFilter run on their glyph helper — that
+            // only happens in CreateRow, for freshly generated rows. Attach it here too so
+            // pre-existing rows also exclude Joystick bindings on PC and resolve correctly.
             var glyphHelperType = FindGlyphHelperType();
-            var textProp = glyphHelperType?.GetProperty("text");
-
-            var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
-            foreach (var txt in texts)
+            if (glyphHelperType != null)
             {
-                // The glyph helper (when present) owns the authoritative tag text and re-renders
-                // it into the TMP component every frame, so writing to txt.text directly gets
-                // silently clobbered on the next refresh. Update the helper's own text instead.
-                var glyphHelper = glyphHelperType != null ? txt.GetComponent(glyphHelperType) : null;
-                string originalText = glyphHelper != null && textProp != null
-                    ? textProp.GetValue(glyphHelper) as string
-                    : txt.text;
-
-                if (string.IsNullOrEmpty(originalText) || !originalText.Contains("<rewiredElement")) continue;
-
-                string updatedText = UpdateControllerTypeInTags(originalText);
-                if (updatedText != originalText)
+                foreach (var txt in GetComponentsInChildren<TextMeshProUGUI>(true))
                 {
-                    if (glyphHelper != null && textProp != null)
-                        textProp.SetValue(glyphHelper, updatedText);
-                    else
-                        txt.text = updatedText;
+                    var glyphHelper = txt.GetComponent(glyphHelperType);
+                    if (glyphHelper != null)
+                        ApplyElementFilter(glyphHelper, glyphHelperType);
                 }
             }
 
@@ -602,77 +534,37 @@ namespace Wagenheimer.RewiredHelper.UI
             }
         }
 
-        private const string MouseFallbackLabel = "Mouse";
-
-        private string UpdateControllerTypeInTags(string text)
+        /// <summary>
+        /// Rewired's own "last active controller" tracking updates the instant ANY device
+        /// produces input — including a keyboard key press while the player is really using the
+        /// mouse — and its glyph resolution falls back to whichever OTHER controller has a
+        /// binding for the action once the tracked device doesn't. Since our Joystick bindings
+        /// exist alongside Mouse/Keyboard ones on the same actions (for real gamepad play), that
+        /// fallback wanders to the Joystick binding on PC the moment a key is touched. Excluding
+        /// Joystick-controller bindings whenever we're not actually in Joystick mode leaves only
+        /// the intended Mouse/Keyboard binding, so Rewired can't help but render it.
+        /// </summary>
+        private static bool IsRewiredElementAllowed(int tagIndex, ActionElementMap aem)
         {
-            if (string.IsNullOrEmpty(text)) return text;
-            if (RewiredInputManager.Instance == null) return text;
+            if (RewiredInputManager.Instance == null) return true;
+            if (aem?.controllerMap == null) return true;
 
-            var currentType = RewiredInputManager.Instance.CurrentControllerType;
-            string targetType = currentType == ControllerType.Joystick ? "Joystick" : "";
+            bool isJoystickMap = aem.controllerMap.controllerType == ControllerType.Joystick;
+            bool weAreOnJoystick = RewiredInputManager.Instance.CurrentControllerType == ControllerType.Joystick;
 
-            string replaced = System.Text.RegularExpressions.Regex.Replace(text, @"<rewiredElement\b[^>]*>", match =>
-            {
-                string tag = match.Value;
+            return weAreOnJoystick || !isJoystickMap;
+        }
 
-                string actionName = "";
-                var actionMatch = System.Text.RegularExpressions.Regex.Match(tag, @"\bactionName\s*=\s*""([^""]*)""");
-                if (actionMatch.Success)
-                {
-                    actionName = actionMatch.Groups[1].Value;
-                }
+        private static readonly MethodInfo IsRewiredElementAllowedMethod =
+            typeof(ControllerHelpRowBuilder).GetMethod(nameof(IsRewiredElementAllowed), BindingFlags.NonPublic | BindingFlags.Static);
 
-                string typeToUse = targetType;
-                if (string.IsNullOrEmpty(typeToUse))
-                {
-                    if (!string.IsNullOrEmpty(actionName) &&
-                        (actionName.IndexOf("Mouse", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0))
-                    {
-                        typeToUse = "Mouse";
-                    }
-                    else if (!string.IsNullOrEmpty(actionName) && ReInput.isReady && HasKeyboardBinding(actionName))
-                    {
-                        typeToUse = "Keyboard";
-                    }
-                    else
-                    {
-                        // No keyboard binding for this action on PC.
-                        typeToUse = "Mouse";
-                    }
-                }
+        private static void ApplyElementFilter(object glyphHelper, Type glyphHelperType)
+        {
+            var filterProp = glyphHelperType.GetProperty("isRewiredElementAllowedHandler");
+            if (filterProp == null || IsRewiredElementAllowedMethod == null) return;
 
-                // Without an icon glyph theme installed, Rewired's own text fallback for a
-                // <rewiredElement> tag describes whatever physical device most recently produced
-                // input, ignoring the controllerType attribute we set here — so a Mouse-forced row
-                // still flickers to a keyboard/joystick-flavored label the instant a key is
-                // pressed elsewhere. Render Mouse as a plain, static label instead of a live tag so
-                // it can't drift. Keyboard/Joystick keep the dynamic tag since those correctly
-                // reflect the actual bound key/button in practice.
-                if (typeToUse == "Mouse")
-                {
-                    return MouseFallbackLabel;
-                }
-
-                if (System.Text.RegularExpressions.Regex.IsMatch(tag, @"\bcontrollerType\s*=\s*""[^""]*"""))
-                {
-                    tag = System.Text.RegularExpressions.Regex.Replace(tag, @"\bcontrollerType\s*=\s*""[^""]*""", $"controllerType=\"{typeToUse}\"");
-                }
-                else
-                {
-                    tag = tag.Insert("<rewiredElement".Length, $" controllerType=\"{typeToUse}\"");
-                }
-
-                return tag;
-            });
-
-            // A grouped row (e.g. "MouseX+MouseY") produces two tags joined by a space; if both
-            // resolve to the static Mouse label, collapse the duplicate into one.
-            return System.Text.RegularExpressions.Regex.Replace(
-                replaced,
-                $@"\b{System.Text.RegularExpressions.Regex.Escape(MouseFallbackLabel)}(\s+{System.Text.RegularExpressions.Regex.Escape(MouseFallbackLabel)}\b)+",
-                MouseFallbackLabel);
+            var handler = Delegate.CreateDelegate(filterProp.PropertyType, IsRewiredElementAllowedMethod);
+            filterProp.SetValue(glyphHelper, handler);
         }
     }
 }

@@ -445,8 +445,10 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             var glyphHelperType = FindGlyphHelperType();
             var textProp = glyphHelperType?.GetProperty("text");
+            Debug.Log($"[RewiredHelper] UpdateExistingRows: glyphHelperType={(glyphHelperType != null ? glyphHelperType.FullName : "null")}, currentType={(RewiredInputManager.Instance != null ? RewiredInputManager.Instance.CurrentControllerType.ToString() : "no-instance")}");
 
             var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
+            Debug.Log($"[RewiredHelper] UpdateExistingRows: found {texts.Length} TextMeshProUGUI under {name}");
             foreach (var txt in texts)
             {
                 // The glyph helper (when present) owns the authoritative tag text and re-renders
@@ -460,6 +462,7 @@ namespace Wagenheimer.RewiredHelper.UI
                 if (string.IsNullOrEmpty(originalText) || !originalText.Contains("<rewiredElement")) continue;
 
                 string updatedText = UpdateControllerTypeInTags(originalText);
+                Debug.Log($"[RewiredHelper] Row '{txt.gameObject.name}': glyphHelper={(glyphHelper != null)} | before='{originalText}' | after='{updatedText}'");
                 if (updatedText != originalText)
                 {
                     if (glyphHelper != null && textProp != null)

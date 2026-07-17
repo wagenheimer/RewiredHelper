@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Rewired;
 using TMPro;
 using UnityEngine;
@@ -367,13 +368,16 @@ namespace Wagenheimer.RewiredHelper.UI
                 }
 
                 // For other PC actions, only force Keyboard if the action actually has a keyboard binding.
-                // If not, let Rewired auto-detect to avoid silent fallback to Joystick glyph.
                 if (ReInput.isReady && HasKeyboardBinding(actionName))
                 {
                     return $"<rewiredElement playerId=0 controllerType=\"Keyboard\" actionName=\"{actionName}\">";
                 }
 
-                return $"<rewiredElement playerId=0 actionName=\"{actionName}\">";
+                // No keyboard binding — force Mouse rather than leaving controllerType unset.
+                // Rewired's own auto-detect wanders to Joystick as soon as any key is pressed
+                // (the last-active controller becomes Keyboard, which has no binding for this
+                // action, so it falls back to whichever other controller does — Joystick).
+                return $"<rewiredElement playerId=0 controllerType=\"Mouse\" actionName=\"{actionName}\">";
             }
         }
 
@@ -431,16 +435,29 @@ namespace Wagenheimer.RewiredHelper.UI
 
         private void UpdateExistingRows()
         {
+            var glyphHelperType = FindGlyphHelperType();
+            var textProp = glyphHelperType?.GetProperty("text");
+
             var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
             foreach (var txt in texts)
             {
-                string originalText = txt.text;
+                // The glyph helper (when present) owns the authoritative tag text and re-renders
+                // it into the TMP component every frame, so writing to txt.text directly gets
+                // silently clobbered on the next refresh. Update the helper's own text instead.
+                var glyphHelper = glyphHelperType != null ? txt.GetComponent(glyphHelperType) : null;
+                string originalText = glyphHelper != null && textProp != null
+                    ? textProp.GetValue(glyphHelper) as string
+                    : txt.text;
+
                 if (string.IsNullOrEmpty(originalText) || !originalText.Contains("<rewiredElement")) continue;
 
                 string updatedText = UpdateControllerTypeInTags(originalText);
                 if (updatedText != originalText)
                 {
-                    txt.text = updatedText;
+                    if (glyphHelper != null && textProp != null)
+                        textProp.SetValue(glyphHelper, updatedText);
+                    else
+                        txt.text = updatedText;
                 }
             }
         }
@@ -477,25 +494,25 @@ namespace Wagenheimer.RewiredHelper.UI
                     {
                         typeToUse = "Keyboard";
                     }
-                    // If no keyboard binding exists, remove controllerType entirely so Rewired auto-detects.
-                    // typeToUse stays empty → handled below
-                }
-
-                if (!string.IsNullOrEmpty(typeToUse))
-                {
-                    if (System.Text.RegularExpressions.Regex.IsMatch(tag, @"\bcontrollerType\s*=\s*""[^""]*"""))
-                    {
-                        tag = System.Text.RegularExpressions.Regex.Replace(tag, @"\bcontrollerType\s*=\s*""[^""]*""", $"controllerType=\"{typeToUse}\"");
-                    }
                     else
                     {
-                        tag = tag.Insert("<rewiredElement".Length, $" controllerType=\"{typeToUse}\"");
+                        // No keyboard binding for this action on PC. Leaving controllerType
+                        // unset lets Rewired auto-detect against its own last-active-controller
+                        // tracking, which wanders to Joystick as soon as ANY key is pressed
+                        // (Escape included) since Joystick is usually the only other controller
+                        // with a real binding for the action. Force Mouse instead — we're
+                        // definitively in a non-Joystick (PC) context here.
+                        typeToUse = "Mouse";
                     }
+                }
+
+                if (System.Text.RegularExpressions.Regex.IsMatch(tag, @"\bcontrollerType\s*=\s*""[^""]*"""))
+                {
+                    tag = System.Text.RegularExpressions.Regex.Replace(tag, @"\bcontrollerType\s*=\s*""[^""]*""", $"controllerType=\"{typeToUse}\"");
                 }
                 else
                 {
-                    // Remove any existing controllerType so Rewired falls back to its own tracking.
-                    tag = System.Text.RegularExpressions.Regex.Replace(tag, @"\s*\bcontrollerType\s*=\s*""[^""]*""", "");
+                    tag = tag.Insert("<rewiredElement".Length, $" controllerType=\"{typeToUse}\"");
                 }
 
                 return tag;

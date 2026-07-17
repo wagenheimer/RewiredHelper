@@ -50,13 +50,11 @@ namespace Wagenheimer.RewiredHelper.UI
             {
                 Rebuild();
             }
-            else
-            {
-                // Delay 1 frame: RewiredInputManager.Start() sets the initial controller (Keyboard)
-                // during Start(), but this Awake may run before that. Waiting ensures we read the
-                // correct CurrentControllerType when generating the first tags.
-                StartCoroutine(UpdateExistingRowsNextFrame());
-            }
+            // The rebuildOnAwake=false path used to start its refresh coroutine here, but this
+            // component commonly lives on a modal popup that starts inactive in the scene.
+            // StartCoroutine() silently no-ops on an inactive GameObject (Unity logs a warning
+            // and never runs it), so that refresh would never happen for a popup opened later via
+            // SetActive(true). Moved to OnEnable, which only fires once the object is truly active.
         }
 
         private System.Collections.IEnumerator UpdateExistingRowsNextFrame()
@@ -68,6 +66,16 @@ namespace Wagenheimer.RewiredHelper.UI
         private void OnEnable()
         {
             RewiredInputManager.OnInputSpecializationChanged += OnInputSpecializationChanged;
+
+            if (!rebuildOnAwake)
+            {
+                // Delay 1 frame: RewiredInputManager.Start() sets the initial controller (Keyboard)
+                // during Start(), but this may run before that on the very first activation.
+                // Waiting ensures we read the correct CurrentControllerType when generating tags.
+                // Also re-runs on every reopen, so a stale controllerType from a prior session
+                // doesn't linger.
+                StartCoroutine(UpdateExistingRowsNextFrame());
+            }
         }
 
         private void OnDisable()

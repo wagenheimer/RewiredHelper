@@ -115,6 +115,8 @@ namespace Wagenheimer.RewiredHelper.UI
 
             for (int i = 0; i < actions.Count; i++)
                 CreateRow(actions[i].Name, actions[i].DescriptiveName, glyphHelperType, i % 2 == 1);
+
+            UpdateTitle();
         }
 
         /// <summary>
@@ -470,6 +472,130 @@ namespace Wagenheimer.RewiredHelper.UI
                     else
                         txt.text = updatedText;
                 }
+            }
+
+            UpdateTitle();
+        }
+
+        private void UpdateTitle()
+        {
+            if (RewiredInputManager.Instance == null) return;
+
+            var currentType = RewiredInputManager.Instance.CurrentControllerType;
+            bool isGamepad = currentType == ControllerType.Joystick;
+
+            Transform current = transform.parent;
+            while (current != null)
+            {
+                var texts = current.GetComponentsInChildren<TextMeshProUGUI>(true);
+                foreach (var txt in texts)
+                {
+                    var localizer = txt.GetComponent("Localize");
+                    bool isTitleLocalizer = false;
+                    if (localizer != null)
+                    {
+                        var termProp = localizer.GetType().GetField("mTerm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (termProp != null)
+                        {
+                            string termValue = termProp.GetValue(localizer) as string;
+                            if (termValue == "GAMEPAD CONTROLS" || termValue == "KEYBOARD CONTROLS" || termValue == "KEYBOARD_CONTROLS")
+                            {
+                                isTitleLocalizer = true;
+                                if (isGamepad)
+                                {
+                                    termProp.SetValue(localizer, "GAMEPAD CONTROLS");
+                                }
+                                else
+                                {
+                                    termProp.SetValue(localizer, "KEYBOARD_CONTROLS");
+                                }
+
+                                var localizeMethod = localizer.GetType().GetMethod("OnLocalize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                if (localizeMethod != null)
+                                {
+                                    localizeMethod.Invoke(localizer, new object[] { true });
+                                }
+                            }
+                        }
+                    }
+
+                    if (txt.text.Contains("Controles") || txt.text.Contains("Controls") || isTitleLocalizer || txt.gameObject.name.Contains("Title") || txt.gameObject.name.Contains("Header"))
+                    {
+                        if (txt.gameObject.name == "Title" || txt.gameObject.name == "Header" || txt.text.Contains("Gamepad") || txt.text.Contains("Mando") || txt.text.Contains("Manette") || txt.text.Contains("Keyboard"))
+                        {
+                            string lang = "English";
+                            try
+                            {
+                                var locMgrType = Type.GetType("I2.Loc.LocalizationManager, Assembly-CSharp");
+                                if (locMgrType == null) locMgrType = Type.GetType("I2.Loc.LocalizationManager, Assembly-CSharp-firstpass");
+                                if (locMgrType != null)
+                                {
+                                    var currentLangProp = locMgrType.GetProperty("CurrentLanguage", BindingFlags.Public | BindingFlags.Static);
+                                    if (currentLangProp != null)
+                                    {
+                                        lang = currentLangProp.GetValue(null) as string;
+                                    }
+                                }
+                            }
+                            catch {}
+
+                            if (isGamepad)
+                            {
+                                if (localizer != null)
+                                {
+                                    var behaviour = localizer as MonoBehaviour;
+                                    if (behaviour != null) behaviour.enabled = true;
+
+                                    var termProp = localizer.GetType().GetField("mTerm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (termProp != null) termProp.SetValue(localizer, "GAMEPAD CONTROLS");
+
+                                    var localizeMethod = localizer.GetType().GetMethod("OnLocalize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (localizeMethod != null) localizeMethod.Invoke(localizer, new object[] { true });
+                                }
+                                else
+                                {
+                                    txt.text = GetGamepadControlsTranslation(lang);
+                                }
+                            }
+                            else
+                            {
+                                if (localizer != null)
+                                {
+                                    var behaviour = localizer as MonoBehaviour;
+                                    if (behaviour != null) behaviour.enabled = false;
+                                }
+                                txt.text = GetKeyboardControlsTranslation(lang);
+                            }
+                        }
+                    }
+                }
+                current = current.parent;
+            }
+        }
+
+        private string GetGamepadControlsTranslation(string lang)
+        {
+            switch (lang)
+            {
+                case "Portuguese": return "Controles De Gamepad";
+                case "Spanish": return "Controles Del Mando";
+                case "French": return "Commandes De La Manette";
+                case "German": return "Gamepad-Steuerung";
+                case "Italian": return "Comandi Del Gamepad";
+                default: return "Gamepad Controls";
+            }
+        }
+
+        private string GetKeyboardControlsTranslation(string lang)
+        {
+            switch (lang)
+            {
+                case "Portuguese": return "Controles De Teclado & Mouse";
+                case "Spanish": return "Controles De Teclado Y Ratón";
+                case "French": return "Commandes Clavier & Souris";
+                case "German": return "Tastatur & Maus Steuerung";
+                case "Italian": return "Comandi Tastiera E Mouse";
+                default: return "Keyboard & Mouse Controls";
             }
         }
 

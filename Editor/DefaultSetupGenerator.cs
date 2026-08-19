@@ -365,10 +365,43 @@ namespace Wagenheimer.RewiredHelper.Editor
             element.FindPropertyRelative("_repeatRate").floatValue = 4f;
         }
 
+        /// <summary>
+        /// Resolves a Rewired action's id by name directly from the scene's InputManager component
+        /// data (serialized under "_userData.actions", same shape as in the shipped prefab) instead
+        /// of <c>ReInput.mapping</c> — Rewired is only initialized at runtime (normally on
+        /// InputManager.Awake), so <c>ReInput.mapping</c> throws "Rewired is not initialized" and
+        /// returns null for every lookup made from editor code, silently leaving elements unbound.
+        /// </summary>
         private static int ResolveActionId(string actionName)
         {
-            var action = ReInput.mapping != null ? ReInput.mapping.GetAction(actionName) : null;
-            return action != null ? action.id : -1;
+            var inputManagerComponent = FindInputManagerInScene();
+            if (inputManagerComponent == null)
+            {
+                Debug.LogWarning($"[RewiredHelper] Could not resolve action '{actionName}': no Rewired Input Manager found in the scene.");
+                return -1;
+            }
+
+            var so = new SerializedObject(inputManagerComponent);
+            var actions = so.FindProperty("_userData.actions");
+            if (actions == null)
+            {
+                Debug.LogWarning($"[RewiredHelper] Could not resolve action '{actionName}': Input Manager's action list field wasn't found — Rewired version may differ from the one this was built against.");
+                return -1;
+            }
+
+            for (int i = 0; i < actions.arraySize; i++)
+            {
+                var action = actions.GetArrayElementAtIndex(i);
+                var nameProp = action.FindPropertyRelative("_name");
+                if (nameProp != null && nameProp.stringValue == actionName)
+                {
+                    var idProp = action.FindPropertyRelative("_id");
+                    return idProp != null ? idProp.intValue : -1;
+                }
+            }
+
+            Debug.LogWarning($"[RewiredHelper] Could not resolve action '{actionName}': no such action exists in the Input Manager. Create it in the Rewired Input Manager editor first.");
+            return -1;
         }
 
         internal static void CreatePlayerMouseAndWire(RewiredInputManager manager)

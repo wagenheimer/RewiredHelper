@@ -255,6 +255,15 @@ namespace Wagenheimer.RewiredHelper.Editor
                         "I2 Localization detected, but the integration specialization helper is not imported. Import it to enable automatic controller glyphs in localized texts.",
                         "Import Integration", () => ImportI2IntegrationSample());
                 }
+
+                // 7b. Verify I2 Terms used by the shipped prefabs/help form (back, click,
+                // cursormovement, ok, controllersupport, menu, GAMEPAD CONTROLS, KEYBOARD_CONTROLS).
+                var hasAllTerms = DefaultSetupGenerator.AllI2TermsExist(out var missingTermCount);
+                DrawCheckResult("I2 Localization Terms", hasAllTerms,
+                    missingTermCount > 0
+                        ? $"{missingTermCount} term(s) used by Rewired Helper's prefabs are missing from the I2 Language Source, so those labels show the raw term key instead of translated text."
+                        : null,
+                    "Verify/Add Terms", () => DefaultSetupGenerator.EnsureI2Terms());
             }
 
             EditorGUILayout.Space(10);

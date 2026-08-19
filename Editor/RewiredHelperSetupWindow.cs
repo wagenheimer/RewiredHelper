@@ -211,6 +211,14 @@ namespace Wagenheimer.RewiredHelper.Editor
                 DrawCardItem("I2 Localization Integration",
                     hasI2Integration ? "✅ I2 Localization Integration is imported and active." : "⚠️ I2 Localization detected, but the integration specialization helper is not imported.",
                     hasI2Integration, "Import Integration", () => ImportI2IntegrationSample(), isOptional: true);
+
+                // 6b. I2 Terms used by the shipped prefabs/help form
+                var hasAllTerms = DefaultSetupGenerator.AllI2TermsExist(out var missingTermCount);
+                DrawCardItem("I2 Localization Terms",
+                    hasAllTerms
+                        ? "✅ All Rewired Helper terms exist in the I2 Language Source."
+                        : $"⚠️ {missingTermCount} term(s) used by Rewired Helper's prefabs are missing from the I2 Language Source.",
+                    hasAllTerms, "Verify/Add Terms", () => DefaultSetupGenerator.EnsureI2Terms(), isOptional: true);
             }
         }
 

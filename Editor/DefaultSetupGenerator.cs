@@ -214,6 +214,116 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
         }
 
+        // Terms baked into the shipped prefabs (formController.prefab's Localize components) and
+        // referenced by name from ControllerHelpRowBuilder.UpdateTitle — if any of these are missing
+        // from the project's I2 Language Source, those labels fall back to showing the raw term key
+        // instead of translated text.
+        internal static readonly string[] RequiredI2Terms =
+        {
+            "back", "click", "cursormovement", "ok", "controllersupport", "menu",
+            "GAMEPAD CONTROLS", "KEYBOARD_CONTROLS"
+        };
+
+        /// <summary>
+        /// True if every entry in <see cref="RequiredI2Terms"/> exists in at least one of the
+        /// project's I2 Language Sources. Uses reflection throughout (never <c>using I2.Loc;</c>) so
+        /// this package still compiles when I2 Localization isn't installed — callers must only
+        /// invoke this after confirming I2's LocalizationManager type resolves.
+        /// </summary>
+        internal static bool AllI2TermsExist(out int missingCount)
+        {
+            missingCount = 0;
+            var sources = GetI2Sources(out var containsTermMethod, out _);
+            if (sources == null)
+            {
+                missingCount = RequiredI2Terms.Length;
+                return false;
+            }
+
+            foreach (var term in RequiredI2Terms)
+            {
+                if (!AnySourceContainsTerm(sources, containsTermMethod, term))
+                    missingCount++;
+            }
+            return missingCount == 0;
+        }
+
+        /// <summary>
+        /// Adds every missing entry from <see cref="RequiredI2Terms"/> to the project's first I2
+        /// Language Source. LanguageSourceData.AddTerm(string) already marks the source dirty and
+        /// saves it (Editor_SetDirty + AssetDatabase.SaveAssets), so no extra persistence step is
+        /// needed here.
+        /// </summary>
+        internal static void EnsureI2Terms()
+        {
+            var sources = GetI2Sources(out var containsTermMethod, out var addTermMethod);
+            if (sources == null || sources.Count == 0)
+            {
+                Debug.LogWarning("[RewiredHelper] No I2 Localization Language Source found in the project — create one first (I2 Localization > Languages Manager > New Language Source).");
+                return;
+            }
+
+            var primarySource = sources[0];
+            int added = 0;
+            foreach (var term in RequiredI2Terms)
+            {
+                if (AnySourceContainsTerm(sources, containsTermMethod, term))
+                    continue;
+
+                addTermMethod.Invoke(primarySource, new object[] { term });
+                added++;
+            }
+
+            Debug.Log(added > 0
+                ? $"[RewiredHelper] Added {added} missing I2 Localization term(s) to '{primarySource}'."
+                : "[RewiredHelper] All required I2 Localization terms already exist.");
+        }
+
+        private static bool AnySourceContainsTerm(System.Collections.IList sources, MethodInfo containsTermMethod, string term)
+        {
+            foreach (var source in sources)
+            {
+                if ((bool)containsTermMethod.Invoke(source, new object[] { term }))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves I2.Loc.LocalizationManager.Sources via reflection and refreshes it first
+        /// (UpdateSources — otherwise a source that only lives in Resources/ may not be registered
+        /// yet in the editor). Returns null if I2 isn't installed or its API doesn't match what this
+        /// was built against, so callers can distinguish "not installed" from "installed, no terms".
+        /// </summary>
+        private static System.Collections.IList GetI2Sources(out MethodInfo containsTermMethod, out MethodInfo addTermMethod)
+        {
+            containsTermMethod = null;
+            addTermMethod = null;
+
+            var locManagerType = FindTypeByName("I2.Loc.LocalizationManager");
+            var sourceType = FindTypeByName("I2.Loc.LanguageSourceData");
+            if (locManagerType == null || sourceType == null)
+                return null;
+
+            var updateSourcesMethod = locManagerType.GetMethod("UpdateSources", BindingFlags.Public | BindingFlags.Static);
+            updateSourcesMethod?.Invoke(null, null);
+
+            var sourcesField = locManagerType.GetField("Sources", BindingFlags.Public | BindingFlags.Static);
+            var sources = sourcesField?.GetValue(null) as System.Collections.IList;
+            if (sources == null)
+                return null;
+
+            containsTermMethod = sourceType.GetMethod("ContainsTerm", new[] { typeof(string) });
+            addTermMethod = sourceType.GetMethod("AddTerm", new[] { typeof(string) });
+            if (containsTermMethod == null || addTermMethod == null)
+            {
+                Debug.LogWarning("[RewiredHelper] Could not resolve I2 Localization's term API (ContainsTerm/AddTerm) — I2 version may differ from the one this was built against.");
+                return null;
+            }
+
+            return sources;
+        }
+
         [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Controller Help Form", priority = 12)]
         internal static void CreateControllerHelpForm()
         {

@@ -35,7 +35,7 @@ without hard-coding any assumptions about your game's UI or save system.
 | Unity | 2021.3 LTS or newer |
 | [Rewired](https://guavaman.com/projects/rewired/) | Any recent version — imported manually, not a UPM package |
 | TextMeshPro | Required by `UnityEngine.UI`/TMP-based components |
-| Steamworks.NET *(optional)* | Auto-detected via `STEAMWORKS_NET` define — enables Steam overlay pause |
+| Steamworks.NET *(optional)* | Auto-detected via the `com.rlabrecque.steamworks.net` package — enables Steam overlay pause |
 | I2 Localization *(optional)* | Only needed for the `Samples~/I2LocalizationIntegration` sample |
 
 ---
@@ -260,8 +260,10 @@ _input.CursorTexture = MyConfig.cursorTexture;
 
 ## Steam Overlay Pause
 
-If `Steamworks.NET` is present (`STEAMWORKS_NET` define set) and `SteamManager.Initialized`,
-the manager auto-pauses when the Steam overlay opens. Disable with `PauseOnSteamOverlay = false`.
+If the `com.rlabrecque.steamworks.net` package is installed, the manager auto-pauses when the
+Steam overlay opens. Set `RewiredInputManager.SteamIsInitialized = true` once your own
+`SteamManager` has initialized (or simply assign it from `SteamManager.Initialized`).
+Disable with `PauseOnSteamOverlay = false`.
 
 ---
 

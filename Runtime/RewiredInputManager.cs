@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 using Rewired;
 
-#if STEAMWORKS_NET && !DISABLESTEAMWORKS
+#if WAGENHEIMER_STEAMWORKS
 using Steamworks;
 #endif
 
@@ -57,6 +57,13 @@ namespace Wagenheimer.RewiredHelper
         private bool alreadyShowedControllerHelp;
 
         public bool IsSteamOverlayActive = false;
+
+        /// <summary>
+        /// The host game must set this to true once Steam is initialized (e.g. from its own
+        /// SteamManager: <c>RewiredInputManager.SteamIsInitialized = SteamManager.Initialized;</c>).
+        /// Only consulted when Steamworks.NET is installed (<c>WAGENHEIMER_STEAMWORKS</c>).
+        /// </summary>
+        public static bool SteamIsInitialized;
 
         [Tooltip("Current mouse position in the Rewired system")]
         public static Vector3 RewiredMousePosition { get; private set; }
@@ -150,7 +157,7 @@ namespace Wagenheimer.RewiredHelper
         }
         #endregion
 
-#if STEAMWORKS_NET && !DISABLESTEAMWORKS
+#if WAGENHEIMER_STEAMWORKS
         protected Callback<GameOverlayActivated_t> m_GameOverlayActivated;
 #endif
 
@@ -199,8 +206,8 @@ namespace Wagenheimer.RewiredHelper
 
             _lastMouseOrTouchMoveTime = Time.time;
 
-#if STEAMWORKS_NET && !DISABLESTEAMWORKS
-            if (SteamManager.Initialized) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
+#if WAGENHEIMER_STEAMWORKS
+            if (SteamIsInitialized) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
 #endif
 
             // Auto-configure using default providers if enabled and not already configured via code
@@ -214,7 +221,7 @@ namespace Wagenheimer.RewiredHelper
             }
         }
 
-#if STEAMWORKS_NET && !DISABLESTEAMWORKS
+#if WAGENHEIMER_STEAMWORKS
         private void OnGameOverlayActivated(GameOverlayActivated_t pCallback)
         {
             IsSteamOverlayActive = pCallback.m_bActive != 0;
@@ -248,8 +255,8 @@ namespace Wagenheimer.RewiredHelper
             if (GamePaused != null && GamePaused.activeSelf && anyButton)
                 PauseGame(false);
 
-#if STEAMWORKS_NET && !DISABLESTEAMWORKS
-            if (PauseOnSteamOverlay && SteamManager.Initialized && IsSteamOverlayActive &&
+#if WAGENHEIMER_STEAMWORKS
+            if (PauseOnSteamOverlay && SteamIsInitialized && IsSteamOverlayActive &&
                 (GamePaused == null || !GamePaused.activeSelf))
                 PauseGame(true);
 #endif

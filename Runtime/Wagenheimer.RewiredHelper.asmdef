@@ -1,7 +1,7 @@
 {
   "name": "Wagenheimer.RewiredHelper",
   "rootNamespace": "Wagenheimer.RewiredHelper",
-  "references": ["Unity.TextMeshPro", "UnityEngine.UI"],
+  "references": ["Unity.TextMeshPro", "UnityEngine.UI", "com.rlabrecque.steamworks.net"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
@@ -9,6 +9,12 @@
   "precompiledReferences": [],
   "autoReferenced": true,
   "defineConstraints": [],
-  "versionDefines": [],
+  "versionDefines": [
+    {
+      "name": "com.rlabrecque.steamworks.net",
+      "expression": "0.0.0",
+      "define": "WAGENHEIMER_STEAMWORKS"
+    }
+  ],
   "noEngineReferences": false
 }

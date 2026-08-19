@@ -383,7 +383,13 @@ namespace Wagenheimer.RewiredHelper.UI
             descRect.sizeDelta = new Vector2(115, 36);
 
             var descText = descGo.AddComponent<TextMeshProUGUI>();
-            descText.text = !string.IsNullOrEmpty(actionDesc) ? actionDesc.ToUpper() : NicifyActionName(actionName);
+            // Rewired leaves an action's descriptiveName blank unless a developer explicitly fills
+            // it in (the common case), so "actionDesc" often just falls back to the raw action name
+            // (e.g. "MoveCameraLeft") — running that through NicifyActionName's camelCase-to-spaced
+            // logic instead of a blind ToUpper() avoids rows reading "MOVECAMERALEFT".
+            bool hasRealDescriptiveName = !string.IsNullOrEmpty(actionDesc) &&
+                !string.Equals(actionDesc, actionName, StringComparison.Ordinal);
+            descText.text = hasRealDescriptiveName ? actionDesc.ToUpper() : NicifyActionName(actionName);
             descText.fontSize = 13;
             descText.fontStyle = FontStyles.Bold;
             descText.color = new Color(0.75f, 0.75f, 0.8f);

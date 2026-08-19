@@ -65,28 +65,75 @@ namespace Wagenheimer.RewiredHelper.Editor
                 Undo.RegisterCompleteObjectUndo(managerGo, "Add RewiredInputManager Component");
             }
 
-            // 3. Instantiate Rewired Event System if not present
-            var eventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
-            if (eventSystem == null)
-            {
-                var eventSystemPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EventSystemPrefabPath);
-                if (eventSystemPrefab != null)
-                {
-                    var instance = (GameObject)PrefabUtility.InstantiatePrefab(eventSystemPrefab);
-                    Undo.RegisterCreatedObjectUndo(instance, "Create Rewired Event System");
-                }
-                else
-                {
-                    // Fallback to standard EventSystem
-                    var go = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem),
-                        typeof(UnityEngine.EventSystems.StandaloneInputModule));
-                    Undo.RegisterCreatedObjectUndo(go, "Create Event System");
-                }
-            }
+            // 3. Instantiate Rewired Event System (with RewiredStandaloneInputModule) if not present
+            EnsureRewiredEventSystem();
 
             EnsureGlyphProvider(managerGo);
 
             Selection.activeGameObject = managerGo;
+            MarkSceneDirty();
+        }
+
+        const string RewiredInputModuleTypeName = "Rewired.Integration.UnityUI.RewiredStandaloneInputModule";
+
+        internal static Type FindRewiredInputModuleType() => FindTypeByName(RewiredInputModuleTypeName);
+
+        /// <summary>
+        /// True only if a RewiredStandaloneInputModule is active in the scene — a plain Unity
+        /// EventSystem (the default StandaloneInputModule) passes Unity's own null checks but never
+        /// routes Rewired's controller input into UI navigation, so checking for "any EventSystem"
+        /// is not enough.
+        /// </summary>
+        internal static bool HasRewiredEventSystemInScene()
+        {
+            var moduleType = FindRewiredInputModuleType();
+            return moduleType != null && UnityEngine.Object.FindObjectOfType(moduleType) != null;
+        }
+
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Rewired Event System", priority = 14)]
+        internal static void CreateRewiredEventSystem() => EnsureRewiredEventSystem();
+
+        /// <summary>
+        /// Ensures the scene has an EventSystem running Rewired's own RewiredStandaloneInputModule.
+        /// If a plain EventSystem already exists (e.g. one Unity auto-created), its default
+        /// StandaloneInputModule is swapped in place for the Rewired one instead of spawning a
+        /// second EventSystem, which Unity doesn't support running side by side.
+        /// </summary>
+        internal static void EnsureRewiredEventSystem()
+        {
+            if (HasRewiredEventSystemInScene())
+                return;
+
+            var moduleType = FindRewiredInputModuleType();
+            var existingEventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
+
+            if (existingEventSystem != null && moduleType != null)
+            {
+                var vanillaModule = existingEventSystem.GetComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                if (vanillaModule != null)
+                    Undo.DestroyObjectImmediate(vanillaModule);
+
+                Undo.AddComponent(existingEventSystem.gameObject, moduleType);
+                Debug.Log("[RewiredHelper] Replaced the scene's Event System input module with RewiredStandaloneInputModule so controller UI navigation works.");
+                MarkSceneDirty();
+                return;
+            }
+
+            var eventSystemPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EventSystemPrefabPath);
+            if (eventSystemPrefab != null)
+            {
+                var instance = (GameObject)PrefabUtility.InstantiatePrefab(eventSystemPrefab);
+                Undo.RegisterCreatedObjectUndo(instance, "Create Rewired Event System");
+                Debug.Log("[RewiredHelper] Created Rewired Event System.");
+            }
+            else
+            {
+                var suffix = moduleType == null
+                    ? " and RewiredStandaloneInputModule wasn't found in this project either — is Rewired's UnityUI integration installed?"
+                    : ".";
+                Debug.LogWarning($"[RewiredHelper] Prefab not found at {EventSystemPrefabPath}{suffix}");
+            }
+
             MarkSceneDirty();
         }
 

@@ -90,7 +90,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 var managerComp = DefaultSetupGenerator.FindInputManagerInScene();
                 var hasManager = managerComp != null;
                 var hasHelper = hasManager && managerComp.GetComponent<RewiredInputManager>() != null;
-                var hasEventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null;
+                var hasEventSystem = DefaultSetupGenerator.HasRewiredEventSystemInScene();
                 var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;
                 var hasCursor = hasHelper && managerComp.GetComponent<RewiredInputManager>().GameCursor != null;
 
@@ -166,11 +166,12 @@ namespace Wagenheimer.RewiredHelper.Editor
                 hasHelper ? "✅ Component attached to the manager." : "❌ Missing on manager! UI/Escape routing will not work.",
                 hasHelper, "Configure", () => DefaultSetupGenerator.CreateRewiredInputManager());
 
-            // 3. Event System
-            var hasEventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null;
+            // 3. Event System — must be running RewiredStandaloneInputModule specifically, not just
+            // any Unity EventSystem (the default StandaloneInputModule doesn't route Rewired input).
+            var hasEventSystem = DefaultSetupGenerator.HasRewiredEventSystemInScene();
             DrawCardItem("Rewired Event System",
-                hasEventSystem ? "✅ Event System found in the scene." : "❌ Missing! Required for physical UI controller navigation.",
-                hasEventSystem, "Create Event System", () => DefaultSetupGenerator.CreateRewiredInputManager());
+                hasEventSystem ? "✅ RewiredStandaloneInputModule active in the scene." : "❌ Missing! Required for controller UI navigation and Player Mouse.",
+                hasEventSystem, "Create Event System", () => DefaultSetupGenerator.EnsureRewiredEventSystem());
 
             // 4. UI Canvas
             var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;

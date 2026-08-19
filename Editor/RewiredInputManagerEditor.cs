@@ -164,11 +164,13 @@ namespace Wagenheimer.RewiredHelper.Editor
                 "Instantiate the configured Rewired prefab to manage bindings and controls.",
                 "Create Manager", () => DefaultSetupGenerator.CreateRewiredInputManager());
 
-            // 2. Verify Event System
-            var hasEventSystem = UnityEngine.Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null;
+            // 2. Verify Event System is running Rewired's own input module (a plain Unity
+            // EventSystem passes a generic null-check but never routes Rewired controller input
+            // into UI navigation or Player Mouse).
+            var hasEventSystem = DefaultSetupGenerator.HasRewiredEventSystemInScene();
             DrawCheckResult("Rewired Event System", hasEventSystem,
-                "An Event System with Rewired support is required for controller UI navigation.",
-                "Create Event System", () => DefaultSetupGenerator.CreateRewiredInputManager());
+                "The scene's Event System must use Rewired's RewiredStandaloneInputModule (not Unity's default StandaloneInputModule) for controller UI navigation and Player Mouse to work.",
+                "Create Event System", () => DefaultSetupGenerator.EnsureRewiredEventSystem());
 
             // 3. Verify Canvas
             var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;

@@ -462,6 +462,25 @@ namespace Wagenheimer.RewiredHelper.UI
             UpdateTitle();
         }
 
+        /// <summary>
+        /// Force-invoking I2's private Localize.OnLocalize(bool) via reflection can throw a
+        /// NullReferenceException from inside I2's own code if this runs before that Localize
+        /// component finished its own Awake/initialization — this method runs from
+        /// ControllerHelpRowBuilder.Awake(), whose order relative to sibling components' Awake is
+        /// not guaranteed. Swallow and log rather than crash the whole Update loop that called us.
+        /// </summary>
+        private static void InvokeOnLocalizeSafely(MethodInfo localizeMethod, object localizer)
+        {
+            try
+            {
+                localizeMethod.Invoke(localizer, new object[] { true });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[RewiredHelper] I2 Localize.OnLocalize threw while refreshing the help form title (likely not initialized yet) — skipping this refresh: {ex.InnerException?.Message ?? ex.Message}");
+            }
+        }
+
         private void UpdateTitle()
         {
             if (RewiredInputManager.Instance == null) return;
@@ -498,7 +517,7 @@ namespace Wagenheimer.RewiredHelper.UI
                                 var localizeMethod = localizer.GetType().GetMethod("OnLocalize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                                 if (localizeMethod != null)
                                 {
-                                    localizeMethod.Invoke(localizer, new object[] { true });
+                                    InvokeOnLocalizeSafely(localizeMethod, localizer);
                                 }
                             }
                         }
@@ -535,7 +554,7 @@ namespace Wagenheimer.RewiredHelper.UI
                                     if (termProp != null) termProp.SetValue(localizer, "GAMEPAD CONTROLS");
 
                                     var localizeMethod = localizer.GetType().GetMethod("OnLocalize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                                    if (localizeMethod != null) localizeMethod.Invoke(localizer, new object[] { true });
+                                    if (localizeMethod != null) InvokeOnLocalizeSafely(localizeMethod, localizer);
                                 }
                                 else
                                 {

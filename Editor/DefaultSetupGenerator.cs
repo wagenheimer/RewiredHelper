@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Rewired;
@@ -214,49 +215,69 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
         }
 
-        // Terms baked into the shipped prefabs (formController.prefab's Localize components) and
-        // referenced by name from ControllerHelpRowBuilder.UpdateTitle — if any of these are missing
-        // from the project's I2 Language Source, those labels fall back to showing the raw term key
-        // instead of translated text.
-        internal static readonly string[] RequiredI2Terms =
+        // Design-time English text for the terms this package's own formController.prefab (Rewired's
+        // stock "Controller Support" dialog) and the runtime-generated Controller Help Form use —
+        // taken straight from that prefab's baked m_text fallback values. Used as a baseline on top
+        // of whatever a live scan of the prefab/scene turns up (see CollectTermGuesses), so the check
+        // still means something before formController.prefab is ever instantiated in a scene.
+        private static readonly Dictionary<string, string> KnownI2TermTranslations = new Dictionary<string, string>
         {
-            "back", "click", "cursormovement", "ok", "controllersupport", "menu",
-            "GAMEPAD CONTROLS", "KEYBOARD_CONTROLS"
+            { "back", "Back" },
+            { "click", "Click" },
+            { "cursormovement", "Cursor Movement" },
+            { "ok", "OK" },
+            { "controllersupport", "Gamepad Support!" },
+            { "menu", "Menu" },
+            { "GAMEPAD CONTROLS", "Gamepad Controls" },
+            { "KEYBOARD_CONTROLS", "Keyboard & Mouse Controls" },
         };
 
         /// <summary>
-        /// True if every entry in <see cref="RequiredI2Terms"/> exists in at least one of the
-        /// project's I2 Language Sources. Uses reflection throughout (never <c>using I2.Loc;</c>) so
-        /// this package still compiles when I2 Localization isn't installed — callers must only
-        /// invoke this after confirming I2's LocalizationManager type resolves.
+        /// True only if every term this package could need — the known baseline plus anything found
+        /// by scanning formController.prefab and any I2.Loc.Localize component in the open scene(s)
+        /// — exists in an I2 Language Source AND already has a non-empty English translation. A term
+        /// that merely exists but has no translation still renders blank/untranslated at runtime, so
+        /// existence alone isn't "done".
         /// </summary>
         internal static bool AllI2TermsExist(out int missingCount)
         {
             missingCount = 0;
-            var sources = GetI2Sources(out var containsTermMethod, out _);
-            if (sources == null)
+            var api = ResolveI2Api();
+            var termGuesses = CollectTermGuesses(api);
+            if (api == null)
             {
-                missingCount = RequiredI2Terms.Length;
+                missingCount = termGuesses.Count;
                 return false;
             }
 
-            foreach (var term in RequiredI2Terms)
+            var sources = api.GetSources();
+            if (sources == null || sources.Count == 0)
             {
-                if (!AnySourceContainsTerm(sources, containsTermMethod, term))
+                missingCount = termGuesses.Count;
+                return false;
+            }
+
+            foreach (var term in termGuesses.Keys)
+            {
+                if (!api.TermHasEnglishTranslation(sources, term))
                     missingCount++;
             }
             return missingCount == 0;
         }
 
         /// <summary>
-        /// Adds every missing entry from <see cref="RequiredI2Terms"/> to the project's first I2
-        /// Language Source. LanguageSourceData.AddTerm(string) already marks the source dirty and
-        /// saves it (Editor_SetDirty + AssetDatabase.SaveAssets), so no extra persistence step is
-        /// needed here.
+        /// Adds every missing term (creating it if needed) with an English translation, to the
+        /// project's first I2 Language Source. Term text comes from <see cref="KnownI2TermTranslations"/>
+        /// for terms this package ships, or is guessed from the sibling Text/TextMeshProUGUI's
+        /// design-time text for anything else found by <see cref="CollectTermGuesses"/> — an empty
+        /// term with no translation still shows blank at runtime, so adding the key alone isn't enough.
         /// </summary>
         internal static void EnsureI2Terms()
         {
-            var sources = GetI2Sources(out var containsTermMethod, out var addTermMethod);
+            var api = ResolveI2Api();
+            if (api == null) return;
+
+            var sources = api.GetSources();
             if (sources == null || sources.Count == 0)
             {
                 Debug.LogWarning("[RewiredHelper] No I2 Localization Language Source found in the project — create one first (I2 Localization > Languages Manager > New Language Source).");
@@ -264,64 +285,205 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
 
             var primarySource = sources[0];
-            int added = 0;
-            foreach (var term in RequiredI2Terms)
-            {
-                if (AnySourceContainsTerm(sources, containsTermMethod, term))
-                    continue;
+            var termGuesses = CollectTermGuesses(api);
 
-                addTermMethod.Invoke(primarySource, new object[] { term });
-                added++;
+            int termsAdded = 0, translationsAdded = 0;
+            foreach (var kvp in termGuesses)
+            {
+                bool wroteTranslation = api.EnsureTermAndEnglishTranslation(primarySource, sources, kvp.Key, kvp.Value, out var termCreated);
+                if (termCreated) termsAdded++;
+                if (wroteTranslation) translationsAdded++;
             }
 
-            Debug.Log(added > 0
-                ? $"[RewiredHelper] Added {added} missing I2 Localization term(s) to '{primarySource}'."
-                : "[RewiredHelper] All required I2 Localization terms already exist.");
-        }
+            api.SaveSource(primarySource);
 
-        private static bool AnySourceContainsTerm(System.Collections.IList sources, MethodInfo containsTermMethod, string term)
-        {
-            foreach (var source in sources)
-            {
-                if ((bool)containsTermMethod.Invoke(source, new object[] { term }))
-                    return true;
-            }
-            return false;
+            Debug.Log(termsAdded == 0 && translationsAdded == 0
+                ? "[RewiredHelper] All required I2 Localization terms already exist with an English translation."
+                : $"[RewiredHelper] I2 Localization: added {termsAdded} new term(s) and {translationsAdded} English translation(s) to '{primarySource}'.");
         }
 
         /// <summary>
-        /// Resolves I2.Loc.LocalizationManager.Sources via reflection and refreshes it first
-        /// (UpdateSources — otherwise a source that only lives in Resources/ may not be registered
-        /// yet in the editor). Returns null if I2 isn't installed or its API doesn't match what this
-        /// was built against, so callers can distinguish "not installed" from "installed, no terms".
+        /// Union of the known baseline terms and whatever I2.Loc.Localize components are found on
+        /// formController.prefab (whether or not it's in the open scene) and in the open scene(s)
+        /// themselves — covers hand-customized copies of the dialog or extra Localize components this
+        /// package doesn't know about by name, which a fixed term list would silently miss.
         /// </summary>
-        private static System.Collections.IList GetI2Sources(out MethodInfo containsTermMethod, out MethodInfo addTermMethod)
+        private static Dictionary<string, string> CollectTermGuesses(I2Api api)
         {
-            containsTermMethod = null;
-            addTermMethod = null;
+            var result = new Dictionary<string, string>(KnownI2TermTranslations);
+            if (api?.LocalizeType == null || api.TermField == null)
+                return result;
 
-            var locManagerType = FindTypeByName("I2.Loc.LocalizationManager");
-            var sourceType = FindTypeByName("I2.Loc.LanguageSourceData");
-            if (locManagerType == null || sourceType == null)
-                return null;
-
-            var updateSourcesMethod = locManagerType.GetMethod("UpdateSources", BindingFlags.Public | BindingFlags.Static);
-            updateSourcesMethod?.Invoke(null, null);
-
-            var sourcesField = locManagerType.GetField("Sources", BindingFlags.Public | BindingFlags.Static);
-            var sources = sourcesField?.GetValue(null) as System.Collections.IList;
-            if (sources == null)
-                return null;
-
-            containsTermMethod = sourceType.GetMethod("ContainsTerm", new[] { typeof(string) });
-            addTermMethod = sourceType.GetMethod("AddTerm", new[] { typeof(string) });
-            if (containsTermMethod == null || addTermMethod == null)
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FormControllerPrefabPath);
+            if (prefab != null)
             {
-                Debug.LogWarning("[RewiredHelper] Could not resolve I2 Localization's term API (ContainsTerm/AddTerm) — I2 version may differ from the one this was built against.");
-                return null;
+                foreach (var comp in prefab.GetComponentsInChildren(api.LocalizeType, true))
+                    AddTermGuess(api, comp, result);
             }
 
-            return sources;
+            foreach (var obj in UnityEngine.Object.FindObjectsOfType(api.LocalizeType, true))
+            {
+                if (obj is Component comp)
+                    AddTermGuess(api, comp, result);
+            }
+
+            return result;
+        }
+
+        private static void AddTermGuess(I2Api api, Component localizeComponent, Dictionary<string, string> result)
+        {
+            var term = api.TermField.GetValue(localizeComponent) as string;
+            if (string.IsNullOrEmpty(term) || result.ContainsKey(term))
+                return;
+
+            result[term] = api.GuessEnglishTextFor(localizeComponent) ?? NicifyTerm(term);
+        }
+
+        private static string NicifyTerm(string term)
+        {
+            if (string.IsNullOrEmpty(term)) return term;
+            return char.ToUpperInvariant(term[0]) + term.Substring(1);
+        }
+
+        private static I2Api ResolveI2Api()
+        {
+            var locManagerType = FindTypeByName("I2.Loc.LocalizationManager");
+            var sourceType = FindTypeByName("I2.Loc.LanguageSourceData");
+            var termDataType = FindTypeByName("I2.Loc.TermData");
+            var localizeType = FindTypeByName("I2.Loc.Localize");
+            if (locManagerType == null || sourceType == null || termDataType == null)
+                return null;
+
+            var api = new I2Api(locManagerType, sourceType, termDataType, localizeType);
+            if (!api.IsValid)
+            {
+                Debug.LogWarning("[RewiredHelper] Could not resolve I2 Localization's term API — I2 version may differ from the one this was built against.");
+                return null;
+            }
+            return api;
+        }
+
+        /// <summary>
+        /// Reflection-only wrapper over I2 Localization's term/language API (never <c>using I2.Loc;</c>
+        /// — this package must still compile when I2 isn't installed).
+        /// </summary>
+        private sealed class I2Api
+        {
+            public readonly Type LocalizeType;
+            public readonly FieldInfo TermField;
+
+            private readonly MethodInfo _updateSourcesMethod;
+            private readonly FieldInfo _sourcesField;
+            private readonly MethodInfo _addTermMethod;
+            private readonly MethodInfo _getTermDataMethod;
+            private readonly MethodInfo _getLanguageIndexMethod;
+            private readonly MethodInfo _addLanguageMethod;
+            private readonly MethodInfo _setTranslationMethod;
+            private readonly MethodInfo _editorSetDirtyMethod;
+            private readonly FieldInfo _languagesField;
+
+            public I2Api(Type locManagerType, Type sourceType, Type termDataType, Type localizeType)
+            {
+                LocalizeType = localizeType;
+
+                _updateSourcesMethod = locManagerType.GetMethod("UpdateSources", BindingFlags.Public | BindingFlags.Static);
+                _sourcesField = locManagerType.GetField("Sources", BindingFlags.Public | BindingFlags.Static);
+
+                _addTermMethod = sourceType.GetMethod("AddTerm", new[] { typeof(string) });
+                _getTermDataMethod = sourceType.GetMethod("GetTermData", new[] { typeof(string), typeof(bool) });
+                _getLanguageIndexMethod = sourceType.GetMethod("GetLanguageIndex", new[] { typeof(string), typeof(bool), typeof(bool) });
+                _addLanguageMethod = sourceType.GetMethod("AddLanguage", new[] { typeof(string) });
+                _editorSetDirtyMethod = sourceType.GetMethod("Editor_SetDirty", BindingFlags.Public | BindingFlags.Instance);
+
+                _setTranslationMethod = termDataType.GetMethod("SetTranslation", new[] { typeof(int), typeof(string), typeof(string) });
+                _languagesField = termDataType.GetField("Languages", BindingFlags.Public | BindingFlags.Instance);
+
+                TermField = localizeType?.GetField("mTerm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            }
+
+            public bool IsValid =>
+                _addTermMethod != null && _getTermDataMethod != null &&
+                _getLanguageIndexMethod != null && _addLanguageMethod != null &&
+                _setTranslationMethod != null && _languagesField != null && _sourcesField != null;
+
+            public System.Collections.IList GetSources()
+            {
+                _updateSourcesMethod?.Invoke(null, null);
+                return _sourcesField.GetValue(null) as System.Collections.IList;
+            }
+
+            public bool TermHasEnglishTranslation(System.Collections.IList sources, string term)
+            {
+                foreach (var source in sources)
+                {
+                    var termData = _getTermDataMethod.Invoke(source, new object[] { term, false });
+                    if (termData == null) continue;
+
+                    int langIdx = (int)_getLanguageIndexMethod.Invoke(source, new object[] { "English", true, true });
+                    if (langIdx < 0) continue;
+
+                    var languages = _languagesField.GetValue(termData) as string[];
+                    if (languages != null && langIdx < languages.Length && !string.IsNullOrEmpty(languages[langIdx]))
+                        return true;
+                }
+                return false;
+            }
+
+            /// <returns>True if an English translation was written (term created and/or translation filled in).</returns>
+            public bool EnsureTermAndEnglishTranslation(object primarySource, System.Collections.IList sources, string term, string englishText, out bool termCreated)
+            {
+                termCreated = false;
+                object termData = null;
+                object owningSource = null;
+
+                foreach (var source in sources)
+                {
+                    var data = _getTermDataMethod.Invoke(source, new object[] { term, false });
+                    if (data == null) continue;
+                    termData = data;
+                    owningSource = source;
+                    break;
+                }
+
+                if (termData == null)
+                {
+                    termData = _addTermMethod.Invoke(primarySource, new object[] { term });
+                    owningSource = primarySource;
+                    termCreated = true;
+                }
+
+                int langIdx = (int)_getLanguageIndexMethod.Invoke(owningSource, new object[] { "English", true, true });
+                if (langIdx < 0)
+                {
+                    _addLanguageMethod.Invoke(owningSource, new object[] { "English" });
+                    langIdx = (int)_getLanguageIndexMethod.Invoke(owningSource, new object[] { "English", true, true });
+                    if (langIdx < 0) return termCreated;
+                }
+
+                var languages = _languagesField.GetValue(termData) as string[];
+                if (languages != null && langIdx < languages.Length && !string.IsNullOrEmpty(languages[langIdx]))
+                    return termCreated; // already translated — nothing more to write
+
+                _setTranslationMethod.Invoke(termData, new object[] { langIdx, englishText, null });
+                return true;
+            }
+
+            public void SaveSource(object source)
+            {
+                _editorSetDirtyMethod?.Invoke(source, null);
+                AssetDatabase.SaveAssets();
+            }
+
+            public string GuessEnglishTextFor(Component localizeComponent)
+            {
+                var tmp = localizeComponent.GetComponent<TMPro.TextMeshProUGUI>();
+                if (tmp != null && !string.IsNullOrEmpty(tmp.text)) return tmp.text;
+
+                var uiText = localizeComponent.GetComponent<UnityEngine.UI.Text>();
+                if (uiText != null && !string.IsNullOrEmpty(uiText.text)) return uiText.text;
+
+                return null;
+            }
         }
 
         [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Controller Help Form", priority = 12)]

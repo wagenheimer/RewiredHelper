@@ -213,11 +213,11 @@ namespace Wagenheimer.RewiredHelper.Editor
                     hasI2Integration, "Import Integration", () => ImportI2IntegrationSample(), isOptional: true);
 
                 // 6b. I2 Terms used by the shipped prefabs/help form
-                var hasAllTerms = DefaultSetupGenerator.AllI2TermsExist(out var missingTermCount);
+                var hasAllTerms = DefaultSetupGenerator.AllI2TermsExist(out var missingTermCount, out var missingTerms);
                 DrawCardItem("I2 Localization Terms",
                     hasAllTerms
                         ? "✅ All Rewired Helper terms exist in the I2 Language Source."
-                        : $"⚠️ {missingTermCount} term(s) used by Rewired Helper's prefabs are missing from the I2 Language Source.",
+                        : $"⚠️ {missingTermCount} term(s) missing from the I2 Language Source: {string.Join(", ", missingTerms)}",
                     hasAllTerms, "Verify/Add Terms", () => DefaultSetupGenerator.EnsureI2Terms(), isOptional: true);
             }
         }
@@ -346,6 +346,18 @@ namespace Wagenheimer.RewiredHelper.Editor
                 DefaultSetupGenerator.CreateControllerHelpForm();
             }
             EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(4);
+            if (Btn("🧹  Remove Duplicate Event Systems (All Scenes)", ColOrange))
+            {
+                DefaultSetupGenerator.RemoveDuplicateEventSystemsInAllScenes();
+            }
+            var hintStyle = new GUIStyle(EditorStyles.miniLabel)
+            { normal = { textColor = ColDim }, wordWrap = true, alignment = TextAnchor.MiddleCenter };
+            EditorGUILayout.LabelField(
+                "Opens every scene in the project, keeps only the Event System running Rewired's input module, " +
+                "and saves the ones that changed. Fixes Unity's \"only one active EventSystem\" duplicate error.",
+                hintStyle);
         }
 
         private static bool Btn(string label, Color color)

@@ -413,8 +413,16 @@ namespace Wagenheimer.RewiredHelper
         #region Input Handling Methods
         private void UpdateCursorPosition()
         {
-            if (Camera.main != null && GameCursor != null)
-                RewiredMousePosition = RectTransformUtility.WorldToScreenPoint(Camera.main, GameCursor.transform.position);
+            if (GameCursor == null) return;
+
+            // Screen Space - Overlay canvases render 1:1 with screen pixels and must be converted
+            // with a null camera; passing Camera.main (or any camera) here skews the result whenever
+            // that camera's projection doesn't happen to match the canvas 1:1 (e.g. a distinct
+            // gameplay/UI camera setup), producing an out-of-bounds RewiredMousePosition that never
+            // hits anything when raycast against world colliders.
+            var canvas = GameCursor.canvas;
+            var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            RewiredMousePosition = RectTransformUtility.WorldToScreenPoint(camera, GameCursor.transform.position);
         }
 
         private const float MOUSE_MOVEMENT_TIME_THRESHOLD = 0.01f;

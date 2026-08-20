@@ -138,6 +138,94 @@ namespace Wagenheimer.RewiredHelper.Editor
             MarkSceneDirty();
         }
 
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Remove Duplicate Event Systems (All Scenes)", priority = 15)]
+        internal static void RemoveDuplicateEventSystemsInAllScenes()
+        {
+            if (!EditorUtility.DisplayDialog("Remove Duplicate Event Systems",
+                    "This opens every scene in the project, removes every EventSystem except the one " +
+                    "running Rewired's RewiredStandaloneInputModule, and saves any scene that changed.\n\n" +
+                    "Make sure your work is saved/committed first — this can't be undone with Ctrl+Z once a " +
+                    "scene is saved.",
+                    "Proceed", "Cancel"))
+                return;
+
+            var scenePaths = AssetDatabase.FindAssets("t:Scene")
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Distinct()
+                .OrderBy(p => p)
+                .ToArray();
+
+            var originalSetup = EditorSceneManager.GetSceneManagerSetup();
+            int scenesChanged = 0;
+            int systemsRemoved = 0;
+
+            try
+            {
+                for (int i = 0; i < scenePaths.Length; i++)
+                {
+                    var path = scenePaths[i];
+                    if (EditorUtility.DisplayCancelableProgressBar("Removing Duplicate Event Systems",
+                            path, (float)i / scenePaths.Length))
+                        break;
+
+                    var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+                    var removed = RemoveDuplicateEventSystemsInOpenScene();
+                    if (removed > 0)
+                    {
+                        systemsRemoved += removed;
+                        scenesChanged++;
+                        EditorSceneManager.MarkSceneDirty(scene);
+                        EditorSceneManager.SaveScene(scene);
+                    }
+                }
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+                if (originalSetup is { Length: > 0 })
+                    EditorSceneManager.RestoreSceneManagerSetup(originalSetup);
+            }
+
+            var message = $"Removed {systemsRemoved} duplicate Event System(s) across {scenesChanged} scene(s).";
+            Debug.Log($"[RewiredHelper] {message}");
+            EditorUtility.DisplayDialog("Remove Duplicate Event Systems", message, "OK");
+        }
+
+        /// <summary>
+        /// Removes every <see cref="UnityEngine.EventSystems.EventSystem"/> in the currently open scene
+        /// except the one running Rewired's input module (or, if none of them do, the first one — which
+        /// gets upgraded in place, matching <see cref="EnsureRewiredEventSystem"/>'s own behavior).
+        /// Returns how many GameObjects were removed.
+        /// </summary>
+        private static int RemoveDuplicateEventSystemsInOpenScene()
+        {
+            var moduleType = FindRewiredInputModuleType();
+            var allSystems = UnityEngine.Object.FindObjectsOfType<UnityEngine.EventSystems.EventSystem>(true);
+            if (allSystems.Length == 0)
+                return 0;
+
+            var keep = moduleType != null
+                ? allSystems.FirstOrDefault(es => es.GetComponent(moduleType) != null) ?? allSystems[0]
+                : allSystems[0];
+
+            if (moduleType != null && keep.GetComponent(moduleType) == null)
+            {
+                var vanilla = keep.GetComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                if (vanilla != null) UnityEngine.Object.DestroyImmediate(vanilla);
+                keep.gameObject.AddComponent(moduleType);
+            }
+
+            int removed = 0;
+            foreach (var es in allSystems)
+            {
+                if (es == keep) continue;
+                UnityEngine.Object.DestroyImmediate(es.gameObject);
+                removed++;
+            }
+
+            return removed;
+        }
+
         const string GlyphProviderTypeName = "Rewired.Glyphs.GlyphProvider";
         const string GlyphSetCollectionTypeName = "Rewired.Glyphs.GlyphSetCollection";
 
@@ -239,29 +327,36 @@ namespace Wagenheimer.RewiredHelper.Editor
         /// that merely exists but has no translation still renders blank/untranslated at runtime, so
         /// existence alone isn't "done".
         /// </summary>
-        internal static bool AllI2TermsExist(out int missingCount)
+        internal static bool AllI2TermsExist(out int missingCount) =>
+            AllI2TermsExist(out missingCount, out _);
+
+        /// <summary>Same as the single-out overload, but also returns the actual missing term names.</summary>
+        internal static bool AllI2TermsExist(out int missingCount, out List<string> missingTerms)
         {
-            missingCount = 0;
+            missingTerms = new List<string>();
             var api = ResolveI2Api();
             var termGuesses = CollectTermGuesses(api);
             if (api == null)
             {
-                missingCount = termGuesses.Count;
+                missingTerms.AddRange(termGuesses.Keys);
+                missingCount = missingTerms.Count;
                 return false;
             }
 
             var sources = api.GetSources();
             if (sources == null || sources.Count == 0)
             {
-                missingCount = termGuesses.Count;
+                missingTerms.AddRange(termGuesses.Keys);
+                missingCount = missingTerms.Count;
                 return false;
             }
 
             foreach (var term in termGuesses.Keys)
             {
                 if (!api.TermHasEnglishTranslation(sources, term))
-                    missingCount++;
+                    missingTerms.Add(term);
             }
+            missingCount = missingTerms.Count;
             return missingCount == 0;
         }
 

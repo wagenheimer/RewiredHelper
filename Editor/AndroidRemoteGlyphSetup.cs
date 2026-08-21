@@ -182,7 +182,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                     BindingFlags.NonPublic | BindingFlags.Instance);
                 if (genMethod != null)
                 {
-                    var editor = Editor.CreateEditor(existing);
+                    var editor = UnityEditor.Editor.CreateEditor(existing);
                     try
                     {
                         genMethod.Invoke(editor, new[] { userData, (object)controllerId });

@@ -25,10 +25,7 @@ namespace Wagenheimer.RewiredHelper.Editor
         const string ControllerName = "AndroidController";
         const string DefaultControllerKey = "android_controller";
 
-        static readonly string[] MenuPath =
-            { "Tools/Wagenheimer/Rewired Helper/Ensure Android Remote Glyphs" };
-
-        [MenuItem(MenuPath[0], priority = 16)]
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Ensure Android Remote Glyphs", priority = 16)]
         internal static void EnsureAndroidRemoteGlyphsMenu()
         {
             int steps = EnsureAndroidRemoteGlyphs();

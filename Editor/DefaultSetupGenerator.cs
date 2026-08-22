@@ -405,24 +405,10 @@ namespace Wagenheimer.RewiredHelper.Editor
         /// </summary>
         private static Dictionary<string, string> CollectTermGuesses(I2Api api)
         {
-            var result = new Dictionary<string, string>(KnownI2TermTranslations);
-            if (api?.LocalizeType == null || api.TermField == null)
-                return result;
-
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FormControllerPrefabPath);
-            if (prefab != null)
-            {
-                foreach (var comp in prefab.GetComponentsInChildren(api.LocalizeType, true))
-                    AddTermGuess(api, comp, result);
-            }
-
-            foreach (var obj in UnityEngine.Object.FindObjectsOfType(api.LocalizeType, true))
-            {
-                if (obj is Component comp)
-                    AddTermGuess(api, comp, result);
-            }
-
-            return result;
+            // Only the curated baseline this package actually ships terms for. The old behavior
+            // scanned every Localize component in open scenes/formController.prefab and added
+            // whatever it "guessed", polluting the Language Source with junk terms.
+            return new Dictionary<string, string>(KnownI2TermTranslations);
         }
 
         private static void AddTermGuess(I2Api api, Component localizeComponent, Dictionary<string, string> result)

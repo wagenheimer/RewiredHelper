@@ -74,13 +74,22 @@ namespace Wagenheimer.RewiredHelper
 
             if (_targetAction == TargetAction.ToggleCanvasGroup && _targetCanvasGroup == null)
                 _targetCanvasGroup = GetComponent<CanvasGroup>();
+        }
 
+        private void OnEnable()
+        {
             RewiredInputManager.RegisterVisibilityController(this);
+            UpdateVisibility();
         }
 
         private void Start()
         {
             if (_shouldUpdateOnStart) UpdateVisibility();
+        }
+
+        private void OnDisable()
+        {
+            RewiredInputManager.UnregisterVisibilityController(this);
         }
 
         private void OnDestroy()

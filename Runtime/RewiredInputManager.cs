@@ -660,9 +660,8 @@ namespace Wagenheimer.RewiredHelper
                     bool mouseMoving = Mathf.Abs(Input.GetAxis("Mouse X")) > MOUSE_MOVEMENT_INPUT_THRESHOLD ||
                                       Mathf.Abs(Input.GetAxis("Mouse Y")) > MOUSE_MOVEMENT_INPUT_THRESHOLD;
                     bool mouseClicked = Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
-                    bool anyKeyPressed = Input.anyKeyDown;
 
-                    if (mouseMoving || mouseClicked || anyKeyPressed)
+                    if (mouseMoving || mouseClicked)
                     {
                         _lastInputWasPC = true;
                         var kb = ReInput.controllers.GetController(ControllerType.Keyboard, 0);

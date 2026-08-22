@@ -7,8 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.47.0] - 2026-08-22
 
-### Added
-- add AutoBridgeSubmitToPointerDown to RewiredInputManager for seamless SFX trigger on gamepad submit
+### Fixed
+- `InputVisibilityController`: added `OnEnable`/`OnDisable` lifecycle registration so dynamic panels and popups immediately evaluate visibility when opened, rather than waiting for first input event or failing if activated after start.
+- `RewiredInputManager`: fixed hybrid input polling switching back from Joystick to PC on `Input.anyKeyDown` (which was erroneously triggered by gamepad buttons and UI navigation events when opening/closing panels). Now only switches back on physical mouse motion (`Mouse X`/`Mouse Y`) or mouse button clicks.
 
 ## [0.46.0] - 2026-08-22
 

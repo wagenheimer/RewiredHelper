@@ -76,10 +76,12 @@ namespace Wagenheimer.RewiredHelper.Editor
             }, ColAccent);
 
             // 3. Controller Help Events
-            DrawSettingsGroup("Controller Help", "❔", new[] {
-                serializedObject.FindProperty("OnShowControllerHelp")
+            DrawSettingsGroup("Controller Help", "?", new[] {
+                serializedObject.FindProperty("OnShowControllerHelp"),
+                serializedObject.FindProperty("ControllerHelpBlockedScenes")
             }, new[] {
-                new GUIContent("On Show Controller Help", "Event triggered once the first time physical controller input is detected.")
+                new GUIContent("On Show Controller Help", "Event triggered once the first time physical controller input is detected."),
+                new GUIContent("Blocked Scenes", "Scene names where the controller help prompt must never appear. The prompt is not consumed in these scenes - it will show in the first allowed scene where controller input is detected.")
             }, ColAccent);
 
             // 4. Runtime Status & State
@@ -529,7 +531,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
             else if (title == "Controller Help")
             {
-                var eventProp = properties[0]; // OnShowControllerHelp is the first property in this group now
+                var eventProp = properties.Length > 1 ? properties[1] : properties[0]; // OnShowControllerHelp
                 var callsProp = eventProp?.FindPropertyRelative("m_PersistentCalls.m_Calls");
                 bool hasListeners = callsProp != null && callsProp.arraySize > 0;
                 

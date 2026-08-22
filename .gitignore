@@ -1,6 +1,8 @@
-﻿# OS
+# OS
 .DS_Store
 Thumbs.db
+*.stackdump
+*.dmp
 
 # Unity generated (do NOT ignore .meta files — they are required by UPM)
 [Ll]ibrary/

@@ -86,6 +86,12 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("If enabled, the manager will automatically configure itself on Start, using default providers.")]
         public bool AutoConfigureOnStart = true;
 
+        [Tooltip("Scene names where the first-time controller-help prompt must NEVER appear. " +
+                 "Matching is by active scene name, case-insensitive. Pressing a gamepad button in " +
+                 "these scenes does not consume the prompt - it will still show the first time a " +
+                 "gamepad button is pressed in an allowed scene.")]
+        public List<string> ControllerHelpBlockedScenes = new List<string>();
+
         [Tooltip("If enabled, Custom Controllers are placed last in the Rewired glyph selector's controller type order. " +
                  "Prevents binds on auxiliary/orphaned Custom Controllers (e.g. AndroidRemote) from overriding mouse/keyboard glyphs on desktop. " +
                  "When a Custom Controller is the last active controller (e.g. using the remote on Android TV), it still takes priority.")]
@@ -689,6 +695,21 @@ namespace Wagenheimer.RewiredHelper
 
         private void ShowControllerHelpIfPossible()
         {
+            // Always wait while the UI is blocked (scene transitions, cutscenes, UIBlockerOverlay):
+            // the prompt would be invisible or land behind a blocker, so postpone instead of
+            // consuming the one-shot flag.
+            if (_uiBlocker.IsUiBlocked || UIBlockerOverlay.Enabled)
+                return;
+
+            // Never show in blacklisted scenes (and don't consume the one-shot flag either).
+            string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            foreach (var blocked in ControllerHelpBlockedScenes)
+            {
+                if (!string.IsNullOrEmpty(blocked) &&
+                    string.Equals(blocked, sceneName, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+
             if (_controllerHelpGate.CanShowControllerHelp)
             {
                 alreadyShowedControllerHelp = true;

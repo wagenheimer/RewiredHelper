@@ -317,8 +317,14 @@ namespace Wagenheimer.RewiredHelper.Editor
             { "controllersupport", "Gamepad Support!" },
             { "menu", "Menu" },
             { "GAMEPAD CONTROLS", "Gamepad Controls" },
-            { "KEYBOARD_CONTROLS", "Keyboard & Mouse Controls" },
         };
+
+        /// <summary>
+        /// The full set of I2 terms this package requires (term -> English fallback translation).
+        /// Used by diagnostics to list each term individually with its present/missing state.
+        /// </summary>
+        internal static Dictionary<string, string> GetRequiredI2Terms() =>
+            new Dictionary<string, string>(CollectTermGuesses(null));
 
         /// <summary>
         /// True only if every term this package could need — the known baseline plus anything found

@@ -162,9 +162,10 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             // 1. Verify Native Manager in Scene
             var hasRewired = DefaultSetupGenerator.FindInputManagerInScene() != null;
-            DrawCheckResult("Rewired Input Manager (Native)", hasRewired, 
+            DrawCheckResult("Rewired Input Manager (Native)", hasRewired,
                 "Instantiate the configured Rewired prefab to manage bindings and controls.",
-                "Create Manager", () => DefaultSetupGenerator.CreateRewiredInputManager());
+                "Create Manager", () => DefaultSetupGenerator.CreateRewiredInputManager(),
+                "Creates Rewired's native Input Manager GameObject in the scene with a default configuration.");
 
             // 2. Verify Event System is running Rewired's own input module (a plain Unity
             // EventSystem passes a generic null-check but never routes Rewired controller input
@@ -172,7 +173,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             var hasEventSystem = DefaultSetupGenerator.HasRewiredEventSystemInScene();
             DrawCheckResult("Rewired Event System", hasEventSystem,
                 "The scene's Event System must use Rewired's RewiredStandaloneInputModule (not Unity's default StandaloneInputModule) for controller UI navigation and Player Mouse to work.",
-                "Create Event System", () => DefaultSetupGenerator.EnsureRewiredEventSystem());
+                "Create Event System", () => DefaultSetupGenerator.EnsureRewiredEventSystem(),
+                "Creates an Event System using Rewired's RewiredStandaloneInputModule so controller input navigates the UI.");
 
             // 3. Verify Canvas
             var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;
@@ -183,13 +185,15 @@ namespace Wagenheimer.RewiredHelper.Editor
                     var canvas = go.GetComponent<Canvas>();
                     canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                     Undo.RegisterCreatedObjectUndo(go, "Create Canvas");
-                });
+                },
+                "Creates a Screen Space - Overlay Canvas with a GraphicRaycaster, required to render cursors and dialogs.");
 
             // 4. Verify Game Cursor (Required)
             var hasCursor = manager.GameCursor != null;
             DrawCheckResult("Game Cursor", hasCursor,
                 "A UI Image is required to act as the visual cursor on screen.",
-                "Create Cursor", () => DefaultSetupGenerator.CreateGameCursorAndWire(manager, serializedObject));
+                "Create Cursor", () => DefaultSetupGenerator.CreateGameCursorAndWire(manager, serializedObject),
+                "Creates a Game Cursor UI Image under the Canvas (hidden until joystick input is detected), adds the GameCursorPositioner and links it to this manager.");
 
             // Standalone Custom Cursor warnings
             if (manager.CustomCursorEnabled && manager.CursorTexture == null)
@@ -227,7 +231,8 @@ namespace Wagenheimer.RewiredHelper.Editor
                 var hasGlyphProvider = glyphProviderType != null && manager.GetComponent(glyphProviderType) != null;
                 DrawCheckResult("Glyph Provider", hasGlyphProvider,
                     "Without a Glyph Provider on the Rewired Input Manager, ReInput.glyphs.glyphProvider is never set, so every <rewiredElement> glyph tag falls back to plain text instead of an icon.",
-                    "Add Glyph Provider", () => DefaultSetupGenerator.EnsureGlyphProvider(manager.gameObject));
+                    "Add Glyph Provider", () => DefaultSetupGenerator.EnsureGlyphProvider(manager.gameObject),
+                    "Adds Rewired's GlyphProvider component to the Input Manager so glyph tags render as icons.");
 
                 // Android Remote glyphs: only relevant when the project actually configures the
                 // AndroidController Custom Controller (Android TV remote support).
@@ -237,7 +242,8 @@ namespace Wagenheimer.RewiredHelper.Editor
                     bool androidGlyphsReady = AndroidRemoteGlyphSetup.IsAndroidRemoteGlyphSetReady(nativeInputManager);
                     DrawCheckResult("Android Remote Glyphs", androidGlyphsReady,
                         "The AndroidController Custom Controller is configured, but its SpriteGlyphSet is missing or not registered in the Glyph Set Collection — on Android TV, UI prompts show raw element names (e.g. \"Left\", \"Escape\") instead of icons.",
-                        "Ensure Android Remote Glyphs", () => AndroidRemoteGlyphSetup.EnsureAndroidRemoteGlyphs());
+                        "Ensure Android Remote Glyphs", () => AndroidRemoteGlyphSetup.EnsureAndroidRemoteGlyphs(),
+                        "One click: fills in missing element keys on the AndroidController, generates/updates its SpriteGlyphSet using Rewired's own generator, copies matching sprites from other installed glyph sets, registers it in the Glyph Set Collection and reloads the Glyph Provider.");
                 }
             }
 
@@ -266,17 +272,32 @@ namespace Wagenheimer.RewiredHelper.Editor
                     var hasI2Integration = FindTypeByName("Wagenheimer.RewiredHelper.Integration.I2SpecializationImportedMarker") != null;
                     DrawCheckResult("I2 Localization Integration", hasI2Integration,
                         "I2 Localization detected, but the integration specialization helper is not imported. Import it to enable automatic controller glyphs in localized texts.",
-                        "Import Integration", () => ImportI2IntegrationSample());
+                        "Import Integration", () => ImportI2IntegrationSample(),
+                        "Copies the SpecializationManager.cs integration sample into Assets/Samples so I2 Localization renders controller glyphs inside translated texts.");
                 }
 
-                // 7b. Verify I2 Terms used by the shipped prefabs/help form (back, click,
-                // cursormovement, ok, controllersupport, menu, GAMEPAD CONTROLS, KEYBOARD_CONTROLS).
-                var hasAllTerms = DefaultSetupGenerator.AllI2TermsExist(out var missingTermCount);
-                DrawCheckResult("I2 Localization Terms", hasAllTerms,
-                    missingTermCount > 0
-                        ? $"{missingTermCount} term(s) used by Rewired Helper's prefabs are missing from the I2 Language Source, so those labels show the raw term key instead of translated text."
-                        : null,
-                    "Verify/Add Terms", () => DefaultSetupGenerator.EnsureI2Terms());
+                // 7b. Verify I2 Terms used by the shipped prefabs/help form — listing every
+                // required term individually with its present/missing state.
+                var hasAllTerms = DefaultSetupGenerator.AllI2TermsExist(out var missingTermCount, out var missingTerms);
+                string termsDescription = null;
+                if (!hasAllTerms)
+                {
+                    var requiredTerms = DefaultSetupGenerator.GetRequiredI2Terms();
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine(missingTermCount == 1
+                        ? "1 term is missing an English translation in the I2 Language Source (shows blank at runtime):"
+                        : $"{missingTermCount} terms are missing or have no English translation in the I2 Language Source:");
+                    sb.AppendLine();
+                    foreach (var term in requiredTerms.Keys)
+                    {
+                        sb.AppendLine(string.Format("{0} {1}", missingTerms.Contains(term) ? "❌" : "✅", term));
+                    }
+                    termsDescription = sb.ToString().TrimEnd();
+                }
+                DrawCheckResult("I2 Localization Terms", hasAllTerms, termsDescription,
+                    "Verify/Add Terms",
+                    () => DefaultSetupGenerator.EnsureI2Terms(),
+                    "Checks every term Rewired Helper needs in the I2 Language Source and adds the missing ones with an English translation.");
             }
 
             EditorGUILayout.Space(10);
@@ -338,7 +359,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             {
                 DrawCheckResult("Player Mouse (Joystick Cursor Movement)", false,
                     "Rewired's Player Mouse component drives the OS/UI pointer from controller input. Without it, the cursor shows for a joystick but never moves.",
-                    "Create Player Mouse", () => DefaultSetupGenerator.CreatePlayerMouseAndWire(manager));
+                    "Create Player Mouse", () => DefaultSetupGenerator.CreatePlayerMouseAndWire(manager),
+                    "Creates Rewired's PlayerMouse component and wires it to move the Game Cursor from joystick/controller input.");
                 return;
             }
 
@@ -347,9 +369,10 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (configuredElements == 0)
             {
-                DrawCheckResult("Player Mouse — Movement Elements", false,
-                    "Player Mouse exists but its Elements list has no axis bound to it, so controller input never reaches it and the cursor stays fixed.",
-                    "Auto-Configure Elements", () => DefaultSetupGenerator.ConfigureMouseMovementElements(playerMouseComp));
+                    DrawCheckResult("Player Mouse — Movement Elements", false,
+                        "Player Mouse exists but its Elements list has no axis bound to it, so controller input never reaches it and the cursor stays fixed.",
+                        "Auto-Configure Elements", () => DefaultSetupGenerator.ConfigureMouseMovementElements(playerMouseComp),
+                        "Binds the horizontal/vertical movement axes to Player Mouse's Elements list so the joystick can move the cursor.");
             }
             else if (configuredElements > 0)
             {
@@ -375,7 +398,8 @@ namespace Wagenheimer.RewiredHelper.Editor
                             : "On Enabled State Changed is not wired to control the Game Cursor's visibility.";
 
                         DrawCheckResult("Player Mouse Events — Wiring", false, reason,
-                            "Fix Wiring", () => DefaultSetupGenerator.WirePlayerMouseEvents(manager, playerMouseComp));
+                            "Fix Wiring", () => DefaultSetupGenerator.WirePlayerMouseEvents(manager, playerMouseComp),
+                            "Rewires Player Mouse's On Screen Position Changed to GameCursorPositioner.SetScreenPosition and On Enabled State Changed to the Game Cursor's visibility.");
                     }
                     else
                     {
@@ -390,11 +414,11 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
         }
 
-        private void DrawCheckResult(string title, bool pass, string missingDesc, string fixBtnText, Action fixAction)
+        private void DrawCheckResult(string title, bool pass, string missingDesc, string fixBtnText, Action fixAction, string fixBtnTooltip = null)
         {
             var color = pass ? ColGreen : ColRed;
             var r = EditorGUILayout.BeginVertical();
-            
+
             // Render Card with left colored sidebar
             EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), ColCard);
             EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, 3, r.height + 4), color);
@@ -402,7 +426,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(10);
-            
+
             var style = new GUIStyle(EditorStyles.boldLabel) { fontSize = 11, normal = { textColor = color } };
             var statusIcon = pass ? "✅  " : "❌  ";
             GUILayout.Label($"{statusIcon}{title}", style);
@@ -411,7 +435,10 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (!pass && !string.IsNullOrEmpty(fixBtnText) && fixAction != null)
             {
-                if (GUILayout.Button(fixBtnText, GUILayout.Width(120), GUILayout.Height(18)))
+                // Auto-sized so long labels (e.g. "Ensure Android Remote Glyphs") are never clipped,
+                // with a hover tooltip describing exactly what the fix will do.
+                var btnContent = new GUIContent(fixBtnText, fixBtnTooltip);
+                if (GUILayout.Button(btnContent, GUILayout.Height(18)))
                 {
                     fixAction.Invoke();
                 }

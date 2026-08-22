@@ -212,13 +212,26 @@ namespace Wagenheimer.RewiredHelper.Editor
                     hasI2Integration ? "✅ I2 Localization Integration is imported and active." : "⚠️ I2 Localization detected, but the integration specialization helper is not imported.",
                     hasI2Integration, "Import Integration", () => ImportI2IntegrationSample(), isOptional: true);
 
-                // 6b. I2 Terms used by the shipped prefabs/help form
+                // 6b. I2 Terms used by the shipped prefabs/help form — listing every required
+                // term individually with its present/missing state.
                 var hasAllTerms = DefaultSetupGenerator.AllI2TermsExist(out var missingTermCount, out var missingTerms);
-                DrawCardItem("I2 Localization Terms",
-                    hasAllTerms
-                        ? "✅ All Rewired Helper terms exist in the I2 Language Source."
-                        : $"⚠️ {missingTermCount} term(s) missing from the I2 Language Source: {string.Join(", ", missingTerms)}",
-                    hasAllTerms, "Verify/Add Terms", () => DefaultSetupGenerator.EnsureI2Terms(), isOptional: true);
+                string termsDesc;
+                if (hasAllTerms)
+                {
+                    termsDesc = "✅ All Rewired Helper terms exist in the I2 Language Source.";
+                }
+                else
+                {
+                    var requiredTerms = DefaultSetupGenerator.GetRequiredI2Terms();
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine($"⚠️ {missingTermCount} term(s) missing or without an English translation:");
+                    foreach (var term in requiredTerms.Keys)
+                        sb.AppendLine(string.Format("{0} {1}", missingTerms.Contains(term) ? "❌" : "✅", term));
+                    termsDesc = sb.ToString().TrimEnd();
+                }
+                DrawCardItem("I2 Localization Terms", termsDesc,
+                    hasAllTerms, "Verify/Add Terms", () => DefaultSetupGenerator.EnsureI2Terms(), isOptional: true,
+                    "Checks every term Rewired Helper needs in the I2 Language Source and adds the missing ones with an English translation.");
             }
         }
 
@@ -263,11 +276,11 @@ namespace Wagenheimer.RewiredHelper.Editor
             return null;
         }
 
-        private void DrawCardItem(string title, string desc, bool pass, string fixBtnLabel, Action fixAction, bool isOptional = false)
+        private void DrawCardItem(string title, string desc, bool pass, string fixBtnLabel, Action fixAction, bool isOptional = false, string fixBtnTooltip = null)
         {
             var color = pass ? ColGreen : (isOptional ? ColOrange : ColRed);
             var cardR = EditorGUILayout.BeginVertical();
-            
+
             // Draw Card with colored status sidebar
             EditorGUI.DrawRect(new Rect(cardR.x - 2, cardR.y - 2, cardR.width + 4, cardR.height + 4), ColCard);
             EditorGUI.DrawRect(new Rect(cardR.x - 2, cardR.y - 2, 3, cardR.height + 4), color);
@@ -279,14 +292,16 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorGUILayout.BeginVertical();
             var titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 12, normal = { textColor = color } };
             EditorGUILayout.LabelField(title, titleStyle);
-            
+
             var descStyle = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = ColDim }, wordWrap = true };
             EditorGUILayout.LabelField(desc, descStyle);
             EditorGUILayout.EndVertical();
 
             if (!pass && !string.IsNullOrEmpty(fixBtnLabel) && fixAction != null)
             {
-                if (GUILayout.Button(fixBtnLabel, GUILayout.Width(130), GUILayout.Height(22)))
+                // Auto-sized so long labels are never clipped, with a hover tooltip describing
+                // exactly what the fix will do.
+                if (GUILayout.Button(new GUIContent(fixBtnLabel, fixBtnTooltip), GUILayout.Height(22)))
                 {
                     fixAction.Invoke();
                     _ranScan = true; // Reload checks

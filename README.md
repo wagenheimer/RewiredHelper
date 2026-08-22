@@ -284,6 +284,26 @@ Typical wiring: keep it in sync with your own block flag every frame:
 UIBlockerOverlay.Enabled = myUiIsBlocked;
 ```
 
+## Input-Based UI, Touch & Controller Controls (`InputVisibilityController`)
+
+Attach **`InputVisibilityController`** to any UI element (or GameObject) to automatically adapt its state based on the current active input device (Mouse/Keyboard, Joystick/Gamepad, or Touch):
+
+- **`TargetAction`**:
+  - `ToggleGameObject` (default): Sets `gameObject.SetActive(true/false)`.
+  - `ToggleSelectableInteractable`: Toggles `interactable` on a `Button`, `Toggle`, `Slider`, etc. (keeps it visible but grays it out / prevents focus).
+  - `ToggleCanvasGroup`: Controls `alpha` (1 / 0) and `blocksRaycasts`/`interactable` on a `CanvasGroup`.
+- **`VisibilityMode`**:
+  - `ShowOnMouseOrKeyboardHideOnJoystickOrTouch`: Perfect for mouse-specific settings (like Custom Cursor toggles, mouse sensitivity).
+  - `ShowOnJoystickOnly` / `HideOnJoystickOnly`: Gamepad specific prompts or panels.
+  - `ShowOnTouchHideOtherwise`: Shows when touch is active; hides on mouse/keyboard/joystick (ideal for virtual DPads/touch buttons).
+  - `HideOnTouchShowOtherwise`: Hides on touch; shows otherwise.
+  - `ShowOnMouseOnly`, `HideOnMouseOnly`, `ShowOnTouchOnly`, `HideOnTouchOnly`, `ShowOnJoystickOrTouchHideOnMouse`, `ShowOnJoystickHideOnMouseOrTouch`.
+  - `AlwaysShow` / `AlwaysHide`: Force state regardless of input.
+- Automatically registers with `RewiredInputManager` and updates immediately whenever the input device changes (`OnInputTypeChanged` / `OnInputSpecializationChanged`).
+- Exposes `_onVisibilityChanged (UnityEvent<bool>)` passing the evaluated boolean.
+
+---
+
 ## Custom Cursor
 
 Both fields are exposed in the Inspector under **Cursor & Visuals**, so you can assign a default
@@ -292,8 +312,37 @@ own save data/settings at runtime — the manager swaps the OS cursor on standal
 active device is a mouse:
 
 ```csharp
+// Update the RewiredInputManager directly so it stays in sync:
 _input.CustomCursorEnabled = MySaveData.CustomCursor;
 _input.CursorTexture = MyConfig.cursorTexture;
+```
+
+> ⚠️ **Important:** Do not call `Cursor.SetCursor(...)` directly in your game code. `RewiredInputManager` manages the hardware OS cursor and joystick virtual cursor every frame. Changing `CustomCursorEnabled` on the manager ensures the preference is respected without getting overwritten.
+
+### Toggling/Disabling Custom Cursor UI in Options
+When a player is using a Gamepad / Joystick, hardware cursor customization is irrelevant. You can:
+1. **Hide/Show the Option with `InputVisibilityController`** on the Toggle GameObject.
+2. **Listen to input changes** in your Options script to enable/disable interactability:
+```csharp
+private void OnEnable()
+{
+    RewiredInputManager.OnInputSpecializationChanged += UpdateCursorToggleState;
+    UpdateCursorToggleState();
+}
+
+private void OnDisable()
+{
+    RewiredInputManager.OnInputSpecializationChanged -= UpdateCursorToggleState;
+}
+
+private void UpdateCursorToggleState()
+{
+    if (cbCustomCursor == null) return;
+    bool isJoystickOrTouch = RewiredInputManager.Instance != null &&
+        (RewiredInputManager.Instance.CurrentControllerType == ControllerType.Joystick || RewiredInputManager.IsUsingTouch);
+    
+    cbCustomCursor.interactable = !isJoystickOrTouch;
+}
 ```
 
 **Testing in the Editor:** the standalone cursor path runs whenever `UNITY_STANDALONE` *or*

@@ -331,7 +331,16 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorGUILayout.LabelField("• **API Usage**:\n" +
                 "  - `RewiredInputManager.IsUsingTouch`: Check if current input source is touch screen.\n" +
                 "  - `RewiredInputManager.CurrentControllerType`: Mouse, Joystick (controller), or Custom (touch).\n" +
-                "  - `RewiredInputManager.OnInputTypeChanged`: Static event invoked when the active input source changes.", docStyle);
+                "  - `RewiredInputManager.OnInputTypeChanged` / `OnInputSpecializationChanged`: Static events invoked when input source changes.\n" +
+                "  - `RewiredInputManager.Instance.CustomCursorEnabled`: Set custom cursor state (never call Cursor.SetCursor directly).", docStyle);
+
+            EditorGUILayout.Space(6);
+            GUILayout.Label("🎛️ Dynamic UI & Visibility", headerStyle);
+            EditorGUILayout.Space(3);
+
+            EditorGUILayout.LabelField("• **InputVisibilityController**:\n" +
+                "  Attach to any UI element/panel to automatically show/hide, toggle Selectable interactability, or adjust CanvasGroup " +
+                "  based on input type (e.g. `ShowOnMouseOrKeyboardHideOnJoystickOrTouch` for Custom Cursor toggles, `ShowOnTouchHideOtherwise` for virtual D-Pads, or `ShowOnJoystickOnly`).", docStyle);
 
             EditorGUILayout.Space(6);
             GUILayout.Label("✨ Modal Dialog Stack System", headerStyle);

@@ -8,7 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.45.0] - 2026-08-22
 
 ### Added
-- auto-sized fix buttons with full hover tooltips + I2 Terms check now lists each required term individually (drops unneeded KEYBOARD_CONTROLS)
+- `InputVisibilityController`: full support for controller/mouse/joystick/touch visibility modes (`ShowOnMouseOrKeyboardHideOnJoystickOrTouch`, `ShowOnJoystickOnly`, `HideOnJoystickOnly`, `ShowOnMouseOnly`, `HideOnMouseOnly`, etc.).
+- `InputVisibilityController`: added `TargetAction` property allowing not just GameObject activation/deactivation, but also toggling `Selectable.interactable` (keeping buttons/toggles visible but disabled) or controlling `CanvasGroup` alpha and raycasts.
+- `InputVisibilityControllerEditor`: rich custom Inspector with color-coded cards, live active input status, and interactive explanations for each visibility mode.
+- Documented Custom Cursor integration and Options UI binding in README and Setup Checker.
+- Auto-sized fix buttons with full hover tooltips + I2 Terms check now lists each required term individually.
 
 ## [0.44.0] - 2026-08-22
 

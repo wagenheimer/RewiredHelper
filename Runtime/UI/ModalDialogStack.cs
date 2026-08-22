@@ -28,6 +28,11 @@ namespace Wagenheimer.RewiredHelper.UI
             if (Modals.Contains(dialog))
                 return; // already open — bring-to-front is left to the host if it needs sibling reordering
 
+            // Already visible or mid-animation (showing/hiding): abort instead of restarting
+            // tweens on top of each other, which used to cause flicker and stuck overlays.
+            if (dialog.IsPlayingShow || dialog.IsPlayingHide)
+                return;
+
             Modals.Add(dialog);
             dialog.ShowEffect = effect;
             dialog.RequestBlockUi(0.7f + delay);

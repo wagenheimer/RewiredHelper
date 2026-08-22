@@ -137,8 +137,22 @@ namespace Wagenheimer.RewiredHelper.UI
 
         internal void RequestBlockUi(float seconds) => OnBlockUiRequested?.Invoke(seconds);
 
+        /// <summary>True while the show animation is running.</summary>
+        public bool IsPlayingShow { get; private set; }
+
+        /// <summary>True while the hide animation is running (dialog is already removed from the modal stack).</summary>
+        public bool IsPlayingHide { get; private set; }
+
         internal void PlayShow(float delay, Action onComplete)
         {
+            IsPlayingHide = false;
+            IsPlayingShow = true;
+            Action onShowComplete = () =>
+            {
+                IsPlayingShow = false;
+                onComplete?.Invoke();
+            };
+
             gameObject.SetActive(true);
             FocusOnShow?.Select();
             gameObject.SendMessage("OnShow", SendMessageOptions.DontRequireReceiver);
@@ -163,25 +177,38 @@ namespace Wagenheimer.RewiredHelper.UI
             switch (ShowEffect)
             {
                 case ShowDialogEffect.Fade:
-                    _activeTween = StartCoroutine(FadeInCoroutine(delay, onComplete));
+                    _activeTween = StartCoroutine(FadeInCoroutine(delay, onShowComplete));
                     break;
                 case ShowDialogEffect.Move:
-                    _activeTween = StartCoroutine(MoveInCoroutine(delay, onComplete, false));
+                    _activeTween = StartCoroutine(MoveInCoroutine(delay, onShowComplete, false));
                     break;
                 case ShowDialogEffect.Scale:
-                    _activeTween = StartCoroutine(ScaleInCoroutine(delay, onComplete, false));
+                    _activeTween = StartCoroutine(ScaleInCoroutine(delay, onShowComplete, false));
                     break;
                 case ShowDialogEffect.FadeAndScale:
-                    _activeTween = StartCoroutine(ScaleInCoroutine(delay, onComplete, true));
+                    _activeTween = StartCoroutine(ScaleInCoroutine(delay, onShowComplete, true));
                     break;
                 case ShowDialogEffect.FadeAndMove:
-                    _activeTween = StartCoroutine(MoveInCoroutine(delay, onComplete, true));
+                    _activeTween = StartCoroutine(MoveInCoroutine(delay, onShowComplete, true));
                     break;
             }
         }
 
         internal void PlayHide(Action onComplete)
         {
+            // Ignore hide requests while the show animation is still running — this prevents a
+            // Back press arriving mid-animation from killing a dialog that is still appearing
+            // (its hide would fight the show coroutine for the same visual state).
+            if (IsPlayingShow) return;
+
+            IsPlayingShow = false;
+            IsPlayingHide = true;
+            Action onHideComplete = () =>
+            {
+                IsPlayingHide = false;
+                onComplete?.Invoke();
+            };
+
             gameObject.SendMessage("OnHide", SendMessageOptions.DontRequireReceiver);
             OnHide?.Invoke();
 
@@ -194,19 +221,19 @@ namespace Wagenheimer.RewiredHelper.UI
             switch (ShowEffect)
             {
                 case ShowDialogEffect.Fade:
-                    _activeTween = StartCoroutine(FadeOutCoroutine(onComplete));
+                    _activeTween = StartCoroutine(FadeOutCoroutine(onHideComplete));
                     break;
                 case ShowDialogEffect.Move:
-                    _activeTween = StartCoroutine(MoveOutCoroutine(onComplete, false));
+                    _activeTween = StartCoroutine(MoveOutCoroutine(onHideComplete, false));
                     break;
                 case ShowDialogEffect.Scale:
-                    _activeTween = StartCoroutine(ScaleOutCoroutine(onComplete, false));
+                    _activeTween = StartCoroutine(ScaleOutCoroutine(onHideComplete, false));
                     break;
                 case ShowDialogEffect.FadeAndScale:
-                    _activeTween = StartCoroutine(ScaleOutCoroutine(onComplete, true));
+                    _activeTween = StartCoroutine(ScaleOutCoroutine(onHideComplete, true));
                     break;
                 case ShowDialogEffect.FadeAndMove:
-                    _activeTween = StartCoroutine(MoveOutCoroutine(onComplete, true));
+                    _activeTween = StartCoroutine(MoveOutCoroutine(onHideComplete, true));
                     break;
             }
         }

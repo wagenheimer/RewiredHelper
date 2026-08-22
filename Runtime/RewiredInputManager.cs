@@ -373,21 +373,28 @@ namespace Wagenheimer.RewiredHelper
         }
 
         /// <summary>
-        /// When joystick/keyboard confirmation (UISubmit / Return / Button A) is pressed on a selected UI element,
-        /// automatically dispatches PointerDown/PointerUp so audio listeners (like EventSounds / PointerDown SFX) trigger naturally.
+        /// When joystick/keyboard confirmation (UISubmit / Submit / Button A / Return) is pressed on a selected UI element,
+        /// automatically dispatches PointerDown/PointerUp/PointerClick so audio listeners (like EventSounds / PointerDown SFX) trigger naturally.
         /// </summary>
         private void HandleSubmitPointerBridge()
         {
-            if (Player == null) return;
-
-            bool submitDown = Player.GetButtonDown("UISubmit");
-            if (!submitDown) return;
-
             var es = UnityEngine.EventSystems.EventSystem.current;
             if (es == null) return;
 
             var selected = es.currentSelectedGameObject;
             if (selected == null || !selected.activeInHierarchy) return;
+
+            bool submitPressed = false;
+            if (Player != null)
+            {
+                submitPressed = Player.GetButtonDown("UISubmit") || Player.GetButtonDown("Submit");
+            }
+            if (!submitPressed)
+            {
+                submitPressed = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.JoystickButton0);
+            }
+
+            if (!submitPressed) return;
 
             var eventData = new UnityEngine.EventSystems.PointerEventData(es)
             {
@@ -395,17 +402,29 @@ namespace Wagenheimer.RewiredHelper
                 button = UnityEngine.EventSystems.PointerEventData.InputButton.Left
             };
 
-            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(
-                selected,
-                eventData,
-                UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler
-            );
+            // 1. Dispatch pointerDown / pointerUp / pointerClick hierarchy (upwards)
+            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler);
+            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler);
+            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
 
-            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(
-                selected,
-                eventData,
-                UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler
-            );
+            // 2. Also dispatch to any child handlers (e.g. EventSounds components attached to child objects)
+            var pointerDownChildren = selected.GetComponentsInChildren<UnityEngine.EventSystems.IPointerDownHandler>();
+            foreach (var handler in pointerDownChildren)
+            {
+                if (handler is Component c && c.gameObject != selected)
+                {
+                    handler.OnPointerDown(eventData);
+                }
+            }
+
+            var pointerClickChildren = selected.GetComponentsInChildren<UnityEngine.EventSystems.IPointerClickHandler>();
+            foreach (var handler in pointerClickChildren)
+            {
+                if (handler is Component c && c.gameObject != selected)
+                {
+                    handler.OnPointerClick(eventData);
+                }
+            }
         }
 
         void OnApplicationPause(bool pauseStatus)

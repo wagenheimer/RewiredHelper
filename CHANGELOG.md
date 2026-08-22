@@ -5,15 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.47.2] - 2026-08-22
-
-### Changed
-- chore: remove bash stackdump, add .meta file for InputVisibilityControllerEditor and update .gitignore
-
-## [0.47.1] - 2026-08-22
+## [0.48.0] - 2026-08-22
 
 ### Fixed
-- register InputVisibilityController in OnEnable and fix hybrid polling returning to PC on gamepad button presses
+- `AutoBridgeSubmitToPointerDown`: expanded event dispatching to handle Toggle/Checkbox hierarchies (supporting `UISubmit`, `Submit`, Return, Enter, and JoystickButton0), triggering `PointerDown`, `PointerUp`, and `PointerClick` on both parent selectable and any child game objects (such as EventSounds components on Checkmark/Label children).
 
 ## [0.47.0] - 2026-08-22
 

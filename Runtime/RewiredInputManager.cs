@@ -880,8 +880,15 @@ namespace Wagenheimer.RewiredHelper
 
             if (_previousInputState == _isUsingTouch && currentControllerType == _lastControllerType) return;
 
-            foreach (var controller in _visibilityControllers)
+            // Clean up destroyed components and iterate on snapshot to avoid CollectionModifiedException
+            _visibilityControllers.RemoveWhere(c => c == null);
+            var snapshot = new InputVisibilityController[_visibilityControllers.Count];
+            _visibilityControllers.CopyTo(snapshot);
+
+            foreach (var controller in snapshot)
+            {
                 if (controller != null) controller.UpdateVisibility();
+            }
 
             OnInputSpecializationChanged?.Invoke();
 
@@ -891,13 +898,14 @@ namespace Wagenheimer.RewiredHelper
 
         public static void RegisterVisibilityController(InputVisibilityController controller)
         {
+            if (controller == null) return;
             _visibilityControllers.Add(controller);
             controller.UpdateVisibility();
         }
 
         public static void UnregisterVisibilityController(InputVisibilityController controller)
         {
-            _visibilityControllers.Remove(controller);
+            if (controller != null) _visibilityControllers.Remove(controller);
         }
         #endregion
     }

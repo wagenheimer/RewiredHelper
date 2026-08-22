@@ -5,10 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.49.1] - 2026-08-22
+## [0.50.0] - 2026-08-22
 
 ### Fixed
-- ensure instantaneous UI visibility recalculation when switching between Mouse/Keyboard and Joystick on open windows
+- `InputVisibilityController`: fixed elements not reappearing when switching back from Joystick to Mouse by keeping controllers registered in `Awake`/`OnDestroy` instead of unregistering on `OnDisable` (which happened when `SetActive(false)` was called).
+- `RewiredInputManager`: resolved `InvalidOperationException: Collection was modified` during `UpdateUIForInputType()` by iterating on a snapshot copy of registered controllers and cleanly pruning destroyed references.
 
 ## [0.49.0] - 2026-08-22
 

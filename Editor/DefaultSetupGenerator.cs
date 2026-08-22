@@ -648,6 +648,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             var img = cursorGo.GetComponent<Image>();
             img.raycastTarget = false; // MUST be false so it doesn't block UI clicks!
             img.color = Color.white;
+            img.enabled = false; // Hidden until RewiredInputManager detects joystick input
 
             var cursorCanvas = cursorGo.AddComponent<Canvas>();
             cursorCanvas.overrideSorting = true;

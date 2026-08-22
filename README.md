@@ -262,6 +262,28 @@ You can customize transitions directly in the `Dialog` Inspector:
 
 ---
 
+## UI Blocker Overlay (`UIBlockerOverlay`)
+
+Static helper that blocks **all pointer input** when you need the game to be temporarily
+unclickable (scene transitions, cutscenes, countdowns):
+
+```csharp
+UIBlockerOverlay.Enabled = true;  // fullscreen transparent Image swallows every click/touch
+UIBlockerOverlay.Enabled = false; // back to normal
+```
+
+- Lazily creates its own topmost overlay `Canvas` (sortingOrder 32767, `DontDestroyOnLoad`) with a
+  fully transparent `Image` whose `raycastTarget = true` — so it intercepts clicks/touches without
+  visually covering anything.
+- Unlike disabling the EventSystem's input modules (the old `UIDisableInput` approach), UI
+  navigation, Rewired input and animations keep working; only raycast targeting is blocked.
+
+Typical wiring: keep it in sync with your own block flag every frame:
+
+```csharp
+UIBlockerOverlay.Enabled = myUiIsBlocked;
+```
+
 ## Custom Cursor
 
 Both fields are exposed in the Inspector under **Cursor & Visuals**, so you can assign a default

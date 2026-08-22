@@ -19,6 +19,7 @@ without hard-coding any assumptions about your game's UI or save system.
   active input device; standalone builds get a `Cursor.SetCursor` texture swap.
 - **Escape/Return routing** — `EscapeButton` (priority-ordered) and `ReturnEscapeEvent`
   components let any UI panel opt into Escape/Return handling without polling `Input` itself.
+- **Audio & SFX Bridge (`AutoBridgeSubmitToPointerDown`)** — automatically fires `IPointerDown` / `IPointerUp` on selected UI elements when confirming via Gamepad (`UISubmit` / Button A), ensuring audio systems like MasterAudio's `EventSounds` configured with PointerDown work seamlessly without code edits.
 - **Controller connect/disconnect handling** — auto-pauses on disconnect (with a console-aware
   reconnect grace period), resumes on reconnect or any button press.
 - **Zero forced dependencies** — no Odin Inspector, no I2 Localization required. Both are

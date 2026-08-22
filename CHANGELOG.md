@@ -8,8 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.46.0] - 2026-08-22
 
 ### Added
-- add rich custom inspector for InputVisibilityController with visual cards, live status and explanations
-- improve InputVisibilityController with Joystick/Mouse/Touch modes and TargetAction support
+- `AutoBridgeSubmitToPointerDown` feature on `RewiredInputManager` (enabled by default): automatically dispatches `IPointerDownHandler` and `IPointerUpHandler` to the currently selected UI element when confirming via gamepad (Button A / `UISubmit`) or keyboard Return, fixing third-party audio listeners (e.g. MasterAudio `EventSounds` configured with PointerDown) globally without modifying their source code or prefabs.
 
 ## [0.45.0] - 2026-08-22
 

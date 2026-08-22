@@ -49,10 +49,12 @@ namespace Wagenheimer.RewiredHelper.Editor
             // 0. Initialization & Boot
             DrawSettingsGroup("Initialization & Boot", "🚀", new[] {
                 serializedObject.FindProperty("AutoConfigureOnStart"),
-                serializedObject.FindProperty("UseDefaultModalStack")
+                serializedObject.FindProperty("UseDefaultModalStack"),
+                serializedObject.FindProperty("AutoBridgeSubmitToPointerDown")
             }, new[] {
                 new GUIContent("Auto Configure On Start", "If checked, the manager will automatically configure itself on Start, removing the need to call Configure() from code."),
-                new GUIContent("Use Default Modal Stack", "Automatically uses the built-in ModalDialogStack provider for UI modals navigation (Escape/Return keys).")
+                new GUIContent("Use Default Modal Stack", "Automatically uses the built-in ModalDialogStack provider for UI modals navigation (Escape/Return keys)."),
+                new GUIContent("Auto Bridge Submit To PointerDown", "Automatically triggers PointerDown/PointerUp on selected UI elements when confirming with Gamepad (Button A / UISubmit), fixing SFX listeners (like EventSounds) that only listen to pointer events.")
             }, ColAccent);
 
             // 1. Cursor & Visuals Settings

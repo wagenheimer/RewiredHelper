@@ -55,6 +55,9 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("Texture used by the custom cursor when Custom Cursor Enabled is checked. Can be assigned here or at runtime.")]
         public Texture2D CursorTexture;
 
+        [Tooltip("If enabled, joystick/keyboard UI confirmation (UISubmit / Return / Button A) automatically invokes PointerDown / PointerUp on the selected GameObject, fixing audio listeners (like EventSounds / PointerDown SFX) that only listen to pointer clicks.")]
+        public bool AutoBridgeSubmitToPointerDown = true;
+
         [SerializeField]
         private bool alreadyShowedControllerHelp;
 
@@ -362,6 +365,47 @@ namespace Wagenheimer.RewiredHelper
                     ReturnEscapeEvent.TriggerOk();
                 }
             }
+
+            if (AutoBridgeSubmitToPointerDown)
+            {
+                HandleSubmitPointerBridge();
+            }
+        }
+
+        /// <summary>
+        /// When joystick/keyboard confirmation (UISubmit / Return / Button A) is pressed on a selected UI element,
+        /// automatically dispatches PointerDown/PointerUp so audio listeners (like EventSounds / PointerDown SFX) trigger naturally.
+        /// </summary>
+        private void HandleSubmitPointerBridge()
+        {
+            if (Player == null) return;
+
+            bool submitDown = Player.GetButtonDown("UISubmit");
+            if (!submitDown) return;
+
+            var es = UnityEngine.EventSystems.EventSystem.current;
+            if (es == null) return;
+
+            var selected = es.currentSelectedGameObject;
+            if (selected == null || !selected.activeInHierarchy) return;
+
+            var eventData = new UnityEngine.EventSystems.PointerEventData(es)
+            {
+                selectedObject = selected,
+                button = UnityEngine.EventSystems.PointerEventData.InputButton.Left
+            };
+
+            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(
+                selected,
+                eventData,
+                UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler
+            );
+
+            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(
+                selected,
+                eventData,
+                UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler
+            );
         }
 
         void OnApplicationPause(bool pauseStatus)

@@ -301,6 +301,8 @@ namespace Wagenheimer.RewiredHelper
             {
                 _lastInputWasPC = false;
                 LastActiveController = controller;
+                _lastKnownControllerType = ControllerType.Joystick;
+                UpdateUIForInputType();
                 Debug.Log($"[RewiredHelper] Switched to Joystick: {controller.name}");
             }
             else if (controller.type == ControllerType.Keyboard || controller.type == ControllerType.Mouse)
@@ -311,6 +313,8 @@ namespace Wagenheimer.RewiredHelper
                 {
                     LastActiveController = keyboardController;
                 }
+                _lastKnownControllerType = ControllerType.Keyboard;
+                UpdateUIForInputType();
                 Debug.Log($"[RewiredHelper] Switched to PC input: {controller.name}");
             }
         }
@@ -725,6 +729,7 @@ namespace Wagenheimer.RewiredHelper
                     HandleJoystickOrCustomController();
                     break;
                 case ControllerType.Mouse:
+                case ControllerType.Keyboard:
                     if (IsConsole)
                         HandleJoystickOrCustomController();
                     else

@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.49.0] - 2026-08-22
 
-### Added
-- enhance submit bridge for toggles and child components
+### Fixed
+- `RewiredInputManager`: fixed active controller type switching between Keyboard and Joystick not triggering UI updates immediately during open windows. Added `Keyboard` handling to `HandleControllerType` and ensured `_lastKnownControllerType` and `UpdateUIForInputType()` execute instantly when controller input changes.
 
 ## [0.48.0] - 2026-08-22
 

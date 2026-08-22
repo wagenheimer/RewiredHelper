@@ -32,6 +32,65 @@ namespace Wagenheimer.RewiredHelper.Editor
             Debug.Log($"[RewiredHelper] Android Remote glyphs: {steps} step(s) applied.");
         }
 
+        /// <summary>
+        /// True when the Input Manager's User Data defines an "AndroidController" Custom Controller.
+        /// </summary>
+        internal static bool HasAndroidCustomController(Component inputManager)
+        {
+            if (inputManager == null) return false;
+            var so = new SerializedObject(inputManager);
+            var controllers = so.FindProperty("_userData.customControllers");
+            if (controllers == null) return false;
+
+            for (int i = 0; i < controllers.arraySize; i++)
+            {
+                var cc = controllers.GetArrayElementAtIndex(i);
+                if (cc.FindPropertyRelative("_name")?.stringValue == ControllerName)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// True when a SpriteGlyphSet for the AndroidController Custom Controller exists AND is
+        /// registered in the GlyphProvider's first GlyphSetCollection. Also returns true whenever
+        /// there is nothing to warn about (no Android controller, or glyph addon not installed —
+        /// those cases are surfaced by other diagnostics).
+        /// </summary>
+        internal static bool IsAndroidRemoteGlyphSetReady(Component inputManager)
+        {
+            if (inputManager == null) return true;
+
+            var spriteGlyphSetType = FindType("Rewired.Glyphs.SpriteGlyphSet");
+            if (spriteGlyphSetType == null) return true; // addon missing — separate diagnostic
+
+            string controllerKey = GetControllerKey(inputManager);
+            if (string.IsNullOrEmpty(controllerKey)) return true; // no Android controller configured
+
+            var setAsset = FindSetWithBaseKey(spriteGlyphSetType, "controller/custom/" + controllerKey);
+            if (setAsset == null) return false;
+
+            // The set exists — verify it is actually reachable through the GlyphProvider.
+            var providerType = FindType("Rewired.Glyphs.GlyphProvider");
+            var provider = providerType != null ? inputManager.GetComponent(providerType) : null;
+            if (provider == null) return true; // provider missing — covered by the Glyph Provider check
+
+            var collections = new SerializedObject(provider).FindProperty("_glyphSetCollections");
+            if (collections == null || collections.arraySize == 0) return false;
+
+            var collection = collections.GetArrayElementAtIndex(0).objectReferenceValue;
+            if (collection == null) return false;
+
+            var sets = new SerializedObject(collection).FindProperty("_sets");
+            if (sets == null) return false;
+
+            for (int i = 0; i < sets.arraySize; i++)
+                if (sets.GetArrayElementAtIndex(i).objectReferenceValue == setAsset)
+                    return true;
+
+            return false;
+        }
+
         /// <summary>Returns how many corrective steps were applied.</summary>
         internal static int EnsureAndroidRemoteGlyphs()
         {

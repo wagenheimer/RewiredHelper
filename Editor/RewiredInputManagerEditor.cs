@@ -228,6 +228,17 @@ namespace Wagenheimer.RewiredHelper.Editor
                 DrawCheckResult("Glyph Provider", hasGlyphProvider,
                     "Without a Glyph Provider on the Rewired Input Manager, ReInput.glyphs.glyphProvider is never set, so every <rewiredElement> glyph tag falls back to plain text instead of an icon.",
                     "Add Glyph Provider", () => DefaultSetupGenerator.EnsureGlyphProvider(manager.gameObject));
+
+                // Android Remote glyphs: only relevant when the project actually configures the
+                // AndroidController Custom Controller (Android TV remote support).
+                var nativeInputManager = DefaultSetupGenerator.FindInputManagerInScene();
+                if (nativeInputManager != null && AndroidRemoteGlyphSetup.HasAndroidCustomController(nativeInputManager))
+                {
+                    bool androidGlyphsReady = AndroidRemoteGlyphSetup.IsAndroidRemoteGlyphSetReady(nativeInputManager);
+                    DrawCheckResult("Android Remote Glyphs", androidGlyphsReady,
+                        "The AndroidController Custom Controller is configured, but its SpriteGlyphSet is missing or not registered in the Glyph Set Collection — on Android TV, UI prompts show raw element names (e.g. \"Left\", \"Escape\") instead of icons.",
+                        "Ensure Android Remote Glyphs", () => AndroidRemoteGlyphSetup.EnsureAndroidRemoteGlyphs());
+                }
             }
 
             // 7. Verify I2 Localization Integration

@@ -212,16 +212,18 @@ namespace Wagenheimer.RewiredHelper
                 _lastInputWasPC = true;
                 if (ReInput.isReady)
                 {
-                var kb = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
-                if (kb != null) lastActiveController = kb; // assign backing field directly to avoid event before register
+                    var kb = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
+                    if (kb != null) lastActiveController = kb; // assign backing field directly to avoid event before register
+                }
+
+                // The scene's GameCursor Image may be enabled by default. HandleControllerType() has no
+                // Keyboard case, so nothing would hide it on desktop until the first mouse/joystick
+                // input — making the OS/hardware cursor and the joystick cursor show simultaneously
+                // on startup. Hide it here: it only comes back once real joystick input is detected
+                // (HandleJoystickOrCustomController).
+                if (!IsConsole && GameCursor != null) GameCursor.enabled = false;
             }
 
-            // The scene's GameCursor Image may be enabled by default. HandleControllerType() has no
-            // Keyboard case, so nothing would hide it on desktop until the first mouse/joystick
-            // input — making the OS/hardware cursor and the joystick cursor show simultaneously
-            // on startup. Hide it here: it only comes back once real joystick input is detected
-            // (HandleJoystickOrCustomController).
-            if (!IsConsole && GameCursor != null) GameCursor.enabled = false;
             _lastMouseOrTouchMoveTime = Time.time;
 
 #if WAGENHEIMER_STEAMWORKS

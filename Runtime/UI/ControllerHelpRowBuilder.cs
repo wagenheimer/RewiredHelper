@@ -71,59 +71,9 @@ namespace Wagenheimer.RewiredHelper.UI
                  actionName.IndexOf("Scroll", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
-        private void Awake()
-        {
-            if (rebuildOnAwake)
-            {
-                Rebuild();
-            }
-            // The rebuildOnAwake=false path used to start its refresh coroutine here, but this
-            // component commonly lives on a modal popup that starts inactive in the scene.
-            // StartCoroutine() silently no-ops on an inactive GameObject (Unity logs a warning
-            // and never runs it), so that refresh would never happen for a popup opened later via
-            // SetActive(true). Moved to OnEnable, which only fires once the object is truly active.
-        }
-
-        private System.Collections.IEnumerator UpdateExistingRowsNextFrame()
-        {
-            yield return null;
-            UpdateExistingRows();
-        }
-
-        private void OnEnable()
-        {
-            RewiredInputManager.OnInputSpecializationChanged += OnInputSpecializationChanged;
-
-            if (!rebuildOnAwake)
-            {
-                // Delay 1 frame: RewiredInputManager.Start() sets the initial controller (Keyboard)
-                // during Start(), but this may run before that on the very first activation.
-                // Waiting ensures we read the correct CurrentControllerType when generating tags.
-                // Also re-runs on every reopen, so a stale controllerType from a prior session
-                // doesn't linger.
-                StartCoroutine(UpdateExistingRowsNextFrame());
-            }
-        }
-
-        private void OnDisable()
-        {
-            RewiredInputManager.OnInputSpecializationChanged -= OnInputSpecializationChanged;
-        }
-
-        private void OnInputSpecializationChanged()
-        {
-            if (Application.isPlaying)
-            {
-                if (rebuildOnAwake)
-                {
-                    Rebuild();
-                }
-                else
-                {
-                    UpdateExistingRows();
-                }
-            }
-        }
+        // Editor-only workflow: rows are generated via the inspector's Generate Rows button and
+        // personalized by hand in edit mode (glyphs, I2 terms, layout). Nothing rebuilds or
+        // rewrites itself at runtime anymore.
 
         public void Rebuild()
         {
@@ -144,8 +94,6 @@ namespace Wagenheimer.RewiredHelper.UI
 
             for (int i = 0; i < actions.Count; i++)
                 CreateRow(actions[i].Name, actions[i].DescriptiveName, glyphHelperType, i % 2 == 1);
-
-            UpdateTitle();
         }
 
         /// <summary>
@@ -431,155 +379,6 @@ namespace Wagenheimer.RewiredHelper.UI
             return null;
         }
 
-        private void UpdateExistingRows()
-        {
-            _pinnedMouseRows.Clear();
-
-            // Rows baked at design time (e.g. a hand-curated ControllerHelpForm prefab with
-            // rebuildOnAwake off) never had ApplyElementFilter run on their glyph helper — that
-            // only happens in CreateRow, for freshly generated rows. Attach it here too so
-            // pre-existing rows also exclude Joystick bindings on PC and resolve correctly.
-            var glyphHelperType = FindGlyphHelperType();
-            var textProp = glyphHelperType?.GetProperty("text");
-            if (glyphHelperType != null)
-            {
-                foreach (var txt in GetComponentsInChildren<TextMeshProUGUI>(true))
-                {
-                    var glyphHelper = txt.GetComponent(glyphHelperType);
-                    if (glyphHelper == null) continue;
-
-                    ApplyElementFilter(glyphHelper, glyphHelperType);
-
-                    string tagText = textProp?.GetValue(glyphHelper) as string;
-                    if (string.IsNullOrEmpty(tagText)) continue;
-
-                    var actionMatch = System.Text.RegularExpressions.Regex.Match(tagText, @"\bactionName\s*=\s*""([^""]*)""");
-                    if (actionMatch.Success && IsMouseNamedAction(actionMatch.Groups[1].Value) && textProp != null)
-                        _pinnedMouseRows.Add((glyphHelper, textProp, tagText));
-                }
-            }
-
-            UpdateTitle();
-        }
-
-        /// <summary>
-        /// Force-invoking I2's private Localize.OnLocalize(bool) via reflection can throw a
-        /// NullReferenceException from inside I2's own code if this runs before that Localize
-        /// component finished its own Awake/initialization — this method runs from
-        /// ControllerHelpRowBuilder.Awake(), whose order relative to sibling components' Awake is
-        /// not guaranteed. Swallow and log rather than crash the whole Update loop that called us.
-        /// </summary>
-        private static void InvokeOnLocalizeSafely(MethodInfo localizeMethod, object localizer)
-        {
-            try
-            {
-                localizeMethod.Invoke(localizer, new object[] { true });
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[RewiredHelper] I2 Localize.OnLocalize threw while refreshing the help form title (likely not initialized yet) — skipping this refresh: {ex.InnerException?.Message ?? ex.Message}");
-            }
-        }
-
-        private void UpdateTitle()
-        {
-            if (RewiredInputManager.Instance == null) return;
-
-            // Scope STRICTLY to this form's own hierarchy (nearest ancestor with a Dialog).
-            // The previous implementation walked all the way up to the scene root and scanned
-            // every TMP text under it, rewriting the I2 term of ANY Localize whose term matched
-            // one of the legacy title terms - corrupting unrelated dialogs when the help form
-            // lived under a shared canvas.
-            Transform root = transform;
-            while (root != null && root.GetComponent<Wagenheimer.RewiredHelper.UI.Dialog>() == null)
-                root = root.parent;
-            if (root == null) return;
-
-            var currentType = RewiredInputManager.Instance.CurrentControllerType;
-            bool isGamepad = currentType == ControllerType.Joystick;
-
-            var texts = root.GetComponentsInChildren<TextMeshProUGUI>(true);
-            foreach (var txt in texts)
-            {
-                // Never touch anything that isn't this form's own title/header element.
-                bool isTitleElement = txt.gameObject.name == "Title" || txt.gameObject.name == "Header";
-                if (!isTitleElement) continue;
-
-                var localizer = txt.GetComponent("Localize");
-                bool isTitleLocalizer = false;
-                if (localizer != null)
-                {
-                    var termProp = localizer.GetType().GetField("mTerm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (termProp != null)
-                    {
-                        string termValue = termProp.GetValue(localizer) as string;
-                        if (termValue == "GAMEPAD CONTROLS" || termValue == "KEYBOARD CONTROLS" || termValue == "KEYBOARD_CONTROLS")
-                        {
-                            isTitleLocalizer = true;
-                            termProp.SetValue(localizer, isGamepad ? "GAMEPAD CONTROLS" : "KEYBOARD_CONTROLS");
-
-                            var localizeMethod = localizer.GetType().GetMethod("OnLocalize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                            if (localizeMethod != null)
-                            {
-                                InvokeOnLocalizeSafely(localizeMethod, localizer);
-                            }
-                        }
-                    }
-                }
-
-                if (isTitleLocalizer || isTitleElement)
-                {
-                        if (txt.gameObject.name == "Title" || txt.gameObject.name == "Header" || txt.text.Contains("Gamepad") || txt.text.Contains("Mando") || txt.text.Contains("Manette") || txt.text.Contains("Keyboard"))
-                        {
-                            string lang = "English";
-                            try
-                            {
-                                var locMgrType = Type.GetType("I2.Loc.LocalizationManager, Assembly-CSharp");
-                                if (locMgrType == null) locMgrType = Type.GetType("I2.Loc.LocalizationManager, Assembly-CSharp-firstpass");
-                                if (locMgrType != null)
-                                {
-                                    var currentLangProp = locMgrType.GetProperty("CurrentLanguage", BindingFlags.Public | BindingFlags.Static);
-                                    if (currentLangProp != null)
-                                    {
-                                        lang = currentLangProp.GetValue(null) as string;
-                                    }
-                                }
-                            }
-                            catch {}
-
-                            if (isGamepad)
-                            {
-                                if (localizer != null)
-                                {
-                                    var behaviour = localizer as MonoBehaviour;
-                                    if (behaviour != null) behaviour.enabled = true;
-
-                                    var termProp = localizer.GetType().GetField("mTerm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                                    if (termProp != null) termProp.SetValue(localizer, "GAMEPAD CONTROLS");
-
-                                    var localizeMethod = localizer.GetType().GetMethod("OnLocalize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                                    if (localizeMethod != null) InvokeOnLocalizeSafely(localizeMethod, localizer);
-                                }
-                                else
-                                {
-                                    txt.text = GetGamepadControlsTranslation(lang);
-                                }
-                            }
-                            else
-                            {
-                                if (localizer != null)
-                                {
-                                    var behaviour = localizer as MonoBehaviour;
-                                    if (behaviour != null) behaviour.enabled = false;
-                                }
-                                txt.text = GetKeyboardControlsTranslation(lang);
-                            }
-                        }
-                    }
-                }
-                current = current.parent;
-            }
-        }
 
         private string GetGamepadControlsTranslation(string lang)
         {

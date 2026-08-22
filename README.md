@@ -127,6 +127,34 @@ Rewired Helper features professional, color-coded custom inspectors to speed up 
 - **`InputVisibilityController`** — attach to any GameObject that should show/hide itself based
   on input type (e.g. on-screen touch controls).
 
+### ReturnEscapeEvent Priority (who wins when several are active?)
+
+`ReturnEscapeEvent` has a **`Priority`** field (0–1000, default **0**). When Escape/Back/Return is
+pressed and the event is triggered:
+
+1. Only instances whose GameObject is **active in hierarchy** are considered.
+2. Among those, **only the one(s) with the highest `Priority` fire** — everything else is skipped.
+
+This replaces the old behavior where *every* active instance fired simultaneously (which caused
+bugs like a panel closing and the main menu opening from a single Back press).
+
+**Typical setup — a game with a main menu plus context panels:**
+
+| Component on... | Priority | Behavior |
+|---|---|---|
+| Context panel (e.g. building selection) | **10** | Consumes Back while it's open and closes itself |
+| Main pause/menu handler | **0** | Receives Back only when no higher-priority panel is active |
+
+Because the list is driven by `OnEnable`/`OnDisable`, gating happens automatically: put the
+component on the panel's own GameObject so it's only registered while the panel is open. The
+moment the panel closes itself in response to Back, it leaves the list — the next press falls
+through to the lower-priority handler (e.g. opens the menu). No code needed, just priorities.
+
+> Note the resolution order for a single press:
+> 1. Top modal's `EscapeButton` (if a modal from your `IModalStackProvider` is open)
+> 2. Highest-priority active `EscapeButton`
+> 3. Highest-priority active `ReturnEscapeEvent`
+
 ---
 
 ## Optional Interfaces

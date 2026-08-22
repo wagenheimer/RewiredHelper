@@ -485,46 +485,50 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             if (RewiredInputManager.Instance == null) return;
 
+            // Scope STRICTLY to this form's own hierarchy (nearest ancestor with a Dialog).
+            // The previous implementation walked all the way up to the scene root and scanned
+            // every TMP text under it, rewriting the I2 term of ANY Localize whose term matched
+            // one of the legacy title terms - corrupting unrelated dialogs when the help form
+            // lived under a shared canvas.
+            Transform root = transform;
+            while (root != null && root.GetComponent<Wagenheimer.RewiredHelper.UI.Dialog>() == null)
+                root = root.parent;
+            if (root == null) return;
+
             var currentType = RewiredInputManager.Instance.CurrentControllerType;
             bool isGamepad = currentType == ControllerType.Joystick;
 
-            Transform current = transform.parent;
-            while (current != null)
+            var texts = root.GetComponentsInChildren<TextMeshProUGUI>(true);
+            foreach (var txt in texts)
             {
-                var texts = current.GetComponentsInChildren<TextMeshProUGUI>(true);
-                foreach (var txt in texts)
-                {
-                    var localizer = txt.GetComponent("Localize");
-                    bool isTitleLocalizer = false;
-                    if (localizer != null)
-                    {
-                        var termProp = localizer.GetType().GetField("mTerm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                        if (termProp != null)
-                        {
-                            string termValue = termProp.GetValue(localizer) as string;
-                            if (termValue == "GAMEPAD CONTROLS" || termValue == "KEYBOARD CONTROLS" || termValue == "KEYBOARD_CONTROLS")
-                            {
-                                isTitleLocalizer = true;
-                                if (isGamepad)
-                                {
-                                    termProp.SetValue(localizer, "GAMEPAD CONTROLS");
-                                }
-                                else
-                                {
-                                    termProp.SetValue(localizer, "KEYBOARD_CONTROLS");
-                                }
+                // Never touch anything that isn't this form's own title/header element.
+                bool isTitleElement = txt.gameObject.name == "Title" || txt.gameObject.name == "Header";
+                if (!isTitleElement) continue;
 
-                                var localizeMethod = localizer.GetType().GetMethod("OnLocalize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                                if (localizeMethod != null)
-                                {
-                                    InvokeOnLocalizeSafely(localizeMethod, localizer);
-                                }
+                var localizer = txt.GetComponent("Localize");
+                bool isTitleLocalizer = false;
+                if (localizer != null)
+                {
+                    var termProp = localizer.GetType().GetField("mTerm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (termProp != null)
+                    {
+                        string termValue = termProp.GetValue(localizer) as string;
+                        if (termValue == "GAMEPAD CONTROLS" || termValue == "KEYBOARD CONTROLS" || termValue == "KEYBOARD_CONTROLS")
+                        {
+                            isTitleLocalizer = true;
+                            termProp.SetValue(localizer, isGamepad ? "GAMEPAD CONTROLS" : "KEYBOARD_CONTROLS");
+
+                            var localizeMethod = localizer.GetType().GetMethod("OnLocalize", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (localizeMethod != null)
+                            {
+                                InvokeOnLocalizeSafely(localizeMethod, localizer);
                             }
                         }
                     }
+                }
 
-                    if (txt.text.Contains("Controles") || txt.text.Contains("Controls") || isTitleLocalizer || txt.gameObject.name.Contains("Title") || txt.gameObject.name.Contains("Header"))
-                    {
+                if (isTitleLocalizer || isTitleElement)
+                {
                         if (txt.gameObject.name == "Title" || txt.gameObject.name == "Header" || txt.text.Contains("Gamepad") || txt.text.Contains("Mando") || txt.text.Contains("Manette") || txt.text.Contains("Keyboard"))
                         {
                             string lang = "English";

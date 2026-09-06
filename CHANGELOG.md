@@ -1,15 +1,19 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.51.0] - 2026-09-06
+
+### Added
+- RewiredHelper: added backward-compatibility wrapper class in the global namespace inheriting from RewiredInputManager, exposing instance, nyButton, CanShowCustomCursor, and RewiredMousePosition so existing games upgrading from the legacy submodule can transition to UPM package with zero code changes.
+
 ## [0.50.1] - 2026-08-22
 
 ### Fixed
-- resolve collection modified exception and fix elements not reappearing when switching back from Joystick to Mouse
-
+- resolve collection modified exception and fix elements not reappearing when switching back from Joystick to Mouse (feat: add RewiredHelper backward compatibility wrapper and bump v0.51.0)
 ## [0.50.0] - 2026-08-22
 
 ### Fixed
@@ -191,7 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.31.1] - 2026-08-19
 
 ### Fixed
-- resolve Player Mouse's MouseX/MouseY action ids from the scene InputManager's serialized data instead of `ReInput.mapping`, which is never initialized in the editor and always failed with "Rewired is not initialized" — the generated Movement elements were being added unbound (`_actionId = -1`)
+- resolve Player Mouse's MouseX/MouseY action ids from the scene InputManager's serialized data instead of `ReInput.mapping`, which is never initialized in the editor and always failed with "Rewired is not initialized" â€” the generated Movement elements were being added unbound (`_actionId = -1`)
 
 ## [0.31.0] - 2026-08-19
 
@@ -246,7 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.29.1] - 2026-07-16
 
 ### Fixed
-- correct BackButton always showing joystick glyph on PC — default to Keyboard, restore mouse polling fallback, delay 1 frame on popup open, and verify keyboard binding before forcing controllerType
+- correct BackButton always showing joystick glyph on PC â€” default to Keyboard, restore mouse polling fallback, delay 1 frame on popup open, and verify keyboard binding before forcing controllerType
 
 ## [0.29.0] - 2026-07-16
 
@@ -642,12 +646,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.3] - 2026-07-09
 
 ### Fixed
-- restore package asmdef — Rewired core ships as precompiled DLLs, not loose scripts
+- restore package asmdef â€” Rewired core ships as precompiled DLLs, not loose scripts
 
 ## [0.3.2] - 2026-07-09
 
 ### Fixed
-- remove package asmdef — breaks compilation against loose-script Rewired installs
+- remove package asmdef â€” breaks compilation against loose-script Rewired installs
 
 ## [0.3.1] - 2026-07-09
 
@@ -656,11 +660,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the package's own `Runtime`/`Editor` assembly definitions. Most Rewired installs ship
   the core `Rewired` namespace (`Player`, `Controller`, `ControllerType`, `ReInput`, etc.) as loose
   scripts with no `.asmdef` of their own, compiling into the default `Assembly-CSharp`. A package
-  with its own separate asmdef can never reference types that only exist in `Assembly-CSharp` —
+  with its own separate asmdef can never reference types that only exist in `Assembly-CSharp` â€”
   so `RewiredInputManager.cs` failed to compile with `CS0246` errors for every Rewired type,
   regardless of whether Rewired was actually installed. The package now compiles as loose scripts
   too, alongside Rewired, exactly like the `Samples~/I2LocalizationIntegration` files already did
-  and the `ModalDialog`/DOTween override pattern already assumed for optional dependencies —
+  and the `ModalDialog`/DOTween override pattern already assumed for optional dependencies â€”
   except here it applies to the package's core, unconditional dependency on Rewired itself.
 
 ## [0.3.0] - 2026-07-09
@@ -684,13 +688,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update RewiredHelper.cs
 - Refactor RewiredHelper methods and add overlay handling
 - Update RewiredHelper.cs
-- Adiciona suporte para visibilidade e localização de UI
-- Verifica se o GO está ativo
-- Ajustes Detecção do Steam Overlay
+- Adiciona suporte para visibilidade e localizaÃ§Ã£o de UI
+- Verifica se o GO estÃ¡ ativo
+- Ajustes DetecÃ§Ã£o do Steam Overlay
 - Atualizado GitIgnore
 - Add escape and return button handling in Unity project
 - Update RewiredHelper.cs
-- Primeira Versão
+- Primeira VersÃ£o
 - Initial commit
 
 ## [0.2.0] - 2026-07-08
@@ -698,7 +702,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `ModalDialog`/`ModalDialogStack` (`Wagenheimer.RewiredHelper.UI`): a generic modal dialog
-  stack — overlay, fade/move show-hide animation, Escape/OK button wiring, sprite/TMP fade-out —
+  stack â€” overlay, fade/move show-hide animation, Escape/OK button wiring, sprite/TMP fade-out â€”
   generalized from a game's local `Dialogs`/`Dialog` classes. Zero third-party dependency by
   default (built-in coroutine tween); subclass `ModalDialog` and override
   `PlayFadeIn`/`PlayFadeOut`/`PlayMoveIn`/`PlayMoveOut` to swap in DOTween or another tweener
@@ -717,11 +721,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial UPM package release, ported from the original loose-script `RewiredHelper` repo.
 - `RewiredInputManager`: input-type detection (mouse / touch / controller), cursor visibility,
   Escape/Return routing, controller connect/disconnect handling.
-- `EscapeButton`, `ReturnEscapeEvent`, `InputVisibilityController` — generic UI helper components,
+- `EscapeButton`, `ReturnEscapeEvent`, `InputVisibilityController` â€” generic UI helper components,
   ported without any third-party inspector dependency.
-- Optional integration interfaces: `IUiBlocker`, `IModalStackProvider`, `IControllerHelpGate` —
+- Optional integration interfaces: `IUiBlocker`, `IModalStackProvider`, `IControllerHelpGate` â€”
   replace the previous hard dependency on game-specific singletons.
 - Editor auto-update checker (`Tools/Wagenheimer/Rewired Helper/Check for Updates...`).
-- `Samples~/DefaultSetup` — minimal bootstrap example.
-- `Samples~/I2LocalizationIntegration` — optional I2 Localization + Rewired Glyphs integration,
+- `Samples~/DefaultSetup` â€” minimal bootstrap example.
+- `Samples~/I2LocalizationIntegration` â€” optional I2 Localization + Rewired Glyphs integration,
   only needed by consumers who already use I2 Loc.
+
+

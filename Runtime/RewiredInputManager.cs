@@ -177,6 +177,29 @@ namespace Wagenheimer.RewiredHelper
         protected Callback<GameOverlayActivated_t> m_GameOverlayActivated;
 #endif
 
+        private static IUiBlocker _pendingUiBlocker;
+        private static IModalStackProvider _pendingModalStack;
+        private static IControllerHelpGate _pendingControllerHelpGate;
+        private static bool _hasPendingConfig;
+
+        /// <summary>
+        /// Statically configures the integration hooks. If <see cref="Instance"/> is already active,
+        /// applies immediately. Otherwise, stores configuration to apply as soon as the instance awakes.
+        /// </summary>
+        public static void SetGlobalConfiguration(IUiBlocker uiBlocker = null, IModalStackProvider modalStack = null,
+            IControllerHelpGate controllerHelpGate = null)
+        {
+            _pendingUiBlocker = uiBlocker;
+            _pendingModalStack = modalStack;
+            _pendingControllerHelpGate = controllerHelpGate;
+            _hasPendingConfig = true;
+
+            if (Instance != null)
+            {
+                Instance.Configure(uiBlocker, modalStack, controllerHelpGate);
+            }
+        }
+
         #region Public API
         /// <summary>
         /// Wires up the optional integration hooks. Call this once after the manager exists
@@ -197,6 +220,10 @@ namespace Wagenheimer.RewiredHelper
         private void Awake()
         {
             InitializeSingleton();
+            if (_hasPendingConfig)
+            {
+                Configure(_pendingUiBlocker, _pendingModalStack, _pendingControllerHelpGate);
+            }
         }
 
         private void Start()

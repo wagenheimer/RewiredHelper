@@ -93,8 +93,3 @@ namespace Wagenheimer.RewiredHelper
     }
 }
 
-// Global alias for backwards compatibility with pre-package code
-public class ReturnEscapeEvent : Wagenheimer.RewiredHelper.ReturnEscapeEvent
-{
-}
-

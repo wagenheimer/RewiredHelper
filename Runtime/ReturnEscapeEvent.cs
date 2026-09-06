@@ -72,5 +72,29 @@ namespace Wagenheimer.RewiredHelper
 
         [ContextMenu("Disparar Evento de Escape")]
         private void DebugTriggerEscapeEvent() => EscapeEvent?.Invoke();
+
+        /// <summary>
+        /// Backwards compatibility property. Setting true triggers <see cref="TriggerEscape"/>.
+        /// </summary>
+        public static bool EscapePressed
+        {
+            get => false;
+            set { if (value) TriggerEscape(); }
+        }
+
+        /// <summary>
+        /// Backwards compatibility property. Setting true triggers <see cref="TriggerOk"/>.
+        /// </summary>
+        public static bool OkPressed
+        {
+            get => false;
+            set { if (value) TriggerOk(); }
+        }
     }
 }
+
+// Global alias for backwards compatibility with pre-package code
+public class ReturnEscapeEvent : Wagenheimer.RewiredHelper.ReturnEscapeEvent
+{
+}
+

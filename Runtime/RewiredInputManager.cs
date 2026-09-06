@@ -30,7 +30,7 @@ namespace Wagenheimer.RewiredHelper
     public class RewiredInputManager : MonoBehaviour
     {
         #region Singleton Pattern
-        public static RewiredInputManager Instance { get; private set; }
+        public static RewiredInputManager Instance { get; protected set; }
         #endregion
 
         #region Public Properties

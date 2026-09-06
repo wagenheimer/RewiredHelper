@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Backward compatibility wrapper for projects using the legacy RewiredHelper name.
@@ -10,5 +10,15 @@ public class RewiredHelper : Wagenheimer.RewiredHelper.RewiredInputManager
     /// <summary>
     /// Legacy singleton accessor matching the previous RewiredHelper.instance API.
     /// </summary>
-    public static Wagenheimer.RewiredHelper.RewiredInputManager instance => Instance;
+    public static Wagenheimer.RewiredHelper.RewiredInputManager instance
+    {
+        get
+        {
+            if (Instance == null)
+            {
+                Instance = Object.FindFirstObjectByType<Wagenheimer.RewiredHelper.RewiredInputManager>();
+            }
+            return Instance;
+        }
+    }
 }

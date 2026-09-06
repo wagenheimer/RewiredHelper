@@ -35,7 +35,19 @@ namespace Wagenheimer.RewiredHelper
 
         #region Public Properties
         [Tooltip("Reference to the Rewired player")]
-        public Rewired.Player Player { get; private set; }
+        public Rewired.Player Player
+        {
+            get
+            {
+                if (_player == null && ReInput.isReady)
+                {
+                    _player = ReInput.players.GetPlayer(0);
+                }
+                return _player;
+            }
+            private set => _player = value;
+        }
+        private Rewired.Player _player;
 
         [Tooltip("Reference to the custom game cursor")]
         public Image GameCursor;
@@ -613,15 +625,18 @@ namespace Wagenheimer.RewiredHelper
                 Instance = this;
                 SubscribeToEvents();
             }
-            else
+            else if (Instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this);
             }
         }
 
         private void InitializePlayer()
         {
-            Player = ReInput.players.GetPlayer(0);
+            if (ReInput.isReady)
+            {
+                Player = ReInput.players.GetPlayer(0);
+            }
         }
 
         private void SubscribeToEvents()

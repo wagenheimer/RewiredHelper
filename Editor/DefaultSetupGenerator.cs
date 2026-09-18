@@ -30,7 +30,7 @@ namespace Wagenheimer.RewiredHelper.Editor
         const string EventSystemPrefabPath = "Packages/com.wagenheimer.rewiredhelper/Runtime/Prefabs/Rewired Event System.prefab";
         const string FormControllerPrefabPath = "Packages/com.wagenheimer.rewiredhelper/Runtime/Prefabs/formController.prefab";
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Rewired Input Manager", priority = 11)]
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Rewired Input Manager", priority = 141)]
         internal static void CreateRewiredInputManager()
         {
             // 1. Instantiate Rewired Input Manager if not present
@@ -91,7 +91,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             return moduleType != null && UnityEngine.Object.FindObjectOfType(moduleType) != null;
         }
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Rewired Event System", priority = 14)]
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Rewired Event System", priority = 144)]
         internal static void CreateRewiredEventSystem() => EnsureRewiredEventSystem();
 
         /// <summary>
@@ -138,7 +138,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             MarkSceneDirty();
         }
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Remove Duplicate Event Systems (All Scenes)", priority = 15)]
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Remove Duplicate Event Systems (All Scenes)", priority = 145)]
         internal static void RemoveDuplicateEventSystemsInAllScenes()
         {
             if (!EditorUtility.DisplayDialog("Remove Duplicate Event Systems",
@@ -573,7 +573,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
         }
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Controller Help Form", priority = 12)]
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create Controller Help Form", priority = 142)]
         internal static void CreateControllerHelpForm()
         {
             var canvas = FindOrCreateCanvas();
@@ -1072,7 +1072,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             return canvas;
         }
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Verify && Fix Game Cursor Wiring", priority = 13)]
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Verify && Fix Game Cursor Wiring", priority = 143)]
         internal static void VerifyAndFixGameCursorWiring()
         {
             var manager = FindInputManagerInScene()?.GetComponent<RewiredInputManager>();

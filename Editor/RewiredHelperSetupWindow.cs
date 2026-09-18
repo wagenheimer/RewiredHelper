@@ -31,7 +31,7 @@ namespace Wagenheimer.RewiredHelper.Editor
         private static readonly Color ColAccent = new(0.22f, 0.60f, 1.00f);
         private static readonly Color ColDim = new(0.55f, 0.55f, 0.60f);
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Setup Checker & Help", priority = 1)]
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Setup Checker & Help", priority = 140)]
         public static void ShowWindow()
         {
             var w = GetWindow<RewiredHelperSetupWindow>("Rewired Helper Checker");

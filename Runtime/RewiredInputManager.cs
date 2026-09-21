@@ -160,6 +160,12 @@ namespace Wagenheimer.RewiredHelper
             }
         }
 
+        /// <summary>
+        /// Legacy alias for <see cref="LastActiveController"/>, kept so consumers ported from the
+        /// original RewiredHelper keep compiling.
+        /// </summary>
+        public Controller UltimoControleAtivo => LastActiveController;
+
         public static bool anyButton => Instance != null && Instance.Player != null &&
                                         (Instance.Player.GetButtonDown("MouseLeftButton") ||
                                          Instance.Player.GetButtonDown("BackButton") ||

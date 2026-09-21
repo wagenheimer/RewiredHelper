@@ -18,24 +18,46 @@ namespace Wagenheimer.RewiredHelper.UI
     {
         public static List<Dialog> Modals { get; } = new();
 
-        public static bool IsThereAnyVisible => Modals.Count > 0;
+        /// <summary>
+        /// Optional host hook. When it returns true, <see cref="IsThereAnyVisible"/> reports false
+        /// even with modals open (e.g. a face/tutorial dialog the host treats as "not blocking the game").
+        /// </summary>
+        public static Func<bool> SuppressVisibility;
 
-        public static void ShowDialog(GameObject dialog) => ShowDialog(dialog.GetComponent<Dialog>());
+        /// <summary>
+        /// Optional host hook used by <see cref="CloseModals"/>. Return true when the host handled the
+        /// close itself (custom animation, audio, etc.) so the default <c>SetActive(false)</c> is skipped.
+        /// </summary>
+        public static Func<Dialog, bool> CloseModalOverride;
+
+        /// <summary>Raised whenever a dialog is shown, carrying the show delay. Host can hook audio/sfx.</summary>
+        public static event Action<Dialog, float> DialogShown;
+
+        /// <summary>Raised whenever a dialog starts to close. Host can hook audio/sfx.</summary>
+        public static event Action<Dialog> DialogClosed;
+
+        public static bool IsThereAnyVisible => Modals.Count > 0 && !(SuppressVisibility?.Invoke() ?? false);
+
+        public static void ShowDialog(GameObject dialog, bool mostraMesmoSeEstiverNaListaBloqueio = false) =>
+            ShowDialog(dialog.GetComponent<Dialog>());
+
+        public static void ShowDialog(RectTransform dialog, bool mostraMesmoSeEstiverNaListaBloqueio = false) =>
+            ShowDialog(dialog.GetComponent<Dialog>());
 
         public static void ShowDialog(Dialog dialog, float delay = 0f,
-            ShowDialogEffect effect = ShowDialogEffect.Fade, Action onShow = null)
+            ShowDialogEffect effect = ShowDialogEffect.Fade, Action onShow = null, bool mostraMesmoSeEstiverNaListaBloqueio = false)
         {
-            if (Modals.Contains(dialog))
-                return; // already open — bring-to-front is left to the host if it needs sibling reordering
+            if (dialog == null) return;
+            if (Modals.Contains(dialog)) return; // already open
 
             // Already visible or mid-animation (showing/hiding): abort instead of restarting
             // tweens on top of each other, which used to cause flicker and stuck overlays.
-            if (dialog.IsPlayingShow || dialog.IsPlayingHide)
-                return;
+            if (dialog.IsPlayingShow || dialog.IsPlayingHide) return;
 
             Modals.Add(dialog);
             dialog.ShowEffect = effect;
             dialog.RequestBlockUi(0.7f + delay);
+            DialogShown?.Invoke(dialog, delay);
             dialog.PlayShow(delay, onShow);
         }
 
@@ -44,10 +66,11 @@ namespace Wagenheimer.RewiredHelper.UI
 
         public static void CloseDialog(Dialog dialog, Action onHide = null)
         {
-            if (!dialog.gameObject.activeSelf) return;
+            if (dialog == null || !dialog.gameObject.activeSelf) return;
 
             Modals.Remove(dialog);
             dialog.RequestBlockUi(dialog.ShowHideDialogTime + dialog.FadeBlackTime);
+            DialogClosed?.Invoke(dialog);
             dialog.PlayHide(() =>
             {
                 dialog.AfterHide?.Invoke();
@@ -55,35 +78,43 @@ namespace Wagenheimer.RewiredHelper.UI
                 dialog.OnHide?.Invoke();
                 dialog.gameObject.SetActive(false);
             });
-            dialog.AfterShow?.Invoke();
         }
 
         /// <summary>Immediately hides every open modal without animation (e.g. on scene transition).</summary>
         public static void CloseModals()
         {
             foreach (var dialog in Modals.Where(d => d != null).ToList())
+            {
+                if (CloseModalOverride != null && CloseModalOverride(dialog)) continue;
                 dialog.gameObject.SetActive(false);
+            }
 
             Modals.Clear();
         }
     }
 
     /// <summary>
-    /// Legacy alias kept for compatibility with the original Storm Tale 2 API (<c>Dialogs.ShowDialog</c>).
-    /// Forwards everything to <see cref="ModalDialogStack"/> — prefer calling that directly in new code.
+    /// Legacy alias kept for compatibility with the original game API (<c>Dialogs.ShowDialog</c>).
+    /// Forwards everything to <see cref="ModalDialogStack"/>.
     /// </summary>
-    [Obsolete("Use ModalDialogStack instead.")]
     public static class Dialogs
     {
         public static List<Dialog> Modals => ModalDialogStack.Modals;
 
+        /// <summary>Legacy list kept so markers can register themselves as "do not show dialogs now".</summary>
+        public static List<IBloqueiaDialogosDeSerExibidos> ListaBloqueiaDialogosDeSerExibidos { get; } = new();
+
         public static bool IsThereAnyVisible => ModalDialogStack.IsThereAnyVisible;
 
-        public static void ShowDialog(GameObject dialog) => ModalDialogStack.ShowDialog(dialog);
+        public static void ShowDialog(GameObject dialog, bool mostraMesmoSeEstiverNaListaBloqueio = false) =>
+            ModalDialogStack.ShowDialog(dialog, mostraMesmoSeEstiverNaListaBloqueio);
+
+        public static void ShowDialog(RectTransform dialog, bool mostraMesmoSeEstiverNaListaBloqueio = false) =>
+            ModalDialogStack.ShowDialog(dialog, mostraMesmoSeEstiverNaListaBloqueio);
 
         public static void ShowDialog(Dialog dialog, float delay = 0f,
-            ShowDialogEffect effect = ShowDialogEffect.Fade, Action onShow = null) =>
-            ModalDialogStack.ShowDialog(dialog, delay, effect, onShow);
+            ShowDialogEffect effect = ShowDialogEffect.Fade, Action onShow = null, bool mostraMesmoSeEstiverNaListaBloqueio = false) =>
+            ModalDialogStack.ShowDialog(dialog, delay, effect, onShow, mostraMesmoSeEstiverNaListaBloqueio);
 
         public static void CloseDialog(GameObject dialog, Action onHide = null) =>
             ModalDialogStack.CloseDialog(dialog, onHide);

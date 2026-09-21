@@ -5,6 +5,7 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Scripting.APIUpdating;
 using UnityEngine.UI;
 
 namespace Wagenheimer.RewiredHelper.UI
@@ -27,12 +28,22 @@ namespace Wagenheimer.RewiredHelper.UI
     }
 
     /// <summary>
+    /// Legacy marker kept for compatibility: components implementing it register themselves
+    /// in <see cref="Dialogs.ListaBloqueiaDialogosDeSerExibidos"/> to signal "do not show dialogs now".
+    /// </summary>
+    public interface IBloqueiaDialogosDeSerExibidos
+    {
+    }
+
+    /// <summary>
     /// A modal dialog panel: overlay ("Black") + show/hide animation + optional
     /// Escape/OK button wiring for <see cref="ModalDialogStack"/>/<see cref="DefaultModalStackProvider"/>.
     ///
     /// Exposes public Show() and Hide() methods so it can be wired directly in UnityEvents
     /// (e.g. OnShowControllerHelp) without requiring custom scripts.
     /// </summary>
+    [ExecuteInEditMode]
+    [MovedFrom(true, sourceNamespace: "", sourceAssembly: "Assembly-CSharp")]
     [RequireComponent(typeof(CanvasGroup))]
     public class Dialog : MonoBehaviour
     {

@@ -79,5 +79,44 @@ namespace Wagenheimer.RewiredHelper.Editor
             if (primary) button.AddToClassList("rh-toolbar-btn-primary");
             return button;
         }
+
+        /// <summary>A small "label: value" pill; the value label is returned so live views can update it.</summary>
+        public static VisualElement CreateChip(string key, string value, out Label valueLabel, string stateClass = null)
+        {
+            var chip = new VisualElement();
+            chip.AddToClassList("rh-chip");
+            if (!string.IsNullOrEmpty(stateClass)) chip.AddToClassList(stateClass);
+
+            var keyLabel = new Label(key);
+            keyLabel.AddToClassList("rh-chip-key");
+            chip.Add(keyLabel);
+
+            valueLabel = new Label(value);
+            valueLabel.AddToClassList("rh-chip-value");
+            chip.Add(valueLabel);
+            return chip;
+        }
+
+        public static VisualElement CreateCodeBox(string code)
+        {
+            var box = new VisualElement();
+            box.AddToClassList("rh-code-box");
+
+            var label = new Label(code);
+            label.AddToClassList("rh-code-text");
+            box.Add(label);
+
+            var copy = new Button { text = "Copy" };
+            copy.AddToClassList("rh-toolbar-btn");
+            copy.AddToClassList("rh-code-copy");
+            copy.clicked += () =>
+            {
+                UnityEngine.GUIUtility.systemCopyBuffer = code;
+                copy.text = "✓";
+                copy.schedule.Execute(() => copy.text = "Copy").ExecuteLater(1200);
+            };
+            box.Add(copy);
+            return box;
+        }
     }
 }

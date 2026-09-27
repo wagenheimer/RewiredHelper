@@ -37,7 +37,13 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   pause, no pause on controller disconnect, no tap-anywhere resume), resolved at runtime from the compile-time
   platform (`AutoIsMobile` in `RewiredInputManager.Pause.cs`), never from serialized values, unless the scene
   explicitly sets `OverridePlatformDefaults`. `Editor/RewiredBuildPreprocessor.cs` (IPreprocessBuildWithReport, like
-  RateControl) logs the policy per build and warns about mobile-breaking overrides; it must stay read-only. Don't reintroduce an unconditional
+  RateControl) logs the policy per build and warns about mobile-breaking overrides (text scan in
+  `RewiredOverrideScanner`, pure and unit-tested); it must stay read-only. Android TV / Fire TV are detected at
+  runtime (`RewiredInputManager.IsTelevisionDevice`) and get the desktop policy. Do not add "fix it" buttons for the
+  pause policy: it is automatic, an override is a deliberate user choice and is only reported.
+- Scene checks live once in `Editor/RewiredSetupChecks.cs` and feed both the Dashboard audit and the Inspector
+  (`Editor/RewiredInputManagerEditor.cs`, UI Toolkit, `rh-` USS). `Editor/AssemblyInfo.cs` exposes internals to
+  `Wagenheimer.RewiredHelper.EditorTests`. Don't reintroduce an unconditional
   `OnApplicationPause -> freeze + overlay`; that was the "game keeps pausing on mobile" bug.
 - `Editor/UpdateChecker.cs` + `UpdateAvailableWindow.cs` — copy-pasted-and-renamed from the
   sibling packages (UnityRateControl/UnityCloudSave/UnityNativeSocial), not a shared library. If

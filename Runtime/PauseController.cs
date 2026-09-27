@@ -238,6 +238,12 @@ namespace Wagenheimer.RewiredHelper
             ? new PausePolicy(AppBackgroundPauseMode.Silent, false, false)
             : new PausePolicy(AppBackgroundPauseMode.Overlay, true, true);
 
+        /// <summary>
+        /// A build for a mobile platform runs the mobile policy, except on televisions (Android TV / Fire TV are
+        /// Android builds, but they use a remote or gamepad, so the desktop/console policy is the right one).
+        /// </summary>
+        public static bool IsMobileDevice(bool isMobileBuild, bool isTelevision) => isMobileBuild && !isTelevision;
+
         public static PausePolicy Resolve(bool overridePlatformDefaults, AppBackgroundPauseMode appBackground,
             AutoToggle pauseOnControllerDisconnect, AutoToggle resumeOnAnyInput, bool isMobile)
         {

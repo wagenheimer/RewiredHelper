@@ -224,6 +224,32 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void IsMobileDevice_MobileBuild_IsMobileExceptOnTelevisions()
+        {
+            Assert.IsTrue(PausePolicy.IsMobileDevice(isMobileBuild: true, isTelevision: false));
+            Assert.IsFalse(PausePolicy.IsMobileDevice(isMobileBuild: true, isTelevision: true));
+        }
+
+        [Test]
+        public void IsMobileDevice_NonMobileBuild_IsNeverMobile()
+        {
+            Assert.IsFalse(PausePolicy.IsMobileDevice(isMobileBuild: false, isTelevision: false));
+            Assert.IsFalse(PausePolicy.IsMobileDevice(isMobileBuild: false, isTelevision: true));
+        }
+
+        [Test]
+        public void AndroidTv_GetsTheDesktopPolicy()
+        {
+            bool isMobile = PausePolicy.IsMobileDevice(isMobileBuild: true, isTelevision: true);
+
+            var policy = PausePolicy.Resolve(false, AppBackgroundPauseMode.Auto, AutoToggle.Auto, AutoToggle.Auto, isMobile);
+
+            Assert.AreEqual(AppBackgroundPauseMode.Overlay, policy.AppBackground);
+            Assert.IsTrue(policy.PauseOnControllerDisconnect);
+            Assert.IsTrue(policy.ResumeOnAnyInput);
+        }
+
+        [Test]
         public void Resolve_WithOverride_AppliesExplicitValuesAndKeepsAutoAsPlatformDefault()
         {
             var policy = PausePolicy.Resolve(true, AppBackgroundPauseMode.Overlay, AutoToggle.Auto, AutoToggle.On, isMobile: true);

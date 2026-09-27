@@ -1,690 +1,478 @@
 using System;
-using System.Reflection;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
 using UnityEditor;
+using UnityEditor.UIElements;
+
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.UIElements;
 
 namespace Wagenheimer.RewiredHelper.Editor
 {
+    /// <summary>
+    /// UI Toolkit inspector for <see cref="RewiredInputManager"/>: live status in Play Mode, a self-diagnosing
+    /// "Setup Health" list with one-click fixes, the automatic per-platform pause policy, and collapsible settings.
+    /// Shares its checks and theme with the Dashboard window.
+    /// </summary>
     [CustomEditor(typeof(RewiredInputManager))]
     public class RewiredInputManagerEditor : UnityEditor.Editor
     {
-        private static bool showHelpFoldout = true;
-        private static bool showBootstrapHelp = false;
-        private static bool showRoutingHelp = false;
-        private static bool showApisHelp = false;
+        private const long LiveRefreshMs = 250;
+        private const long RefreshDebounceMs = 150;
 
-        private static readonly string GlyphHelperTypeName = "Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper";
+        private RewiredInputManager _manager;
+        private VisualElement _root;
+        private Foldout _healthFoldout;
+        private VisualElement _healthContent;
+        private Label _headerBadge;
+        private VisualElement _policyRows;
+        private VisualElement _pauseChecks;
+        private VisualElement _overrideBox;
+        private Foldout _automaticContent;
+        private Button _pauseScreenButton;
+        private VisualElement _blockedScenesInfo;
+        private VisualElement _liveCard;
+        private readonly Dictionary<string, Label> _liveValues = new Dictionary<string, Label>();
+        private bool _refreshQueued;
 
-        private static Color ColBg => EditorGUIUtility.isProSkin
-            ? new(0.16f, 0.16f, 0.18f) : new(0.82f, 0.82f, 0.84f);
-        private static Color ColCard => EditorGUIUtility.isProSkin
-            ? new(0.20f, 0.20f, 0.22f) : new(0.90f, 0.90f, 0.92f);
-        private static Color ColGreen => EditorGUIUtility.isProSkin
-            ? new(0.20f, 0.75f, 0.35f) : new(0.10f, 0.55f, 0.20f);
-        private static Color ColRed => EditorGUIUtility.isProSkin
-            ? new(0.85f, 0.25f, 0.20f) : new(0.70f, 0.15f, 0.10f);
-        private static Color ColOrange => EditorGUIUtility.isProSkin
-            ? new(1.00f, 0.60f, 0.10f) : new(0.85f, 0.50f, 0.05f);
-        private static readonly Color ColAccent = new(0.22f, 0.60f, 1.00f);
-        private static readonly Color ColDim = new(0.55f, 0.55f, 0.60f);
-
-        public override void OnInspectorGUI()
+        public override VisualElement CreateInspectorGUI()
         {
-            var manager = (RewiredInputManager)target;
+            _manager = (RewiredInputManager)target;
 
-            serializedObject.Update();
+            _root = new VisualElement();
+            _root.AddToClassList("rh-inspector");
+            RewiredHelperUIStyle.Apply(_root);
 
-            // Draw Script field (read-only)
-            GUI.enabled = false;
-            EditorGUILayout.ObjectField("Script", MonoScript.FromMonoBehaviour((MonoBehaviour)target), typeof(MonoScript), false);
-            GUI.enabled = true;
+            _root.Add(BuildHeader());
+            _root.Add(BuildLiveCard());
+            BuildAutomaticSection();
+            BuildHealthSection();
+            BuildBootSection();
+            BuildCursorSection();
+            BuildPauseSection();
+            BuildControllerHelpSection();
+            BuildRuntimeStateSection();
+            BuildHelpSection();
 
-            EditorGUILayout.Space(5);
+            _root.Bind(serializedObject);
+            _root.TrackSerializedObjectValue(serializedObject, _ => QueueRefresh());
+            _root.RegisterCallback<AttachToPanelEvent>(_ => Subscribe());
+            _root.RegisterCallback<DetachFromPanelEvent>(_ => Unsubscribe());
+            _root.schedule.Execute(UpdateLive).Every(LiveRefreshMs);
 
-            // ==========================================
-            // SETTINGS GROUPS (MANUAL DRAWING)
-            // ==========================================
-            
-            // 0. Initialization & Boot
-            DrawSettingsGroup("Initialization & Boot", "🚀", new[] {
-                serializedObject.FindProperty("AutoConfigureOnStart"),
-                serializedObject.FindProperty("UseDefaultModalStack"),
-                serializedObject.FindProperty("AutoBridgeSubmitToPointerDown")
-            }, new[] {
-                new GUIContent("Auto Configure On Start", "If checked, the manager will automatically configure itself on Start, removing the need to call Configure() from code."),
-                new GUIContent("Use Default Modal Stack", "Automatically uses the built-in ModalDialogStack provider for UI modals navigation (Escape/Return keys)."),
-                new GUIContent("Auto Bridge Submit To PointerDown", "Automatically triggers PointerDown/PointerUp on selected UI elements when confirming with Gamepad (Button A / UISubmit), fixing SFX listeners (like EventSounds) that only listen to pointer events.")
-            }, ColAccent);
+            RefreshDynamic();
+            return _root;
+        }
 
-            // 1. Cursor & Visuals Settings
-            DrawSettingsGroup("Cursor & Visuals", "🖱️", new[] {
-                serializedObject.FindProperty("GameCursor"),
-                serializedObject.FindProperty("CustomCursorEnabled"),
-                serializedObject.FindProperty("CursorTexture")
-            }, new[] {
-                new GUIContent("Game Cursor", "UI Image used to render the custom in-game cursor."),
-                new GUIContent("Custom Cursor Enabled", "Enables the standalone OS cursor (Cursor.SetCursor) using Cursor Texture below. Can also be toggled at runtime from your save data."),
-                new GUIContent("Cursor Texture", "Texture used by the standalone custom cursor when Custom Cursor Enabled is checked.")
-            }, ColAccent);
+        #region Refresh
 
-            // 2. Pause Policy: automatic per platform unless explicitly overridden
-            var pauseProps = new System.Collections.Generic.List<SerializedProperty>
+        private void Subscribe()
+        {
+            EditorApplication.hierarchyChanged += QueueRefresh;
+            Undo.undoRedoPerformed += QueueRefresh;
+        }
+
+        private void Unsubscribe()
+        {
+            EditorApplication.hierarchyChanged -= QueueRefresh;
+            Undo.undoRedoPerformed -= QueueRefresh;
+        }
+
+        /// <summary>Coalesces bursts of hierarchy/serialization changes into a single rebuild.</summary>
+        private void QueueRefresh()
+        {
+            if (_refreshQueued || _root == null || _manager == null) return;
+
+            _refreshQueued = true;
+            _root.schedule.Execute(() =>
             {
-                serializedObject.FindProperty("GamePaused"),
-                serializedObject.FindProperty("OverridePlatformDefaults")
+                _refreshQueued = false;
+                if (_manager != null) RefreshDynamic();
+            }).ExecuteLater(RefreshDebounceMs);
+        }
+
+        private void RefreshDynamic()
+        {
+            RefreshAutomatic();
+            RefreshHealth();
+            RefreshPolicy();
+            RefreshBlockedScenes();
+        }
+
+        #endregion
+
+        #region Header and live status
+
+        private VisualElement BuildHeader()
+        {
+            var banner = new VisualElement();
+            banner.AddToClassList("rh-header");
+
+            var row = new VisualElement();
+            row.AddToClassList("rh-header-row");
+
+            var left = new VisualElement();
+            left.AddToClassList("rh-header-left");
+            left.Add(new Label("🎮") { style = { fontSize = 18, marginRight = 6 } });
+
+            var title = new Label("Rewired Helper");
+            title.AddToClassList("rh-header-title");
+            left.Add(title);
+
+            var version = new Label("v" + RewiredHelperDashboardWindow.GetPackageVersion());
+            version.AddToClassList("rh-header-version");
+            left.Add(version);
+
+            _headerBadge = new Label("checking...");
+            _headerBadge.AddToClassList("rh-badge");
+            _headerBadge.style.marginLeft = 8;
+            left.Add(_headerBadge);
+            row.Add(left);
+
+            var actions = new VisualElement();
+            actions.AddToClassList("rh-toolbar-actions");
+            actions.Add(RewiredHelperUIStyle.CreateButton("Dashboard", RewiredHelperDashboardWindow.OpenDashboard));
+            row.Add(actions);
+
+            banner.Add(row);
+            return banner;
+        }
+
+        private VisualElement BuildLiveCard()
+        {
+            _liveCard = new VisualElement();
+            _liveCard.AddToClassList("rh-card");
+            _liveCard.Add(new Label("▶ LIVE STATUS") { style = { unityFontStyleAndWeight = FontStyle.Bold, fontSize = 11, marginBottom = 4 } });
+
+            var chips = RewiredInspectorWidgets.CreateChipRow();
+            foreach (var key in new[] { "Platform", "Policy", "Input", "Controller", "Paused", "System UI", "Configured", "Steam overlay" })
+            {
+                chips.Add(RewiredHelperUIStyle.CreateChip(key, "-", out var value));
+                _liveValues[key] = value;
+            }
+            _liveCard.Add(chips);
+
+            var buttons = RewiredInspectorWidgets.CreateRow("rh-chip-row");
+            buttons.Add(RewiredHelperUIStyle.CreateButton("⏸ Test Pause", () => _manager.RequestPause()));
+            buttons.Add(RewiredHelperUIStyle.CreateButton("▶ Resume", () => _manager.Resume()));
+            buttons.Q<Button>().style.marginLeft = 0;
+            _liveCard.Add(buttons);
+
+            _liveCard.style.display = DisplayStyle.None;
+            return _liveCard;
+        }
+
+        private void UpdateLive()
+        {
+            if (_manager == null) return;
+
+            bool isPlaying = Application.isPlaying;
+            _liveCard.style.display = isPlaying ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!isPlaying) return;
+
+            SetLive("Platform", Application.platform + (RewiredInputManager.IsTelevisionDevice ? " (TV)" : string.Empty));
+            SetLive("Policy", RewiredInputManager.IsMobilePolicyActive ? "mobile" : "desktop / console");
+            SetLive("Input", _manager.CurrentControllerType + (RewiredInputManager.IsUsingTouch ? " (touch)" : string.Empty));
+            SetLive("Controller", _manager.LastActiveController != null ? _manager.LastActiveController.name : "none");
+            SetLive("Paused", _manager.IsFrozen ? "frozen" : _manager.IsPaused ? "silent" : "no");
+            SetLive("System UI", RewiredInputManager.IsSystemUiActive ? "active" : "idle");
+            SetLive("Configured", _manager.IsConfigured ? "yes" : "no");
+            SetLive("Steam overlay", _manager.IsSteamOverlayActive ? "open" : "closed");
+        }
+
+        private void SetLive(string key, string value)
+        {
+            if (_liveValues.TryGetValue(key, out var label) && label.text != value)
+                label.text = value;
+        }
+
+        #endregion
+
+        #region Automatic
+
+        /// <summary>Lists everything the package decides by itself, so nothing looks like a manual chore.</summary>
+        private void BuildAutomaticSection()
+        {
+            _automaticContent = RewiredInspectorWidgets.CreateSection(_root, "auto", "🤖 Automatic (no setup needed)", true,
+                "Decided by the platform of each build and by the device at runtime.");
+        }
+
+        private void RefreshAutomatic()
+        {
+            _automaticContent.Query<VisualElement>(className: "rh-check").ForEach(e => e.RemoveFromHierarchy());
+
+            var target = EditorUserBuildSettings.activeBuildTarget;
+            var policy = PausePolicy.ForPlatform(RewiredHelperAudit.IsMobileTarget);
+            bool hasSteam = RewiredHelperAudit.HasSteamManager();
+
+            var rows = new[]
+            {
+                ("Pause policy for the build platform",
+                 $"Build target {target}: app background = {policy.AppBackground}, pause on controller disconnect = {OnOff(policy.PauseOnControllerDisconnect)}, " +
+                 $"tap to resume = {OnOff(policy.ResumeOnAnyInput)}. Android TV / Fire TV devices switch to the desktop policy at runtime."),
+                ("Steam overlay",
+                 hasSteam ? "SteamManager found: the overlay pauses the game and resumes it when it closes."
+                          : "No SteamManager in the project: nothing to configure (only used on Steam builds)."),
+                ("Cursor per input device",
+                 "Touch: hidden. Mouse/keyboard: OS cursor (custom texture on standalone). Gamepad/remote: on-screen Game Cursor."),
+                ("Controller help",
+                 "Shown once, the first time a gamepad button is pressed in an allowed scene. Never on touch."),
+                ("Every build",
+                 "The Unity Build Pipeline, Build Settings and CLI builds log the policy in use and warn about overrides that would break mobile.")
             };
-            var pauseLabels = new System.Collections.Generic.List<GUIContent>
+
+            foreach (var (title, detail) in rows)
+                _automaticContent.Add(RewiredInspectorWidgets.CreateAutomaticRow(title, detail));
+        }
+
+        #endregion
+
+        #region Health
+
+        private void BuildHealthSection()
+        {
+            _healthFoldout = RewiredInspectorWidgets.CreateSection(_root, "health", "🛠 Setup Health", true,
+                "Checks this scene and offers a one-click fix for whatever is missing.");
+
+            var toolbar = RewiredInspectorWidgets.CreateRow("rh-chip-row");
+            var refresh = RewiredHelperUIStyle.CreateButton("↻ Re-check", RefreshDynamic);
+            refresh.style.marginLeft = 0;
+            toolbar.Add(refresh);
+            toolbar.Add(RewiredHelperUIStyle.CreateButton("🤖 Copy AI Fix Prompt", CopyFixPrompt));
+            toolbar.Add(RewiredHelperUIStyle.CreateButton("🔍 Full Audit", RewiredHelperDashboardWindow.OpenAuditTab));
+            _healthFoldout.Add(toolbar);
+
+            _healthContent = new VisualElement { style = { marginTop = 4 } };
+            _healthFoldout.Add(_healthContent);
+        }
+
+        private List<AuditResult> CollectSceneChecks()
+        {
+            var results = new List<AuditResult>();
+            RewiredSetupChecks.Run(results, _manager);
+            return results;
+        }
+
+        private void RefreshHealth()
+        {
+            var results = CollectSceneChecks();
+            RewiredInspectorWidgets.FillChecks(_healthContent, results, RefreshDynamic);
+
+            int fails = results.Count(r => r.Severity == AuditSeverity.Fail);
+            int warnings = results.Count(r => r.Severity == AuditSeverity.Warning);
+            int issues = fails + warnings;
+
+            _healthFoldout.text = issues == 0 ? "🛠 Setup Health" : $"🛠 Setup Health  ({issues} to review)";
+            UpdateHeaderBadge(fails, warnings);
+        }
+
+        private void UpdateHeaderBadge(int fails, int warnings)
+        {
+            _headerBadge.RemoveFromClassList("rh-badge-pass");
+            _headerBadge.RemoveFromClassList("rh-badge-warn");
+            _headerBadge.RemoveFromClassList("rh-badge-fail");
+
+            if (fails > 0)
             {
-                new GUIContent("Game Paused", "GameObject shown while the game is frozen (not for silent pauses)."),
-                new GUIContent("Override Platform Defaults", "Off (recommended): the pause behavior is picked automatically for the build platform. Mobile: silent app-background pause, no pause on controller disconnect, no tap-to-resume. Desktop/console: overlay, pause on disconnect, resume on input. Turn on only to override.")
-            };
-            if (serializedObject.FindProperty("OverridePlatformDefaults").boolValue)
-            {
-                pauseProps.Add(serializedObject.FindProperty("PauseOnAppBackground"));
-                pauseLabels.Add(new GUIContent("Pause On App Background", "Auto = the platform default. Off = nothing. Silent = raises OnPauseChanged only. Overlay = freezes time and shows Game Paused."));
-                pauseProps.Add(serializedObject.FindProperty("PauseOnControllerDisconnect"));
-                pauseLabels.Add(new GUIContent("Pause On Controller Disconnect", "Auto = the platform default (off on Android/iOS)."));
-                pauseProps.Add(serializedObject.FindProperty("ResumeOnAnyInput"));
-                pauseLabels.Add(new GUIContent("Resume On Any Input", "While frozen, any tap/click/Back resumes. Auto = the platform default (off on Android/iOS)."));
+                _headerBadge.text = $"{fails} problem(s)";
+                _headerBadge.AddToClassList("rh-badge-fail");
             }
-            pauseProps.Add(serializedObject.FindProperty("PauseOnSteamOverlay"));
-            pauseLabels.Add(new GUIContent("Pause On Steam Overlay", "Automatically pauses the game when Steam overlay opens (Steam readiness is auto-detected)."));
-            DrawSettingsGroup("Pause Policy", "🎮", pauseProps.ToArray(), pauseLabels.ToArray(), ColAccent);
-            DrawMobilePauseWarning();
-
-            // 3. Controller Help Events
-            DrawSettingsGroup("Controller Help", "?", new[] {
-                serializedObject.FindProperty("OnShowControllerHelp"),
-                serializedObject.FindProperty("ControllerHelpBlockedScenes")
-            }, new[] {
-                new GUIContent("On Show Controller Help", "Event triggered once the first time physical controller input is detected."),
-                new GUIContent("Blocked Scenes", "Scene names where the controller help prompt must never appear. The prompt is not consumed in these scenes - it will show in the first allowed scene where controller input is detected.")
-            }, ColAccent);
-
-            // 4. Runtime Status & State
-            DrawSettingsGroup("Runtime Status & State", "⚙️", new[] {
-                serializedObject.FindProperty("alreadyShowedControllerHelp"),
-                serializedObject.FindProperty("IsSteamOverlayActive")
-            }, new[] {
-                new GUIContent("Already Showed Help", "Tracks if the player was already shown the controller help form."),
-                new GUIContent("Is Steam Overlay Active", "Indicates if the Steam overlay is currently active.")
-            }, ColDim);
-
-            serializedObject.ApplyModifiedProperties();
-
-            EditorGUILayout.Space(10);
-            DrawSeparator();
-            EditorGUILayout.Space(5);
-
-            // ==========================================
-            // SECTION 1: QUICK HELP GUIDE & DOCUMENTATION
-            // ==========================================
-            showHelpFoldout = EditorGUILayout.BeginFoldoutHeaderGroup(showHelpFoldout, "📖 QUICK HELP GUIDE");
-            if (showHelpFoldout)
+            else if (warnings > 0)
             {
-                EditorGUI.indentLevel++;
-
-                showBootstrapHelp = EditorGUILayout.Foldout(showBootstrapHelp, "How to Initialize (Bootstrap)");
-                if (showBootstrapHelp)
-                {
-                    EditorGUILayout.HelpBox(
-                        "To initialize the manager, call Configure() in your bootstrap script (e.g. in Awake):\n\n" +
-                        "RewiredInputManager.Instance.Configure(\n" +
-                        "    uiBlocker: yourUiBlocker,\n" +
-                        "    modalStack: yourModalStack,\n" +
-                        "    controllerHelpGate: yourHelpGate\n" +
-                        ");\n\n" +
-                        "All arguments are optional and will assume safe default behaviors if omitted.",
-                        MessageType.Info
-                    );
-                }
-
-                showRoutingHelp = EditorGUILayout.Foldout(showRoutingHelp, "Escape & Return Routing");
-                if (showRoutingHelp)
-                {
-                    EditorGUILayout.HelpBox(
-                        "• EscapeButton: Attach to any UI button. The active button with the highest priority will respond to the Escape key (or Back/Menu buttons on controllers).\n\n" +
-                        "• ReturnEscapeEvent: Fires generic events when Escape or Return are pressed and no button or modal dialog claims the key first.\n\n" +
-                        "• IModalStackProvider: Register your own modal stack so that its top-most modal automatically gains routing priority.",
-                        MessageType.Info
-                    );
-                }
-
-                showApisHelp = EditorGUILayout.Foldout(showApisHelp, "Core APIs for your Code");
-                if (showApisHelp)
-                {
-                    EditorGUILayout.HelpBox(
-                        "• RewiredInputManager.IsUsingTouch: true if the player touched the screen recently.\n\n" +
-                        "• manager.CurrentControllerType: Returns whether the player is using Mouse/Keyboard, Joystick (Controller), or Custom (Touch).\n\n" +
-                        "• RewiredInputManager.OnInputTypeChanged: Static event fired when the active input source changes (e.g. to swap controller UI glyphs).\n\n" +
-                        "• manager.Vibrate(): Fires controller rumble on the active controller for Player 0.",
-                        MessageType.Info
-                    );
-                }
-
-                EditorGUI.indentLevel--;
-            }
-            EditorGUILayout.EndFoldoutHeaderGroup();
-
-            EditorGUILayout.Space(15);
-            DrawSeparator();
-            EditorGUILayout.Space(5);
-
-            // ==========================================
-            // SECTION 2: SETUP DIAGNOSTIC & STATUS CHECKER
-            // ==========================================
-            var sectionHeaderStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = ColAccent } };
-            GUILayout.Label("🛠️ SETUP DIAGNOSTIC & STATUS CHECKER", sectionHeaderStyle);
-            EditorGUILayout.Space(5);
-
-            // 1. Verify Native Manager in Scene
-            var hasRewired = DefaultSetupGenerator.FindInputManagerInScene() != null;
-            DrawCheckResult("Rewired Input Manager (Native)", hasRewired,
-                "Instantiate the configured Rewired prefab to manage bindings and controls.",
-                "Create Manager", () => DefaultSetupGenerator.CreateRewiredInputManager(),
-                "Creates Rewired's native Input Manager GameObject in the scene with a default configuration.");
-
-            // 2. Verify Event System is running Rewired's own input module (a plain Unity
-            // EventSystem passes a generic null-check but never routes Rewired controller input
-            // into UI navigation or Player Mouse).
-            var hasEventSystem = DefaultSetupGenerator.HasRewiredEventSystemInScene();
-            DrawCheckResult("Rewired Event System", hasEventSystem,
-                "The scene's Event System must use Rewired's RewiredStandaloneInputModule (not Unity's default StandaloneInputModule) for controller UI navigation and Player Mouse to work.",
-                "Create Event System", () => DefaultSetupGenerator.EnsureRewiredEventSystem(),
-                "Creates an Event System using Rewired's RewiredStandaloneInputModule so controller input navigates the UI.");
-
-            // 3. Verify Canvas
-            var hasCanvas = UnityEngine.Object.FindObjectOfType<Canvas>() != null;
-            DrawCheckResult("UI Canvas", hasCanvas,
-                "The scene requires a Canvas to render custom cursors and modal dialogs.",
-                "Create Canvas", () => {
-                    var go = new GameObject("Canvas", typeof(Canvas), typeof(GraphicRaycaster));
-                    var canvas = go.GetComponent<Canvas>();
-                    canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                    Undo.RegisterCreatedObjectUndo(go, "Create Canvas");
-                },
-                "Creates a Screen Space - Overlay Canvas with a GraphicRaycaster, required to render cursors and dialogs.");
-
-            // 4. Verify Game Cursor (Required)
-            var hasCursor = manager.GameCursor != null;
-            DrawCheckResult("Game Cursor", hasCursor,
-                "A UI Image is required to act as the visual cursor on screen.",
-                "Create Cursor", () => DefaultSetupGenerator.CreateGameCursorAndWire(manager, serializedObject),
-                "Creates a Game Cursor UI Image under the Canvas (hidden until joystick input is detected), adds the GameCursorPositioner and links it to this manager.");
-
-            // Standalone Custom Cursor warnings
-            if (manager.CustomCursorEnabled && manager.CursorTexture == null)
-            {
-                DrawWarningBox("Standalone Custom Cursor is enabled, but no Cursor Texture has been assigned!");
-            }
-
-            // 4b. Verify Player Mouse (drives the cursor from joystick/controller input)
-            DrawPlayerMouseCheck(manager);
-
-            // 5. Verify Runtime Initialization
-            if (EditorApplication.isPlaying)
-            {
-                if (!manager.IsConfigured)
-                {
-                    DrawErrorBox("Runtime: The Configure() method has not been called in this session. Initialize it in your game's Awake/Start.");
-                }
-                else
-                {
-                    DrawSuccessBox("Runtime: Initialized and configured successfully!");
-                }
-            }
-
-            // 6. Verify Rewired Glyphs Addon
-            var glyphHelperType = FindGlyphHelperType();
-            if (glyphHelperType == null)
-            {
-                DrawHintBox("Note: The Rewired Official Glyphs Addon was not detected in the project. If you wish to use dynamic controller icons in help texts, install it via:\nWindow > Rewired > Extras > Glyphs > Install");
+                _headerBadge.text = $"{warnings} warning(s)";
+                _headerBadge.AddToClassList("rh-badge-warn");
             }
             else
             {
-                DrawSuccessBox("Rewired Glyphs Addon detected and active!");
-
-                var glyphProviderType = DefaultSetupGenerator.FindGlyphProviderType();
-                var hasGlyphProvider = glyphProviderType != null && manager.GetComponent(glyphProviderType) != null;
-                DrawCheckResult("Glyph Provider", hasGlyphProvider,
-                    "Without a Glyph Provider on the Rewired Input Manager, ReInput.glyphs.glyphProvider is never set, so every <rewiredElement> glyph tag falls back to plain text instead of an icon.",
-                    "Add Glyph Provider", () => DefaultSetupGenerator.EnsureGlyphProvider(manager.gameObject),
-                    "Adds Rewired's GlyphProvider component to the Input Manager so glyph tags render as icons.");
-
-                // Android Remote glyphs: only relevant when the project actually configures the
-                // AndroidController Custom Controller (Android TV remote support).
-                var nativeInputManager = DefaultSetupGenerator.FindInputManagerInScene();
-                if (nativeInputManager != null && AndroidRemoteGlyphSetup.HasAndroidCustomController(nativeInputManager))
-                {
-                    bool androidGlyphsReady = AndroidRemoteGlyphSetup.IsAndroidRemoteGlyphSetReady(nativeInputManager);
-                    DrawCheckResult("Android Remote Glyphs", androidGlyphsReady,
-                        "The AndroidController Custom Controller is configured, but its SpriteGlyphSet is missing or not registered in the Glyph Set Collection — on Android TV, UI prompts show raw element names (e.g. \"Left\", \"Escape\") instead of icons.",
-                        "Ensure Android Remote Glyphs", () => AndroidRemoteGlyphSetup.EnsureAndroidRemoteGlyphs(),
-                        "One click: fills in missing element keys on the AndroidController, generates/updates its SpriteGlyphSet using Rewired's own generator, copies matching sprites from other installed glyph sets, registers it in the Glyph Set Collection and reloads the Glyph Provider.");
-                }
-            }
-
-            // 7. Verify I2 Localization Integration
-            var i2ManagerType = FindTypeByName("I2.Loc.LocalizationManager");
-            if (i2ManagerType != null)
-            {
-                bool isPartial = false;
-                string specPath = "Assets/I2/Localization/Scripts/Configurables/SpecializationManager.cs";
-                if (System.IO.File.Exists(specPath))
-                {
-                    string content = System.IO.File.ReadAllText(specPath);
-                    isPartial = content.Contains("partial class SpecializationManager");
-                }
-                else
-                {
-                    isPartial = true; // File not found at expected path, assume partial to avoid false alarm
-                }
-
-                if (!isPartial)
-                {
-                    DrawErrorBox("I2 Localization: SpecializationManager.cs is not declared as a 'partial' class. Open '" + specPath + "' and add the 'partial' keyword (e.g. 'public partial class SpecializationManager') so that the Rewired Helper integration can compile.");
-                }
-                else
-                {
-                    var hasI2Integration = FindTypeByName("Wagenheimer.RewiredHelper.Integration.I2SpecializationImportedMarker") != null;
-                    DrawCheckResult("I2 Localization Integration", hasI2Integration,
-                        "I2 Localization detected, but the integration specialization helper is not imported. Import it to enable automatic controller glyphs in localized texts.",
-                        "Import Integration", () => ImportI2IntegrationSample(),
-                        "Copies the SpecializationManager.cs integration sample into Assets/Samples so I2 Localization renders controller glyphs inside translated texts.");
-                }
-
-                // 7b. Verify I2 Terms used by the shipped prefabs/help form — listing every
-                // required term individually with its present/missing state.
-                var hasAllTerms = DefaultSetupGenerator.AllI2TermsExist(out var missingTermCount, out var missingTerms);
-                string termsDescription = null;
-                if (!hasAllTerms)
-                {
-                    var requiredTerms = DefaultSetupGenerator.GetRequiredI2Terms();
-                    var sb = new System.Text.StringBuilder();
-                    sb.AppendLine(missingTermCount == 1
-                        ? "1 term is missing an English translation in the I2 Language Source (shows blank at runtime):"
-                        : $"{missingTermCount} terms are missing or have no English translation in the I2 Language Source:");
-                    sb.AppendLine();
-                    foreach (var term in requiredTerms.Keys)
-                    {
-                        sb.AppendLine(string.Format("{0} {1}", missingTerms.Contains(term) ? "❌" : "✅", term));
-                    }
-                    termsDescription = sb.ToString().TrimEnd();
-                }
-                DrawCheckResult("I2 Localization Terms", hasAllTerms, termsDescription,
-                    "Verify/Add Terms",
-                    () => DefaultSetupGenerator.EnsureI2Terms(),
-                    "Checks every term Rewired Helper needs in the I2 Language Source and adds the missing ones with an English translation.");
-            }
-
-            EditorGUILayout.Space(10);
-        }
-
-        private static void ImportI2IntegrationSample()
-        {
-            string sourcePath = "Packages/com.wagenheimer.rewiredhelper/Samples~/I2LocalizationIntegration/SpecializationManager.cs";
-            string destDir = "Assets/Samples/Rewired Helper/I2 Localization Integration";
-            string destPath = System.IO.Path.Combine(destDir, "SpecializationManager.cs");
-
-            try
-            {
-                if (!System.IO.Directory.Exists(destDir))
-                {
-                    System.IO.Directory.CreateDirectory(destDir);
-                }
-
-                if (System.IO.File.Exists(sourcePath))
-                {
-                    System.IO.File.Copy(sourcePath, destPath, true);
-                    AssetDatabase.ImportAsset(destPath, ImportAssetOptions.ForceUpdate);
-                    AssetDatabase.Refresh();
-                    Debug.Log("[RewiredHelper] Imported I2 Localization Integration successfully!");
-                }
-                else
-                {
-                    Debug.LogError($"[RewiredHelper] Integration source file not found at: {sourcePath}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[RewiredHelper] Failed to import I2 Localization Integration: {ex.Message}");
+                _headerBadge.text = "All good";
+                _headerBadge.AddToClassList("rh-badge-pass");
             }
         }
 
-        private static Type FindTypeByName(string typeName)
+        private void CopyFixPrompt()
         {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            var results = CollectSceneChecks();
+            RewiredHelperAudit.AttachPrompts(results);
+            GUIUtility.systemCopyBuffer = RewiredHelperAudit.ToPromptMarkdown(results);
+            _healthFoldout.text = "🛠 Setup Health  (prompt copied)";
+        }
+
+        #endregion
+
+        #region Settings sections
+
+        private void BuildBootSection()
+        {
+            var section = RewiredInspectorWidgets.CreateSection(_root, "boot", "🚀 Initialization & Boot", false,
+                "Zero-code default: the manager configures itself on Start. Turn it off to call Configure()/SetGlobalConfiguration from your bootstrap.");
+            AddFields(section, "AutoConfigureOnStart", "UseDefaultModalStack", "AutoBridgeSubmitToPointerDown");
+        }
+
+        private void BuildCursorSection()
+        {
+            var section = RewiredInspectorWidgets.CreateSection(_root, "cursor", "🖱 Cursor & Glyphs", false);
+            AddFields(section, "GameCursor", "CustomCursorEnabled", "CursorTexture", "ForceGlyphCustomControllerLast");
+        }
+
+        private void BuildControllerHelpSection()
+        {
+            var section = RewiredInspectorWidgets.CreateSection(_root, "help", "❓ Controller Help", false,
+                "Shown once, the first time a physical controller is used, unless the scene is blocked.");
+            AddFields(section, "OnShowControllerHelp", "ControllerHelpBlockedScenes");
+
+            _blockedScenesInfo = new VisualElement();
+            section.Add(_blockedScenesInfo);
+
+            var create = RewiredHelperUIStyle.CreateButton("📝 Create Controller Help Form", DefaultSetupGenerator.CreateControllerHelpForm);
+            create.style.marginLeft = 0;
+            create.style.alignSelf = Align.FlexStart;
+            section.Add(create);
+        }
+
+        private void RefreshBlockedScenes()
+        {
+            _blockedScenesInfo.Clear();
+            if (_manager.ControllerHelpBlockedScenes.Count == 0) return;
+
+            var inBuild = new HashSet<string>(
+                EditorBuildSettings.scenes.Select(s => Path.GetFileNameWithoutExtension(s.path)), StringComparer.OrdinalIgnoreCase);
+            var unknown = _manager.ControllerHelpBlockedScenes.Where(n => !string.IsNullOrEmpty(n) && !inBuild.Contains(n)).ToList();
+            if (unknown.Count == 0) return;
+
+            _blockedScenesInfo.Add(RewiredHelperUIStyle.CreateCallout(
+                "Not in Build Settings (typo or removed scene): " + string.Join(", ", unknown), AuditSeverity.Warning));
+        }
+
+        private void BuildRuntimeStateSection()
+        {
+            var section = RewiredInspectorWidgets.CreateSection(_root, "state", "⚙ Runtime State", false, "Read-only, driven by the game at runtime.");
+            AddFields(section, "alreadyShowedControllerHelp", "IsSteamOverlayActive");
+            section.SetEnabled(false);
+        }
+
+        private void AddFields(VisualElement parent, params string[] propertyNames)
+        {
+            foreach (var name in propertyNames)
             {
-                var type = assembly.GetType(typeName);
-                if (type != null) return type;
+                var property = serializedObject.FindProperty(name);
+                if (property == null) continue;
+
+                parent.Add(new PropertyField(property));
             }
-            return null;
+        }
+
+        #endregion
+
+        #region Pause policy
+
+        private void BuildPauseSection()
+        {
+            var section = RewiredInspectorWidgets.CreateSection(_root, "pause", "⏸ Pause Policy", true,
+                "Chosen automatically from the platform of each build (Unity Build Pipeline, Build Settings, CLI). Nothing to configure.");
+
+            _policyRows = new VisualElement();
+            section.Add(_policyRows);
+
+            AddFields(section, "GamePaused", "PauseOnSteamOverlay", "OverridePlatformDefaults");
+
+            _overrideBox = new VisualElement();
+            foreach (var name in new[] { "PauseOnAppBackground", "PauseOnControllerDisconnect", "ResumeOnAnyInput" })
+                _overrideBox.Add(new PropertyField(serializedObject.FindProperty(name)));
+            section.Add(_overrideBox);
+
+            _pauseChecks = new VisualElement { style = { marginTop = 4 } };
+            section.Add(_pauseChecks);
+
+            section.Add(BuildPauseButtons());
         }
 
         /// <summary>
-        /// Checks for Rewired's own Rewired.Components.PlayerMouse — the component that actually
-        /// drives cursor/pointer movement from controller input. Only offers the specific action
-        /// that's actually missing (create it, or bind its Movement axes) instead of re-offering
-        /// to recreate something that already exists.
+        /// Only offered while there is no pause screen with a Resume button. The automatic policy on mobile never
+        /// freezes the game, so this matters for the desktop/console overlay and for manual RequestPause().
         /// </summary>
-        private void DrawPlayerMouseCheck(RewiredInputManager manager)
+        private VisualElement BuildPauseButtons()
         {
-            var playerMouseType = DefaultSetupGenerator.FindPlayerMouseType();
-            var playerMouseComp = DefaultSetupGenerator.FindPlayerMouseInScene(playerMouseType);
-
-            if (playerMouseComp == null)
-            {
-                DrawCheckResult("Player Mouse (Joystick Cursor Movement)", false,
-                    "Rewired's Player Mouse component drives the OS/UI pointer from controller input. Without it, the cursor shows for a joystick but never moves.",
-                    "Create Player Mouse", () => DefaultSetupGenerator.CreatePlayerMouseAndWire(manager),
-                    "Creates Rewired's PlayerMouse component and wires it to move the Game Cursor from joystick/controller input.");
-                return;
-            }
-
-            var pmSerialized = new SerializedObject(playerMouseComp);
-            var configuredElements = DefaultSetupGenerator.CountConfiguredMouseElements(pmSerialized);
-
-            if (configuredElements == 0)
-            {
-                    DrawCheckResult("Player Mouse — Movement Elements", false,
-                        "Player Mouse exists but its Elements list has no axis bound to it, so controller input never reaches it and the cursor stays fixed.",
-                        "Auto-Configure Elements", () => DefaultSetupGenerator.ConfigureMouseMovementElements(playerMouseComp),
-                        "Binds the horizontal/vertical movement axes to Player Mouse's Elements list so the joystick can move the cursor.");
-            }
-            else if (configuredElements > 0)
-            {
-                DrawCheckResult("Player Mouse (Joystick Cursor Movement)", true, null, null, null);
-
-                // Verify Player Mouse Events are wired to GameCursor
-                if (manager.GameCursor != null)
-                {
-                    var positioner = manager.GameCursor.GetComponent<Wagenheimer.RewiredHelper.UI.GameCursorPositioner>();
-                    DrawCheckResult("Game Cursor Positioner", positioner != null,
-                        "GameCursorPositioner converts the Player Mouse screen position into the Canvas's local space. Without it, the cursor only lines up correctly on a Screen Space - Overlay Canvas with a 1:1 Canvas Scaler.",
-                        "Add Positioner", () => manager.GameCursor.gameObject.AddComponent<Wagenheimer.RewiredHelper.UI.GameCursorPositioner>());
-
-                    var onScreenPos = pmSerialized.FindProperty("_onScreenPositionChanged");
-                    var onEnabled = pmSerialized.FindProperty("_onEnabledStateChanged");
-                    bool posWiredToPositioner = IsEventWiredTo(onScreenPos, positioner, "SetScreenPosition");
-                    bool enabledWired = IsEventWired(onEnabled);
-
-                    if (!posWiredToPositioner || !enabledWired)
-                    {
-                        var reason = !posWiredToPositioner
-                            ? "On Screen Position Changed isn't wired to GameCursorPositioner.SetScreenPosition (it may still be bound directly to RectTransform.anchoredPosition, which only works on a Screen Space - Overlay Canvas with a 1:1 Canvas Scaler — otherwise the cursor drifts off-screen)."
-                            : "On Enabled State Changed is not wired to control the Game Cursor's visibility.";
-
-                        DrawCheckResult("Player Mouse Events — Wiring", false, reason,
-                            "Fix Wiring", () => DefaultSetupGenerator.WirePlayerMouseEvents(manager, playerMouseComp),
-                            "Rewires Player Mouse's On Screen Position Changed to GameCursorPositioner.SetScreenPosition and On Enabled State Changed to the Game Cursor's visibility.");
-                    }
-                    else
-                    {
-                        DrawCheckResult("Player Mouse Events — Wiring", true, null, null, null);
-                    }
-                }
-            }
-            else
-            {
-                // -1: couldn't read the Elements field (different Rewired version) — don't claim a false failure.
-                DrawHintBox("Player Mouse detected, but its Elements list couldn't be inspected automatically — verify manually that a horizontal/vertical axis is bound.");
-            }
+            _pauseScreenButton = RewiredHelperUIStyle.CreateButton("🛠 Create Pause Screen (with Resume button)",
+                () => DefaultSetupGenerator.CreatePauseScreenAndWire(_manager, serializedObject));
+            _pauseScreenButton.style.marginLeft = 0;
+            _pauseScreenButton.style.marginTop = 4;
+            _pauseScreenButton.style.alignSelf = Align.FlexStart;
+            _pauseScreenButton.tooltip = "Creates a pause screen for desktop/console (overlay) or manual RequestPause(), with a Resume button wired to Resume().";
+            return _pauseScreenButton;
         }
 
-        private void DrawCheckResult(string title, bool pass, string missingDesc, string fixBtnText, Action fixAction, string fixBtnTooltip = null)
+        private void RefreshPolicy()
         {
-            var color = pass ? ColGreen : ColRed;
-            var r = EditorGUILayout.BeginVertical();
+            _overrideBox.style.display = _manager.OverridePlatformDefaults ? DisplayStyle.Flex : DisplayStyle.None;
+            _pauseScreenButton.style.display = RewiredHelperAudit.HasResumeButton(_manager) ? DisplayStyle.None : DisplayStyle.Flex;
 
-            // Render Card with left colored sidebar
-            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), ColCard);
-            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, 3, r.height + 4), color);
-            GUILayout.Space(4);
+            _policyRows.Clear();
+            bool activeIsMobile = RewiredHelperAudit.IsMobileTarget;
+            _policyRows.Add(CreatePolicyRow("Android / iOS", true, activeIsMobile));
+            _policyRows.Add(CreatePolicyRow("Desktop / Console", false, !activeIsMobile));
 
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(10);
-
-            var style = new GUIStyle(EditorStyles.boldLabel) { fontSize = 11, normal = { textColor = color } };
-            var statusIcon = pass ? "✅  " : "❌  ";
-            GUILayout.Label($"{statusIcon}{title}", style);
-
-            GUILayout.FlexibleSpace();
-
-            if (!pass && !string.IsNullOrEmpty(fixBtnText) && fixAction != null)
-            {
-                // Auto-sized so long labels (e.g. "Ensure Android Remote Glyphs") are never clipped,
-                // with a hover tooltip describing exactly what the fix will do.
-                var btnContent = new GUIContent(fixBtnText, fixBtnTooltip);
-                if (GUILayout.Button(btnContent, GUILayout.Height(18)))
-                {
-                    fixAction.Invoke();
-                }
-            }
-            else
-            {
-                var greenStyle = new GUIStyle(EditorStyles.label) { richText = true };
-                GUILayout.Label("<color=green>Ready</color>", greenStyle);
-            }
-            GUILayout.Space(5);
-            EditorGUILayout.EndHorizontal();
-
-            if (!pass && !string.IsNullOrEmpty(missingDesc))
-            {
-                EditorGUI.indentLevel++;
-                var descStyle = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = ColDim }, wordWrap = true };
-                EditorGUILayout.LabelField(missingDesc, descStyle);
-                EditorGUI.indentLevel--;
-                EditorGUILayout.Space(2);
-            }
-
-            GUILayout.Space(4);
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(4);
+            var mobileChecks = new List<AuditResult>();
+            RewiredHelperAudit.AuditMobilePause(mobileChecks, _manager);
+            RewiredInspectorWidgets.FillChecks(_pauseChecks, mobileChecks, RefreshDynamic);
         }
 
-        private void DrawWarningBox(string msg)
+        private VisualElement CreatePolicyRow(string platform, bool isMobile, bool isActiveTarget)
         {
-            DrawStatusBox(msg, ColOrange, "⚠️", "Warning");
+            var policy = PausePolicy.Resolve(_manager.OverridePlatformDefaults, _manager.PauseOnAppBackground,
+                _manager.PauseOnControllerDisconnect, _manager.ResumeOnAnyInput, isMobile);
+
+            var row = RewiredInspectorWidgets.CreateRow("rh-policy-row");
+            var name = new Label(isActiveTarget ? platform + "  ●" : platform);
+            name.AddToClassList("rh-policy-name");
+            name.tooltip = isActiveTarget ? "Active build target" : null;
+            row.Add(name);
+
+            var chips = RewiredInspectorWidgets.CreateChipRow();
+            chips.Add(RewiredHelperUIStyle.CreateChip("background", policy.AppBackground.ToString().ToLowerInvariant(), out _,
+                policy.AppBackground == AppBackgroundPauseMode.Overlay ? "rh-chip-warn" : "rh-chip-on"));
+            chips.Add(RewiredHelperUIStyle.CreateChip("disconnect pause", OnOff(policy.PauseOnControllerDisconnect), out _,
+                policy.PauseOnControllerDisconnect ? "rh-chip-off" : "rh-chip-on"));
+            chips.Add(RewiredHelperUIStyle.CreateChip("tap to resume", OnOff(policy.ResumeOnAnyInput), out _, "rh-chip-off"));
+            if (_manager.OverridePlatformDefaults)
+                chips.Add(RewiredHelperUIStyle.CreateChip("", "overridden", out _, "rh-chip-warn"));
+            row.Add(chips);
+            return row;
         }
 
-        private void DrawHintBox(string msg)
+        private static string OnOff(bool value) => value ? "on" : "off";
+
+        #endregion
+
+        #region Help
+
+        private void BuildHelpSection()
         {
-            DrawStatusBox(msg, ColDim, "💡", "Info");
+            var section = RewiredInspectorWidgets.CreateSection(_root, "quickhelp", "📖 Quick Help", false);
+
+            section.Add(new Label("Bootstrap (all arguments optional)") { style = { unityFontStyleAndWeight = FontStyle.Bold, fontSize = 11 } });
+            section.Add(RewiredHelperUIStyle.CreateCodeBox(
+                "RewiredInputManager.SetGlobalConfiguration(\n" +
+                "    uiBlocker: myBlocker,\n" +
+                "    modalStack: new DefaultModalStackProvider(),\n" +
+                "    controllerHelpGate: myGate,\n" +
+                "    pauseGate: myPauseGate);"));
+
+            section.Add(new Label("Ads / IAP / share sheets") { style = { unityFontStyleAndWeight = FontStyle.Bold, fontSize = 11 } });
+            section.Add(RewiredHelperUIStyle.CreateCodeBox(
+                "using (RewiredInputManager.BeginSystemUi()) { ShowInterstitial(); }\n" +
+                "RewiredInputManager.OnPauseChanged += (paused, frozen) => Music.SetPaused(paused);"));
+
+            var routing = RewiredHelperUIStyle.CreateCallout(
+                "• EscapeButton: the active button with the highest priority answers Escape / Back / Menu.\n" +
+                "• ReturnEscapeEvent: fires when Escape/Return are pressed and no button or modal claims them.\n" +
+                "• IModalStackProvider: the top-most modal gains routing priority.\n" +
+                "• IsUsingTouch, CurrentControllerType, OnInputTypeChanged: react to the active input source.",
+                AuditSeverity.Info);
+            section.Add(routing);
         }
 
-        private void DrawErrorBox(string msg)
-        {
-            DrawStatusBox(msg, ColRed, "❌", "Error");
-        }
-
-        private void DrawSuccessBox(string msg)
-        {
-            DrawStatusBox(msg, ColGreen, "✅", "Success");
-        }
-
-        private void DrawStatusBox(string msg, Color statusColor, string icon, string tag)
-        {
-            var r = EditorGUILayout.BeginVertical();
-            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), ColCard);
-            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, 3, r.height + 4), statusColor);
-            GUILayout.Space(4);
-
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(10);
-
-            var titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 11, normal = { textColor = statusColor } };
-            GUILayout.Label($"{icon}  {tag}", titleStyle, GUILayout.ExpandWidth(false));
-
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(10);
-
-            var msgStyle = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = ColDim }, wordWrap = true };
-            EditorGUILayout.LabelField(msg, msgStyle);
-
-            GUILayout.Space(5);
-            EditorGUILayout.EndHorizontal();
-
-            GUILayout.Space(4);
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(4);
-        }
-
-        private void DrawMobilePauseWarning()
-        {
-            var manager = (RewiredInputManager)serializedObject.targetObject;
-            if (!manager.OverridePlatformDefaults) return;
-
-            bool forcesOverlay = manager.PauseOnAppBackground == AppBackgroundPauseMode.Overlay;
-            bool forcesDisconnectPause = manager.PauseOnControllerDisconnect == AutoToggle.On;
-            if (!forcesOverlay && !forcesDisconnectPause) return;
-
-            EditorGUILayout.HelpBox(
-                "Overridden values also apply to Android/iOS builds: an Overlay pause on app background (notification shade, ads, " +
-                "IAP sheets) or a pause on controller disconnect freezes a touch game and shows the pause screen.", MessageType.Warning);
-            if (GUILayout.Button("📱  Use Platform Defaults (automatic)", GUILayout.Height(20)))
-            {
-                RewiredHelperAudit.ApplyAutoPreset(manager);
-                serializedObject.Update();
-            }
-            EditorGUILayout.Space(4);
-        }
-
-        private void DrawSettingsGroup(string title, string icon, SerializedProperty[] properties, GUIContent[] labels, Color accentColor)
-        {
-            GUILayout.Label($"{icon}  {title.ToUpper()}", EditorStyles.boldLabel);
-            var r = EditorGUILayout.BeginVertical();
-            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), ColCard);
-            EditorGUI.DrawRect(new Rect(r.x - 2, r.y - 2, 3, r.height + 4), accentColor);
-            GUILayout.Space(5);
-
-            EditorGUI.indentLevel++;
-            for (int i = 0; i < properties.Length; i++)
-            {
-                if (properties[i] != null)
-                {
-                    // Disable editing for runtime status variables
-                    if (properties[i].name == "IsSteamOverlayActive" || properties[i].name == "alreadyShowedControllerHelp")
-                    {
-                        GUI.enabled = false;
-                        EditorGUILayout.PropertyField(properties[i], labels[i]);
-                        GUI.enabled = true;
-                    }
-                    else
-                    {
-                        EditorGUILayout.PropertyField(properties[i], labels[i]);
-                    }
-                }
-            }
-            EditorGUI.indentLevel--;
-
-            // Draw custom creation shortcuts
-            if (title == "Cursor & Visuals" && properties[0].objectReferenceValue == null)
-            {
-                EditorGUILayout.Space(2);
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.Space(15);
-                if (GUILayout.Button("🛠️  Generate Game Cursor & Link", GUILayout.Height(20)))
-                {
-                    DefaultSetupGenerator.CreateGameCursorAndWire((RewiredInputManager)serializedObject.targetObject, serializedObject);
-                }
-                GUILayout.Space(5);
-                EditorGUILayout.EndHorizontal();
-            }
-            else if (title == "Pause Policy" && properties[0].objectReferenceValue == null)
-            {
-                EditorGUILayout.Space(2);
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.Space(15);
-                if (GUILayout.Button("🛠️  Generate Pause Screen & Link", GUILayout.Height(20)))
-                {
-                    DefaultSetupGenerator.CreatePauseScreenAndWire((RewiredInputManager)serializedObject.targetObject, serializedObject);
-                }
-                GUILayout.Space(5);
-                EditorGUILayout.EndHorizontal();
-            }
-            else if (title == "Controller Help")
-            {
-                var eventProp = properties.Length > 1 ? properties[1] : properties[0]; // OnShowControllerHelp
-                var callsProp = eventProp?.FindPropertyRelative("m_PersistentCalls.m_Calls");
-                bool hasListeners = callsProp != null && callsProp.arraySize > 0;
-                
-                if (!hasListeners)
-                {
-                    EditorGUILayout.Space(2);
-                    EditorGUILayout.BeginHorizontal();
-                    GUILayout.Space(15);
-                    if (GUILayout.Button("🛠️  Generate Help Form & Wire Event", GUILayout.Height(20)))
-                    {
-                        DefaultSetupGenerator.CreateControllerHelpFormAndWire((RewiredInputManager)serializedObject.targetObject);
-                    }
-                    GUILayout.Space(5);
-                    EditorGUILayout.EndHorizontal();
-                }
-            }
-
-            GUILayout.Space(5);
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(10);
-        }
-
-        private void DrawSeparator()
-        {
-            Rect rect = EditorGUILayout.GetControlRect(false, 1);
-            rect.height = 1;
-            EditorGUI.DrawRect(rect, new Color(0.5f, 0.5f, 0.5f, 0.3f));
-        }
-
-        private Type FindGlyphHelperType()
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var type = assembly.GetType(GlyphHelperTypeName);
-                if (type != null)
-                    return type;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Unlike <see cref="IsEventWired"/> (any non-null listener), this checks the event is
-        /// wired to a *specific* target/method — used to tell a correct GameCursorPositioner
-        /// binding apart from a stale direct-to-anchoredPosition one left by an older setup.
-        /// </summary>
-        private static bool IsEventWiredTo(SerializedProperty eventProp, UnityEngine.Object target, string methodName)
-        {
-            if (eventProp == null || target == null) return false;
-            var calls = eventProp.FindPropertyRelative("m_PersistentCalls.m_Calls");
-            if (calls == null) return false;
-
-            for (int i = 0; i < calls.arraySize; i++)
-            {
-                var call = calls.GetArrayElementAtIndex(i);
-                var callTarget = call.FindPropertyRelative("m_Target").objectReferenceValue;
-                var callMethod = call.FindPropertyRelative("m_MethodName").stringValue;
-                if (callTarget == target && callMethod == methodName)
-                    return true;
-            }
-            return false;
-        }
-
-        private static bool IsEventWired(SerializedProperty eventProp)
-        {
-            if (eventProp == null) return false;
-            var calls = eventProp.FindPropertyRelative("m_PersistentCalls.m_Calls");
-            if (calls == null || calls.arraySize == 0) return false;
-
-            for (int i = 0; i < calls.arraySize; i++)
-            {
-                var call = calls.GetArrayElementAtIndex(i);
-                var target = call.FindPropertyRelative("m_Target").objectReferenceValue;
-                var methodName = call.FindPropertyRelative("m_MethodName").stringValue;
-                if (target != null && !string.IsNullOrEmpty(methodName))
-                    return true;
-            }
-            return false;
-        }
+        #endregion
     }
 }

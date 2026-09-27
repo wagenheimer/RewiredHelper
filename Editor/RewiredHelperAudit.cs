@@ -45,7 +45,6 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// </summary>
     public static class RewiredHelperAudit
     {
-        private const string CategoryScene = "Scene Setup";
         private const string CategoryMobile = "Mobile & Pause";
         private const string CategoryProject = "Project";
 
@@ -67,7 +66,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             var results = new List<AuditResult>();
             var manager = FindAll<RewiredInputManager>().FirstOrDefault();
 
-            AuditSceneSetup(results, manager);
+            RewiredSetupChecks.Run(results, manager);
             AuditMobilePause(results, manager);
             AuditProject(results, manager);
             AttachPrompts(results);
@@ -79,83 +78,10 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android ||
             EditorUserBuildSettings.activeBuildTarget == BuildTarget.iOS;
 
-        #region Scene setup
-
-        private static void AuditSceneSetup(List<AuditResult> results, RewiredInputManager manager)
-        {
-            var inputManager = DefaultSetupGenerator.FindInputManagerInScene();
-            Add(results, CategoryScene, "Rewired Input Manager in the scene", inputManager != null,
-                "Found in the open scene.", "Missing: no Rewired input will be processed.",
-                "Create it with the Rewired Helper generator.", "Create Manager", DefaultSetupGenerator.CreateRewiredInputManager);
-
-            Add(results, CategoryScene, "RewiredInputManager component", manager != null,
-                "Component present.", "Missing: input-type tracking, cursor and Escape routing will not work.",
-                "Add RewiredInputManager next to the Rewired Input Manager.", "Configure", DefaultSetupGenerator.CreateRewiredInputManager);
-
-            Add(results, CategoryScene, "Event System uses Rewired's input module", DefaultSetupGenerator.HasRewiredEventSystemInScene(),
-                "RewiredStandaloneInputModule active.",
-                "Missing: controller UI navigation and Player Mouse will not work (Unity's default module ignores Rewired).",
-                "Create/repair the Event System.", "Create Event System", DefaultSetupGenerator.EnsureRewiredEventSystem);
-
-            AuditDuplicateEventSystems(results);
-            AuditCanvasAndCursor(results, manager);
-            AuditOptionalAddons(results);
-        }
-
-        private static void AuditDuplicateEventSystems(List<AuditResult> results)
-        {
-            int count = FindAll<EventSystem>().Count;
-            Add(results, CategoryScene, "Single Event System", count <= 1,
-                "No duplicate Event Systems in the open scene.",
-                $"{count} Event Systems in the open scene: Unity logs 'There can be only one active Event System'.",
-                "Keep only the one running Rewired's input module.", "Remove Duplicates (All Scenes)",
-                DefaultSetupGenerator.RemoveDuplicateEventSystemsInAllScenes, AuditSeverity.Warning);
-        }
-
-        private static void AuditCanvasAndCursor(List<AuditResult> results, RewiredInputManager manager)
-        {
-            Add(results, CategoryScene, "UI Canvas", FindAll<Canvas>().Count > 0,
-                "Canvas found.", "No Canvas in the open scene (needed for the game cursor and modal dialogs).",
-                "Add a Screen Space - Overlay Canvas.", failSeverity: AuditSeverity.Warning);
-
-            if (manager == null) return;
-
-            // Touch-only titles never draw a game cursor, so a missing one is only a hint on mobile.
-            var missing = IsMobileTarget ? AuditSeverity.Info : AuditSeverity.Warning;
-            var so = new SerializedObject(manager);
-            Add(results, CategoryScene, "Game Cursor (controller/remote cursor image)", manager.GameCursor != null,
-                "Game Cursor image assigned.", "Not assigned: gamepad/remote users get no on-screen cursor.",
-                "Generate and link a Game Cursor.", "Create Game Cursor",
-                () => DefaultSetupGenerator.CreateGameCursorAndWire(manager, so), missing);
-        }
-
-        private static void AuditOptionalAddons(List<AuditResult> results)
-        {
-            bool hasGlyphs = FindType("Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper") != null;
-            Add(results, CategoryScene, "Rewired Glyphs add-on", hasGlyphs,
-                "Detected in the project.", "Not installed: UI labels cannot show dynamic controller icons.",
-                "Extract Assets/Rewired/Internal/Assets/Extras/GlyphsUnityUITMProAddonV2.zip (optional).", failSeverity: AuditSeverity.Info);
-
-            if (FindType("I2.Loc.LocalizationManager") == null) return;
-
-            bool hasIntegration = FindType("Wagenheimer.RewiredHelper.Integration.I2SpecializationImportedMarker") != null;
-            Add(results, CategoryScene, "I2 Localization integration imported", hasIntegration,
-                "Integration sample is imported.", "I2 Localization detected, but the specialization helper sample is not imported.",
-                "Import the I2 Localization Integration sample.", "Import Integration", I2IntegrationImporter.Import,
-                AuditSeverity.Warning);
-
-            bool termsOk = DefaultSetupGenerator.AllI2TermsExist(out int missingCount);
-            Add(results, CategoryScene, "I2 Localization terms", termsOk,
-                "All Rewired Helper terms exist.", $"{missingCount} term(s) missing or without an English translation.",
-                "Add the missing terms to the I2 Language Source.", "Verify/Add Terms", DefaultSetupGenerator.EnsureI2Terms,
-                AuditSeverity.Warning);
-        }
-
-        #endregion
 
         #region Mobile & pause
 
-        private static void AuditMobilePause(List<AuditResult> results, RewiredInputManager manager)
+        internal static void AuditMobilePause(List<AuditResult> results, RewiredInputManager manager)
         {
             if (manager == null)
             {
@@ -169,32 +95,33 @@ namespace Wagenheimer.RewiredHelper.Editor
         }
 
         /// <summary>
-        /// The pause policy is automatic per build platform. Only an explicit override can put a mobile
-        /// build back into the "GAME PAUSED on every app switch" behavior, so that is all worth flagging.
+        /// The pause policy is automatic per build platform, so there is nothing to "fix": the only way to end up
+        /// with the "GAME PAUSED on every app switch" behavior on mobile is an explicit override, which is the
+        /// user's deliberate choice and is only reported (uncheck Override Platform Defaults to go back to automatic).
         /// </summary>
         private static void AuditAutoDefaults(List<AuditResult> results, RewiredInputManager manager)
         {
             Add(results, CategoryMobile, "Pause policy is automatic for the build platform", !manager.OverridePlatformDefaults,
-                "Following platform best practices (mobile: silent pause, no tap-to-resume; desktop/console: overlay, resume on input).",
-                "Override Platform Defaults is on: the values below replace the automatic per-platform policy.",
-                "Turn Override Platform Defaults off unless you really need custom behavior.", "Use Platform Defaults",
-                () => ApplyAutoPreset(manager), AuditSeverity.Info);
+                "Chosen from the build platform: mobile = silent pause, no tap-to-resume; desktop/console/TV = overlay, resume on input.",
+                "Override Platform Defaults is on: the values on the manager replace the automatic per-platform policy.",
+                "Uncheck Override Platform Defaults on the RewiredInputManager to return to the automatic policy.",
+                failSeverity: AuditSeverity.Info);
 
             if (!manager.OverridePlatformDefaults) return;
 
             Add(results, CategoryMobile, "Overridden app-background pause is safe on mobile",
                 manager.PauseOnAppBackground != AppBackgroundPauseMode.Overlay,
                 $"PauseOnAppBackground = {manager.PauseOnAppBackground}.",
-                "PauseOnAppBackground = Overlay: on Android/iOS every notification shade, ad, IAP sheet or app switch freezes the game and shows 'GAME PAUSED'.",
-                "Use Auto/Silent for mobile builds.", "Use Platform Defaults",
-                () => ApplyAutoPreset(manager), AuditSeverity.Warning);
+                RewiredOverrideScanner.OverlayIssue,
+                "Set PauseOnAppBackground to Auto/Silent, or uncheck Override Platform Defaults.",
+                failSeverity: AuditSeverity.Warning);
 
             Add(results, CategoryMobile, "Overridden controller-disconnect pause is safe on mobile",
                 manager.PauseOnControllerDisconnect != AutoToggle.On,
                 $"PauseOnControllerDisconnect = {manager.PauseOnControllerDisconnect}.",
-                "PauseOnControllerDisconnect = On: Bluetooth pads/remotes connecting and disconnecting pause a touch game on Android/iOS.",
-                "Use Auto/Off for mobile builds.", "Use Platform Defaults",
-                () => ApplyAutoPreset(manager), AuditSeverity.Warning);
+                RewiredOverrideScanner.DisconnectIssue,
+                "Set PauseOnControllerDisconnect to Auto/Off, or uncheck Override Platform Defaults.",
+                failSeverity: AuditSeverity.Warning);
         }
 
         private static void AuditResumePath(List<AuditResult> results, RewiredInputManager manager)
@@ -230,19 +157,6 @@ namespace Wagenheimer.RewiredHelper.Editor
                 }
             }
             return false;
-        }
-
-        /// <summary>Resets the pause policy to the per-platform Auto defaults (mobile-safe on Android/iOS, classic elsewhere).</summary>
-        internal static void ApplyAutoPreset(RewiredInputManager manager)
-        {
-            if (manager == null) return;
-
-            Undo.RecordObject(manager, "Apply Rewired Helper auto pause preset");
-            manager.OverridePlatformDefaults = false;
-            manager.PauseOnAppBackground = AppBackgroundPauseMode.Auto;
-            manager.PauseOnControllerDisconnect = AutoToggle.Auto;
-            manager.ResumeOnAnyInput = AutoToggle.Auto;
-            EditorUtility.SetDirty(manager);
         }
 
         #endregion
@@ -318,7 +232,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         #region Helpers
 
-        private static void Add(List<AuditResult> results, string category, string title, bool pass, string passDetail,
+        internal static void Add(List<AuditResult> results, string category, string title, bool pass, string passDetail,
             string failDetail, string hint, string fixLabel = null, Action fix = null, AuditSeverity failSeverity = AuditSeverity.Fail)
         {
             var result = Result(category, title, pass ? AuditSeverity.Pass : failSeverity, pass ? passDetail : failDetail);
@@ -331,8 +245,11 @@ namespace Wagenheimer.RewiredHelper.Editor
             results.Add(result);
         }
 
-        private static AuditResult Result(string category, string title, AuditSeverity severity, string detail) =>
+        internal static AuditResult Result(string category, string title, AuditSeverity severity, string detail) =>
             new AuditResult { Category = category, Title = title, Severity = severity, Detail = detail };
+
+        /// <summary>True when the project has the standard Steamworks.NET SteamManager the pause logic auto-detects.</summary>
+        internal static bool HasSteamManager() => FindType("SteamManager") != null;
 
         internal static List<T> FindAll<T>() where T : UnityEngine.Object
         {
@@ -374,7 +291,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         #region Export
 
-        private static void AttachPrompts(List<AuditResult> results)
+        internal static void AttachPrompts(List<AuditResult> results)
         {
             for (int i = 0; i < results.Count; i++)
             {

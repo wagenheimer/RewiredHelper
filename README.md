@@ -122,6 +122,14 @@ Rewired Helper features professional, color-coded custom inspectors to speed up 
 
 ---
 
+## Inspector
+
+The `RewiredInputManager` inspector is a UI Toolkit panel sharing the Dashboard theme: a **Live Status** strip in Play Mode
+(platform, active policy, input device, pause state, system-UI scope, with *Test Pause* / *Resume* buttons), an
+**Automatic** list of everything decided for you (pause policy per build platform, Steam detection, cursor per device,
+controller help), a **Setup Health** list with one-click fixes for whatever is missing in the scene, and collapsible
+settings sections. The Setup Health checks are the same ones the Dashboard audit uses.
+
 ## Escape / Return Routing
 
 - **`EscapeButton`** — attach to a `Button`. When Escape is pressed and no modal (see below)
@@ -376,11 +384,12 @@ Build Settings or CLI) when the game runs, never from what was saved in a scene:
 | Pause on controller disconnect | **off** | on (only if the disconnected pad was the active device and the player isn't using touch) |
 | Resume on any input | **off** (use a Resume button wired to `Resume()`) | on |
 | Steam overlay | n/a | pauses, resumes on close; Steam readiness is auto-detected from `SteamManager.Initialized` |
+| Android TV / Fire TV | uses the desktop / console column (detected at runtime with `UiModeManager`) | |
 
 Every player build logs the policy it uses (`RewiredBuildPreprocessor`) and warns if a scene/prefab contains an explicit
 override that breaks it on mobile. To customise, turn on **Override Platform Defaults** on the manager and edit the
 three settings (each still has an `Auto` value = the platform default). The Dashboard's *Mobile & Pause* tab shows the
-per-platform table and the **Use Platform Defaults** button.
+per-platform table.
 
 Why mobile differs: the OS already suspends the app, and notification shade / ads / IAP sheets / app switches
 all raise `OnApplicationPause`, so a "GAME PAUSED" overlay popping up constantly is noise. Bluetooth pads and

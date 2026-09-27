@@ -24,8 +24,47 @@ namespace Wagenheimer.RewiredHelper
         private PauseController _pauseController;
         private static SystemUiTracker _systemUi;
 
+        private const int AndroidUiModeTypeTelevision = 4;
+        private static bool? _isTelevision;
+
+        /// <summary>True when this build targets a mobile platform (Android/iOS), decided by the build's compile-time platform.</summary>
+        public static bool IsMobileBuild => AutoIsMobile;
+
+        /// <summary>True on Android TV / Fire TV (detected once at runtime through UiModeManager).</summary>
+        public static bool IsTelevisionDevice
+        {
+            get
+            {
+                if (!_isTelevision.HasValue) _isTelevision = DetectTelevision();
+                return _isTelevision.Value;
+            }
+        }
+
+        /// <summary>True when the mobile pause policy applies on this device: a mobile build that is not a television.</summary>
+        public static bool IsMobilePolicyActive => PausePolicy.IsMobileDevice(AutoIsMobile, IsTelevisionDevice);
+
+        private static bool DetectTelevision()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
+                using (var uiMode = activity.Call<AndroidJavaObject>("getSystemService", "uimode"))
+                    return uiMode.Call<int>("getCurrentModeType") == AndroidUiModeTypeTelevision;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RewiredHelper] Could not detect Android TV, assuming a handheld: " + ex.Message);
+                return false;
+            }
+#else
+            return false;
+#endif
+        }
+
         private PausePolicy Policy => PausePolicy.Resolve(
-            OverridePlatformDefaults, PauseOnAppBackground, PauseOnControllerDisconnect, ResumeOnAnyInput, AutoIsMobile);
+            OverridePlatformDefaults, PauseOnAppBackground, PauseOnControllerDisconnect, ResumeOnAnyInput, IsMobilePolicyActive);
 
         /// <summary>The app-background mode in effect on this platform (platform best practice unless overridden).</summary>
         public AppBackgroundPauseMode EffectiveAppBackgroundMode => Policy.AppBackground;

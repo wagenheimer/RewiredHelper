@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 using UnityEditor;
 using UnityEditor.Build;
@@ -23,10 +22,6 @@ namespace Wagenheimer.RewiredHelper.Editor
     {
         private const long MaxScannedFileBytes = 8L * 1024 * 1024;
 
-        private static readonly Regex OverrideOn = new Regex(@"^\s*OverridePlatformDefaults:\s*1\s*$", RegexOptions.Multiline);
-        private static readonly Regex ForcedOverlay = new Regex(@"^\s*PauseOnAppBackground:\s*3\s*$", RegexOptions.Multiline);
-        private static readonly Regex ForcedDisconnectPause = new Regex(@"^\s*PauseOnControllerDisconnect:\s*1\s*$", RegexOptions.Multiline);
-
         public int callbackOrder => -40;
 
         public void OnPreprocessBuild(BuildReport report)
@@ -45,7 +40,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
 
             Debug.Log($"[RewiredHelper] Build target {target}: automatic pause policy = app background {policy.AppBackground}, " +
-                      $"pause on controller disconnect {OnOff(policy.PauseOnControllerDisconnect)}, resume on any input {OnOff(policy.ResumeOnAnyInput)}.");
+                      $"pause on controller disconnect {OnOff(policy.PauseOnControllerDisconnect)}, resume on any input {OnOff(policy.ResumeOnAnyInput)}." +
+                      (isMobile ? " (Android TV / Fire TV devices switch to the desktop policy at runtime.)" : string.Empty));
 
             if (isMobile)
                 WarnAboutBreakingOverrides(users);
@@ -86,17 +82,13 @@ namespace Wagenheimer.RewiredHelper.Editor
         {
             foreach (var path in users)
             {
-                if (!ReadYaml(path, out var text) || !OverrideOn.IsMatch(text)) continue;
+                if (!ReadYaml(path, out var text)) continue;
 
-                if (ForcedOverlay.IsMatch(text))
-                    Debug.LogWarning($"[RewiredHelper] {path}: Override Platform Defaults forces PauseOnAppBackground = Overlay. " +
-                                     "On this mobile build every notification shade, ad, IAP sheet or app switch will freeze the game and show the pause screen. " +
-                                     "Turn Override Platform Defaults off (Tools > Wagenheimer > Rewired Helper > Dashboard).", AssetDatabase.LoadMainAssetAtPath(path));
-
-                if (ForcedDisconnectPause.IsMatch(text))
-                    Debug.LogWarning($"[RewiredHelper] {path}: Override Platform Defaults forces PauseOnControllerDisconnect = On. " +
-                                     "Bluetooth pads/remotes connecting and disconnecting will pause a touch game on this mobile build.",
-                        AssetDatabase.LoadMainAssetAtPath(path));
+                foreach (var issue in RewiredOverrideScanner.FindMobileBreakingOverrides(text))
+                {
+                    Debug.LogWarning($"[RewiredHelper] {path}: {issue} Turn Override Platform Defaults off " +
+                                     "(Tools > Wagenheimer > Rewired Helper > Dashboard).", AssetDatabase.LoadMainAssetAtPath(path));
+                }
             }
         }
 

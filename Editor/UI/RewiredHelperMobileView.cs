@@ -61,15 +61,15 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             card.Bind(so);
 
-            var presetRow = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 8 } };
-            presetRow.Add(RewiredHelperUIStyle.CreateButton("📱 Use Platform Defaults (automatic)", () =>
+            if (!RewiredHelperAudit.HasResumeButton(manager))
             {
-                RewiredHelperAudit.ApplyAutoPreset(manager);
-                so.Update();
-            }, primary: true));
-            presetRow.Add(RewiredHelperUIStyle.CreateButton("🛠 Generate Pause Screen + Resume button",
-                () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, so)));
-            card.Add(presetRow);
+                var create = RewiredHelperUIStyle.CreateButton("🛠 Create Pause Screen (with Resume button)",
+                    () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, so));
+                create.style.marginLeft = 0;
+                create.style.marginTop = 6;
+                create.style.alignSelf = UnityEngine.UIElements.Align.FlexStart;
+                card.Add(create);
+            }
 
             return card;
         }
@@ -86,6 +86,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             card.Add(CreatePolicyRow("Pause on controller disconnect", OnOff(mobile.PauseOnControllerDisconnect), OnOff(desktop.PauseOnControllerDisconnect)));
             card.Add(CreatePolicyRow("Resume on any input", OnOff(mobile.ResumeOnAnyInput), OnOff(desktop.ResumeOnAnyInput)));
             card.Add(CreatePolicyRow("Steam overlay", "n/a", "pauses, resumes on close (auto-detected)"));
+            card.Add(CreatePolicyRow("Android TV / Fire TV", "-", "uses the desktop / console policy (detected at runtime)"));
 
             var activeMobile = RewiredHelperAudit.IsMobileTarget;
             card.Add(RewiredHelperUIStyle.CreateCallout(

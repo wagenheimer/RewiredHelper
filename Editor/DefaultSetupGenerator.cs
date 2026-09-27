@@ -616,8 +616,14 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         internal static void CreatePauseScreenAndWire(RewiredInputManager manager, SerializedObject serializedObject)
         {
+            if (manager != null && manager.GamePaused != null)
+            {
+                AddResumeButtonToExistingPauseScreen(manager);
+                return;
+            }
+
             var canvas = FindOrCreateCanvas();
-            var pauseGo = CreatePauseScreen(canvas.transform);
+            var pauseGo = CreatePauseScreen(canvas.transform, manager);
 
             Undo.RegisterCreatedObjectUndo(pauseGo, "Create Pause Screen");
 
@@ -854,7 +860,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
         }
 
-        private static GameObject CreatePauseScreen(Transform parent)
+        private static GameObject CreatePauseScreen(Transform parent, RewiredInputManager manager)
         {
             var pauseGo = new GameObject("PauseScreen", typeof(RectTransform), typeof(Image));
             var pauseRect = (RectTransform)pauseGo.transform;
@@ -891,13 +897,63 @@ namespace Wagenheimer.RewiredHelper.Editor
             subRect.anchoredPosition = new Vector2(0, -20);
 
             var subText = subGo.AddComponent<TextMeshProUGUI>();
-            subText.text = "Press ESC or Menu button to resume";
+            subText.text = "Tap Resume, or press ESC / Menu, to continue";
             subText.fontSize = 18;
             subText.color = new Color(0.7f, 0.7f, 0.75f);
             subText.alignment = TextAlignmentOptions.Center;
 
+            CreateResumeButton(pauseRect, manager);
+
             pauseGo.SetActive(false);
             return pauseGo;
+        }
+
+        /// <summary>Existing pause screens (generated before the Resume button existed) get one instead of a duplicate screen.</summary>
+        private static void AddResumeButtonToExistingPauseScreen(RewiredInputManager manager)
+        {
+            if (RewiredHelperAudit.HasResumeButton(manager))
+            {
+                Debug.Log("[RewiredHelper] The pause screen already has a Resume button.");
+                return;
+            }
+
+            var screen = (RectTransform)manager.GamePaused.transform;
+            int before = screen.childCount;
+            CreateResumeButton(screen, manager);
+            Undo.RegisterCreatedObjectUndo(screen.GetChild(before).gameObject, "Add Resume Button");
+            MarkSceneDirty();
+            Debug.Log("[RewiredHelper] Added a Resume button to the existing pause screen.");
+        }
+
+        /// <summary>Explicit Resume button so touch players never depend on "tap anywhere" (which misfires into gameplay).</summary>
+        private static void CreateResumeButton(RectTransform parent, RewiredInputManager manager)
+        {
+            var btnGo = new GameObject("ResumeButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            var btnRect = (RectTransform)btnGo.transform;
+            btnRect.SetParent(parent, false);
+            btnRect.anchorMin = new Vector2(0.5f, 0.5f);
+            btnRect.anchorMax = new Vector2(0.5f, 0.5f);
+            btnRect.sizeDelta = new Vector2(260, 64);
+            btnRect.anchoredPosition = new Vector2(0, -100);
+
+            btnGo.GetComponent<Image>().color = new Color(0.22f, 0.60f, 1f);
+
+            var labelGo = new GameObject("Label", typeof(RectTransform));
+            var labelRect = (RectTransform)labelGo.transform;
+            labelRect.SetParent(btnRect, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.sizeDelta = Vector2.zero;
+
+            var label = labelGo.AddComponent<TextMeshProUGUI>();
+            label.text = "RESUME";
+            label.fontSize = 26;
+            label.fontStyle = FontStyles.Bold;
+            label.color = Color.white;
+            label.alignment = TextAlignmentOptions.Center;
+
+            if (manager != null)
+                UnityEditor.Events.UnityEventTools.AddPersistentListener(btnGo.GetComponent<Button>().onClick, manager.Resume);
         }
 
         static GameObject GenerateRowBasedHelpForm(Transform parent)

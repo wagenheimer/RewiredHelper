@@ -68,14 +68,21 @@ namespace Wagenheimer.RewiredHelper.Editor
                 new GUIContent("Cursor Texture", "Texture used by the standalone custom cursor when Custom Cursor Enabled is checked.")
             }, ColAccent);
 
-            // 2. Pause & Steam Overlay
-            DrawSettingsGroup("Pause & Steam Overlay", "🎮", new[] {
+            // 2. Pause Policy
+            DrawSettingsGroup("Pause Policy", "🎮", new[] {
                 serializedObject.FindProperty("GamePaused"),
+                serializedObject.FindProperty("PauseOnAppBackground"),
+                serializedObject.FindProperty("PauseOnControllerDisconnect"),
+                serializedObject.FindProperty("ResumeOnAnyInput"),
                 serializedObject.FindProperty("PauseOnSteamOverlay")
             }, new[] {
-                new GUIContent("Game Paused", "GameObject toggled when the game pauses."),
+                new GUIContent("Game Paused", "GameObject shown while the game is frozen (not for silent pauses)."),
+                new GUIContent("Pause On App Background", "Auto = Silent on Android/iOS, Overlay elsewhere. Off = nothing. Silent = raises OnPauseChanged only (no overlay, timeScale untouched). Overlay = freezes time and shows Game Paused."),
+                new GUIContent("Pause On Controller Disconnect", "Auto = off on Android/iOS (Bluetooth pads/remotes come and go), on elsewhere."),
+                new GUIContent("Resume On Any Input", "While frozen, any tap/click/Back resumes. Auto = off on Android/iOS (use a Resume button wired to Resume()), on elsewhere."),
                 new GUIContent("Pause On Steam Overlay", "Automatically pauses the game when Steam overlay opens.")
             }, ColAccent);
+            DrawMobilePauseWarning();
 
             // 3. Controller Help Events
             DrawSettingsGroup("Controller Help", "?", new[] {
@@ -516,6 +523,25 @@ namespace Wagenheimer.RewiredHelper.Editor
             EditorGUILayout.Space(4);
         }
 
+        private void DrawMobilePauseWarning()
+        {
+            var manager = (RewiredInputManager)serializedObject.targetObject;
+            bool forcesOverlay = manager.PauseOnAppBackground == AppBackgroundPauseMode.Overlay;
+            bool forcesDisconnectPause = manager.PauseOnControllerDisconnect == AutoToggle.On;
+            if (!forcesOverlay && !forcesDisconnectPause) return;
+
+            EditorGUILayout.HelpBox(
+                "Forced values are saved in the scene and also apply to Android/iOS builds: an Overlay pause on app background " +
+                "(notification shade, ads, IAP sheets) or a pause on controller disconnect freezes a touch game and shows the pause screen. " +
+                "Use Auto to get Silent/off on mobile and the classic behavior on desktop/console.", MessageType.Warning);
+            if (GUILayout.Button("📱  Apply Auto Preset (mobile-safe)", GUILayout.Height(20)))
+            {
+                RewiredHelperAudit.ApplyAutoPreset(manager);
+                serializedObject.Update();
+            }
+            EditorGUILayout.Space(4);
+        }
+
         private void DrawSettingsGroup(string title, string icon, SerializedProperty[] properties, GUIContent[] labels, Color accentColor)
         {
             GUILayout.Label($"{icon}  {title.ToUpper()}", EditorStyles.boldLabel);
@@ -557,7 +583,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 GUILayout.Space(5);
                 EditorGUILayout.EndHorizontal();
             }
-            else if (title == "Pause & Steam Overlay" && properties[0].objectReferenceValue == null)
+            else if (title == "Pause Policy" && properties[0].objectReferenceValue == null)
             {
                 EditorGUILayout.Space(2);
                 EditorGUILayout.BeginHorizontal();

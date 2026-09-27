@@ -41,6 +41,22 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         public override VisualElement CreateInspectorGUI()
         {
+            // If anything below throws, Unity would otherwise silently fall back to the plain reflection-based
+            // inspector with no visible error — indistinguishable from "the custom editor was never built". Catch
+            // it, log the full exception (with stack trace) so it's fixable, and show that failure instead of hiding it.
+            try
+            {
+                return BuildInspector();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
+                return BuildFallback(ex);
+            }
+        }
+
+        private VisualElement BuildInspector()
+        {
             _manager = (RewiredInputManager)target;
 
             // Scene checks (Event System, Canvas, Player Mouse...) only make sense for an object living in the open
@@ -73,6 +89,30 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             RefreshDynamic();
             return _root;
+        }
+
+        /// <summary>Plain IMGUI fields (always safe) plus the exception, so the manager stays usable and the bug is visible.</summary>
+        private VisualElement BuildFallback(Exception ex)
+        {
+            var root = new VisualElement();
+            var box = new HelpBox(
+                "Rewired Helper's custom inspector failed to build and fell back to plain fields.\n" +
+                $"{ex.GetType().Name}: {ex.Message}\nSee the Console for the full stack trace, and please report this.",
+                HelpBoxMessageType.Error);
+            root.Add(box);
+            root.Add(new IMGUIContainer(() =>
+            {
+                serializedObject.Update();
+                var prop = serializedObject.GetIterator();
+                bool enterChildren = true;
+                while (prop.NextVisible(enterChildren))
+                {
+                    EditorGUILayout.PropertyField(prop, true);
+                    enterChildren = false;
+                }
+                serializedObject.ApplyModifiedProperties();
+            }));
+            return root;
         }
 
         #region Refresh
@@ -108,15 +148,31 @@ namespace Wagenheimer.RewiredHelper.Editor
             }).ExecuteLater(RefreshDebounceMs);
         }
 
+        /// <summary>
+        /// Runs on every hierarchy/undo/serialization change and re-executes user-supplied checks. Unlike
+        /// CreateInspectorGUI, an exception here would not fall back to a safe default — it would spam the
+        /// Console on every keystroke — so it is caught and surfaced once via the header badge instead.
+        /// </summary>
         private void RefreshDynamic()
         {
-            if (_isSceneContext)
+            try
             {
-                RefreshAutomatic();
-                RefreshHealth();
+                if (_isSceneContext)
+                {
+                    RefreshAutomatic();
+                    RefreshHealth();
+                }
+                RefreshPolicy();
+                RefreshBlockedScenes();
             }
-            RefreshPolicy();
-            RefreshBlockedScenes();
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
+                _headerBadge.text = "refresh error, see Console";
+                _headerBadge.RemoveFromClassList("rh-badge-pass");
+                _headerBadge.RemoveFromClassList("rh-badge-warn");
+                _headerBadge.AddToClassList("rh-badge-fail");
+            }
         }
 
         #endregion
@@ -182,22 +238,33 @@ namespace Wagenheimer.RewiredHelper.Editor
             return _liveCard;
         }
 
+        private bool _liveUpdateFailed;
+
         private void UpdateLive()
         {
-            if (_manager == null) return;
+            if (_manager == null || _liveUpdateFailed) return;
 
-            bool isPlaying = Application.isPlaying;
-            _liveCard.style.display = isPlaying ? DisplayStyle.Flex : DisplayStyle.None;
-            if (!isPlaying) return;
+            try
+            {
+                bool isPlaying = Application.isPlaying;
+                _liveCard.style.display = isPlaying ? DisplayStyle.Flex : DisplayStyle.None;
+                if (!isPlaying) return;
 
-            SetLive("Platform", Application.platform + (RewiredInputManager.IsTelevisionDevice ? " (TV)" : string.Empty));
-            SetLive("Policy", RewiredInputManager.IsMobilePolicyActive ? "mobile" : "desktop / console");
-            SetLive("Input", _manager.CurrentControllerType + (RewiredInputManager.IsUsingTouch ? " (touch)" : string.Empty));
-            SetLive("Controller", _manager.LastActiveController != null ? _manager.LastActiveController.name : "none");
-            SetLive("Paused", _manager.IsFrozen ? "frozen" : _manager.IsPaused ? "silent" : "no");
-            SetLive("System UI", RewiredInputManager.IsSystemUiActive ? "active" : "idle");
-            SetLive("Configured", _manager.IsConfigured ? "yes" : "no");
-            SetLive("Steam overlay", _manager.IsSteamOverlayActive ? "open" : "closed");
+                SetLive("Platform", Application.platform + (RewiredInputManager.IsTelevisionDevice ? " (TV)" : string.Empty));
+                SetLive("Policy", RewiredInputManager.IsMobilePolicyActive ? "mobile" : "desktop / console");
+                SetLive("Input", _manager.CurrentControllerType + (RewiredInputManager.IsUsingTouch ? " (touch)" : string.Empty));
+                SetLive("Controller", _manager.LastActiveController != null ? _manager.LastActiveController.name : "none");
+                SetLive("Paused", _manager.IsFrozen ? "frozen" : _manager.IsPaused ? "silent" : "no");
+                SetLive("System UI", RewiredInputManager.IsSystemUiActive ? "active" : "idle");
+                SetLive("Configured", _manager.IsConfigured ? "yes" : "no");
+                SetLive("Steam overlay", _manager.IsSteamOverlayActive ? "open" : "closed");
+            }
+            catch (Exception ex)
+            {
+                // This runs every 250 ms: stop retrying after the first failure instead of spamming the Console.
+                _liveUpdateFailed = true;
+                Debug.LogException(ex);
+            }
         }
 
         private void SetLive(string key, string value)

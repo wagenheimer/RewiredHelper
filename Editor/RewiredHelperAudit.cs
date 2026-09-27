@@ -74,6 +74,9 @@ namespace Wagenheimer.RewiredHelper.Editor
             return results;
         }
 
+        /// <summary>An override that breaks mobile best practices only matters when building for mobile.</summary>
+        private static AuditSeverity OverrideSeverity => IsMobileTarget ? AuditSeverity.Warning : AuditSeverity.Info;
+
         internal static bool IsMobileTarget =>
             EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android ||
             EditorUserBuildSettings.activeBuildTarget == BuildTarget.iOS;
@@ -114,14 +117,14 @@ namespace Wagenheimer.RewiredHelper.Editor
                 $"PauseOnAppBackground = {manager.PauseOnAppBackground}.",
                 RewiredOverrideScanner.OverlayIssue,
                 "Set PauseOnAppBackground to Auto/Silent, or uncheck Override Platform Defaults.",
-                failSeverity: AuditSeverity.Warning);
+                failSeverity: OverrideSeverity);
 
             Add(results, CategoryMobile, "Overridden controller-disconnect pause is safe on mobile",
                 manager.PauseOnControllerDisconnect != AutoToggle.On,
                 $"PauseOnControllerDisconnect = {manager.PauseOnControllerDisconnect}.",
                 RewiredOverrideScanner.DisconnectIssue,
                 "Set PauseOnControllerDisconnect to Auto/Off, or uncheck Override Platform Defaults.",
-                failSeverity: AuditSeverity.Warning);
+                failSeverity: OverrideSeverity);
         }
 
         private static void AuditResumePath(List<AuditResult> results, RewiredInputManager manager)
@@ -129,18 +132,17 @@ namespace Wagenheimer.RewiredHelper.Editor
             var mode = manager.EffectiveAppBackgroundMode;
             bool canFreeze = mode == AppBackgroundPauseMode.Overlay || manager.ShouldPauseOnControllerDisconnect;
 #if WAGENHEIMER_STEAMWORKS
-            canFreeze |= manager.PauseOnSteamOverlay;
+            canFreeze |= manager.PauseOnSteamOverlay && !IsMobileTarget; // Steam does not exist on mobile
 #endif
             if (!canFreeze) return;
 
             bool hasResumeButton = HasResumeButton(manager);
-            var so = new SerializedObject(manager);
 
             Add(results, CategoryMobile, "A frozen game can always be resumed", manager.ShouldResumeOnAnyInput || hasResumeButton,
                 manager.ShouldResumeOnAnyInput ? "Any input resumes." : "The pause screen has a Resume button wired to Resume().",
                 "The game can freeze, tap-anywhere resume is off and the pause screen has no Resume button: the player can get stuck.",
                 "Add a Resume button (wired to RewiredInputManager.Resume) to the pause screen.", "Add Resume Button",
-                () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, so));
+                () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, new SerializedObject(manager)));
         }
 
         internal static bool HasResumeButton(RewiredInputManager manager)

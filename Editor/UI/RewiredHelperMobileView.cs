@@ -64,7 +64,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             if (!RewiredHelperAudit.HasResumeButton(manager))
             {
                 var create = RewiredHelperUIStyle.CreateButton("🛠 Create Pause Screen (with Resume button)",
-                    () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, so));
+                    () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, new SerializedObject(manager)));
                 create.style.marginLeft = 0;
                 create.style.marginTop = 6;
                 create.style.alignSelf = UnityEngine.UIElements.Align.FlexStart;

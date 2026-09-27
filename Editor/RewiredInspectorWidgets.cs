@@ -13,6 +13,7 @@ namespace Wagenheimer.RewiredHelper.Editor
     internal static class RewiredInspectorWidgets
     {
         private const string SessionKeyPrefix = "RewiredHelper.Inspector.";
+        private const string PassedGroupKey = SessionKeyPrefix + "passedGroup";
 
         /// <summary>A card containing a foldout whose open/closed state survives inspector rebuilds and domain reloads.</summary>
         public static Foldout CreateSection(VisualElement parent, string key, string title, bool defaultOpen, string hint = null)
@@ -104,8 +105,12 @@ namespace Wagenheimer.RewiredHelper.Editor
             var passed = results.Where(r => r.Severity == AuditSeverity.Pass).ToList();
             if (passed.Count == 0) return;
 
-            var group = new Foldout { text = $"✓ {passed.Count} check(s) passed", value = false };
+            var group = new Foldout { text = $"✓ {passed.Count} check(s) passed", value = SessionState.GetBool(PassedGroupKey, false) };
             group.style.marginTop = 4;
+            group.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.target == group) SessionState.SetBool(PassedGroupKey, evt.newValue);
+            });
             foreach (var result in passed)
                 group.Add(CreateCheckRow(result, onFixed));
             container.Add(group);

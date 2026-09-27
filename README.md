@@ -423,7 +423,8 @@ contains a Resume button wired to `Resume()`. With the Auto defaults an ad or IA
 
 If the `com.rlabrecque.steamworks.net` package is installed, the manager pauses when the Steam overlay opens
 and resumes when it closes. Steam readiness is detected from `SteamManager.Initialized` (standard Steamworks.NET
-bootstrap); set `RewiredInputManager.SteamIsInitialized = true` yourself only if you use a different bootstrap. Disable with `PauseOnSteamOverlay = false`.
+bootstrap); set `RewiredInputManager.SteamIsInitialized = true` yourself only if you use a different bootstrap.
+With IL2CPP managed stripping, keep `SteamManager` in a `link.xml` (or assign `SteamIsInitialized` yourself), since it is read by reflection. Disable with `PauseOnSteamOverlay = false`.
 
 ---
 

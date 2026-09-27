@@ -67,5 +67,26 @@ namespace Wagenheimer.RewiredHelper.Tests
 
             Assert.IsEmpty(RewiredOverrideScanner.FindMobileBreakingOverrides(yaml));
         }
+
+        [Test]
+        public void PrefabInstanceModifications_AreDetected()
+        {
+            var yaml = "    - target: {fileID: 1}\n      propertyPath: OverridePlatformDefaults\n      value: 1\n" +
+                       "    - target: {fileID: 1}\n      propertyPath: PauseOnAppBackground\n      value: 3\n";
+
+            var issues = RewiredOverrideScanner.FindMobileBreakingOverrides(yaml);
+
+            Assert.AreEqual(1, issues.Count);
+            Assert.AreEqual(RewiredOverrideScanner.OverlayIssue, issues[0]);
+        }
+
+        [Test]
+        public void PrefabInstanceModifications_WithSafeValues_AreIgnored()
+        {
+            var yaml = "    - target: {fileID: 1}\n      propertyPath: OverridePlatformDefaults\n      value: 1\n" +
+                       "    - target: {fileID: 1}\n      propertyPath: PauseOnAppBackground\n      value: 2\n";
+
+            Assert.IsEmpty(RewiredOverrideScanner.FindMobileBreakingOverrides(yaml));
+        }
     }
 }

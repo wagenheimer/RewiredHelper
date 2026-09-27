@@ -75,24 +75,34 @@ namespace Wagenheimer.RewiredHelper
         /// <summary>Whether any input resumes a frozen game on this platform.</summary>
         public bool ShouldResumeOnAnyInput => Policy.ResumeOnAnyInput;
 
+        private const float SteamProbeIntervalSeconds = 0.5f;
+
         private static Func<bool> _steamManagerProbe;
         private static bool _steamProbeResolved;
+        private static float _nextSteamProbeTime;
+        private static bool _lastSteamProbeResult;
 
         /// <summary>
-        /// True when Steam is up: <see cref="SteamIsInitialized"/> if the host set it, otherwise auto-detected from a
-        /// <c>SteamManager.Initialized</c> found in any loaded assembly (the standard Steamworks.NET bootstrap).
+        /// True when Steam is up: <see cref="SteamIsInitialized"/> if the host set it, otherwise auto-detected from the
+        /// standard Steamworks.NET <c>SteamManager</c> in any loaded assembly. Polled at most every half second, and it
+        /// never touches <c>SteamManager.Instance</c> (whose getter would spawn a SteamManager GameObject).
         /// </summary>
         private static bool IsSteamReady
         {
             get
             {
                 if (SteamIsInitialized) return true;
+                if (Time.realtimeSinceStartup < _nextSteamProbeTime) return _lastSteamProbeResult;
+
                 if (!_steamProbeResolved)
                 {
                     _steamProbeResolved = true;
                     _steamManagerProbe = BuildSteamManagerProbe();
                 }
-                return _steamManagerProbe != null && _steamManagerProbe();
+
+                _nextSteamProbeTime = Time.realtimeSinceStartup + SteamProbeIntervalSeconds;
+                _lastSteamProbeResult = _steamManagerProbe != null && _steamManagerProbe();
+                return _lastSteamProbeResult;
             }
         }
 
@@ -101,15 +111,19 @@ namespace Wagenheimer.RewiredHelper
             var type = FindType("SteamManager");
             if (type == null) return null;
 
-            var property = type.GetProperty("Initialized", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            if (property != null && property.PropertyType == typeof(bool))
-                return () => (bool)property.GetValue(null);
+            const System.Reflection.BindingFlags staticAny =
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static;
 
-            var field = type.GetField("Initialized", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            if (field != null && field.FieldType == typeof(bool))
-                return () => (bool)field.GetValue(null);
+            var initialized = type.GetProperty("Initialized", staticAny);
+            if (initialized == null || initialized.PropertyType != typeof(bool)) return null;
 
-            return null;
+            // Steamworks.NET's Initialized reads Instance.m_bInitialized and Instance creates the GameObject when
+            // missing, so only ask once the singleton already exists (s_instance is its backing field).
+            var instanceField = type.GetField("s_instance", staticAny);
+            if (instanceField == null)
+                return () => (bool)initialized.GetValue(null);
+
+            return () => (instanceField.GetValue(null) as UnityEngine.Object) != null && (bool)initialized.GetValue(null);
         }
 
         private static SystemUiTracker SystemUi => _systemUi ??= new SystemUiTracker(() => Time.realtimeSinceStartup);

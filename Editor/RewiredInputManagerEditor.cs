@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEditor.UIElements;
 
 using UnityEngine;
@@ -36,10 +37,15 @@ namespace Wagenheimer.RewiredHelper.Editor
         private VisualElement _liveCard;
         private readonly Dictionary<string, Label> _liveValues = new Dictionary<string, Label>();
         private bool _refreshQueued;
+        private bool _isSceneContext;
 
         public override VisualElement CreateInspectorGUI()
         {
             _manager = (RewiredInputManager)target;
+
+            // Scene checks (Event System, Canvas, Player Mouse...) only make sense for an object living in the open
+            // scene: for a prefab asset or Prefab Mode they would report false problems and "fix" the wrong scene.
+            _isSceneContext = !EditorUtility.IsPersistent(target) && PrefabStageUtility.GetCurrentPrefabStage() == null;
 
             _root = new VisualElement();
             _root.AddToClassList("rh-inspector");
@@ -47,8 +53,11 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             _root.Add(BuildHeader());
             _root.Add(BuildLiveCard());
-            BuildAutomaticSection();
-            BuildHealthSection();
+            if (_isSceneContext)
+            {
+                BuildAutomaticSection();
+                BuildHealthSection();
+            }
             BuildBootSection();
             BuildCursorSection();
             BuildPauseSection();
@@ -70,14 +79,20 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private void Subscribe()
         {
-            EditorApplication.hierarchyChanged += QueueRefresh;
+            EditorApplication.hierarchyChanged += OnHierarchyChanged;
             Undo.undoRedoPerformed += QueueRefresh;
         }
 
         private void Unsubscribe()
         {
-            EditorApplication.hierarchyChanged -= QueueRefresh;
+            EditorApplication.hierarchyChanged -= OnHierarchyChanged;
             Undo.undoRedoPerformed -= QueueRefresh;
+        }
+
+        /// <summary>Spawns/destroys are constant while playing; the "Re-check" button covers that case.</summary>
+        private void OnHierarchyChanged()
+        {
+            if (!Application.isPlaying) QueueRefresh();
         }
 
         /// <summary>Coalesces bursts of hierarchy/serialization changes into a single rebuild.</summary>
@@ -95,8 +110,11 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private void RefreshDynamic()
         {
-            RefreshAutomatic();
-            RefreshHealth();
+            if (_isSceneContext)
+            {
+                RefreshAutomatic();
+                RefreshHealth();
+            }
             RefreshPolicy();
             RefreshBlockedScenes();
         }

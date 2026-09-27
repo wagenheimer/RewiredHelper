@@ -84,11 +84,10 @@ namespace Wagenheimer.RewiredHelper.Editor
         {
             // Touch-only titles never draw a game cursor, so a missing one is only a hint on mobile.
             var missing = RewiredHelperAudit.IsMobileTarget ? AuditSeverity.Info : AuditSeverity.Warning;
-            var so = new SerializedObject(manager);
             RewiredHelperAudit.Add(results, Category, "Game Cursor (controller/remote cursor image)", manager.GameCursor != null,
                 "Game Cursor image assigned.", "Not assigned: gamepad/remote users get no on-screen cursor.",
                 "Creates a Game Cursor Image under the Canvas (hidden until joystick input), adds GameCursorPositioner and links it here.",
-                "Create Game Cursor", () => DefaultSetupGenerator.CreateGameCursorAndWire(manager, so), missing);
+                "Create Game Cursor", () => DefaultSetupGenerator.CreateGameCursorAndWire(manager, new SerializedObject(manager)), missing);
 
             if (manager.CustomCursorEnabled)
             {
@@ -129,7 +128,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 return;
             }
 
-            var serialized = new SerializedObject(playerMouse);
+            using var serialized = new SerializedObject(playerMouse);
             int configured = DefaultSetupGenerator.CountConfiguredMouseElements(serialized);
             if (configured < 0)
             {
@@ -156,7 +155,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 "GameCursorPositioner present.",
                 "Without it the cursor only lines up on a Screen Space - Overlay Canvas with a 1:1 Canvas Scaler.",
                 "Adds GameCursorPositioner to the Game Cursor.", "Add Positioner",
-                () => manager.GameCursor.gameObject.AddComponent<UI.GameCursorPositioner>(), severity);
+                () => Undo.AddComponent<UI.GameCursorPositioner>(manager.GameCursor.gameObject), severity);
 
             bool positionWired = IsEventWiredTo(playerMouseSerialized.FindProperty("_onScreenPositionChanged"), positioner, "SetScreenPosition");
             bool enabledWired = IsEventWired(playerMouseSerialized.FindProperty("_onEnabledStateChanged"));

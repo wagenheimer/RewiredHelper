@@ -10,9 +10,14 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// </summary>
     public static class RewiredOverrideScanner
     {
-        private static readonly Regex OverrideOn = new Regex(@"^\s*OverridePlatformDefaults:\s*1\s*$", RegexOptions.Multiline);
-        private static readonly Regex ForcedOverlay = new Regex(@"^\s*PauseOnAppBackground:\s*3\s*$", RegexOptions.Multiline);
-        private static readonly Regex ForcedDisconnectPause = new Regex(@"^\s*PauseOnControllerDisconnect:\s*1\s*$", RegexOptions.Multiline);
+        // Direct component fields ("  Field: value") and prefab-instance modifications ("propertyPath: Field" then "value: N").
+        private static readonly Regex OverrideOn = Field("OverridePlatformDefaults", 1);
+        private static readonly Regex ForcedOverlay = Field("PauseOnAppBackground", 3);
+        private static readonly Regex ForcedDisconnectPause = Field("PauseOnControllerDisconnect", 1);
+
+        private static Regex Field(string name, int value) => new Regex(
+            @"^\s*" + name + @":\s*" + value + @"\s*$|propertyPath:\s*" + name + @"\s*\r?\n\s*value:\s*" + value + @"\s*$",
+            RegexOptions.Multiline);
 
         public const string OverlayIssue =
             "Override Platform Defaults forces PauseOnAppBackground = Overlay: on a mobile build every notification shade, ad, IAP sheet " +

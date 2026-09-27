@@ -7,7 +7,10 @@ using UnityEngine.UIElements;
 
 namespace Wagenheimer.RewiredHelper.Editor
 {
-    /// <summary>Edits the pause policy of the scene's RewiredInputManager and explains the mobile best practices.</summary>
+    /// <summary>
+    /// The "Automatic" tab. Leads with what the package decides by itself per platform; the only manual controls
+    /// (an explicit override and the pause-screen reference) live in a collapsed Advanced section.
+    /// </summary>
     internal sealed class RewiredHelperMobileView
     {
         private static readonly string[] OverrideFields =
@@ -24,84 +27,59 @@ namespace Wagenheimer.RewiredHelper.Editor
             BuildUI();
         }
 
+        private void Rebuild()
+        {
+            Root.Clear();
+            BuildUI();
+        }
+
         private void BuildUI()
         {
             Root.Add(BuildAutomaticPolicyCard());
-            Root.Add(BuildPolicyCard());
-            Root.Add(BuildBestPracticesCard());
-        }
-
-        private VisualElement BuildPolicyCard()
-        {
-            var card = RewiredHelperUIStyle.CreateCard("📱 Pause Policy (open scene)",
-                "What makes the game pause, and how the player gets out of it.");
 
             var manager = RewiredHelperAudit.FindAll<RewiredInputManager>().FirstOrDefault();
-            if (manager == null)
-            {
-                card.Add(RewiredHelperUIStyle.CreateCallout("No RewiredInputManager in the open scene. Create it from the Setup Audit tab.", AuditSeverity.Warning));
-                return card;
-            }
+            Root.Add(BuildSceneStatusCard(manager));
+            if (manager != null)
+                BuildAdvancedSection(manager);
 
-            var so = new SerializedObject(manager);
-            card.Add(new PropertyField(so.FindProperty("GamePaused")));
-            card.Add(new PropertyField(so.FindProperty("PauseOnSteamOverlay")));
-
-            var overrideField = new PropertyField(so.FindProperty("OverridePlatformDefaults"));
-            card.Add(overrideField);
-
-            var overrideBox = new VisualElement();
-            foreach (var field in OverrideFields)
-                overrideBox.Add(new PropertyField(so.FindProperty(field)));
-            card.Add(overrideBox);
-
-            overrideBox.style.display = manager.OverridePlatformDefaults ? DisplayStyle.Flex : DisplayStyle.None;
-            overrideField.RegisterValueChangeCallback(_ =>
-                overrideBox.style.display = so.FindProperty("OverridePlatformDefaults").boolValue ? DisplayStyle.Flex : DisplayStyle.None);
-
-            card.Bind(so);
-
-            if (!RewiredHelperAudit.HasResumeButton(manager))
-            {
-                var create = RewiredHelperUIStyle.CreateButton("🛠 Create Pause Screen (with Resume button)",
-                    () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, new SerializedObject(manager)));
-                create.style.marginLeft = 0;
-                create.style.marginTop = 6;
-                create.style.alignSelf = UnityEngine.UIElements.Align.FlexStart;
-                card.Add(create);
-            }
-
-            return card;
+            BuildHowItWorksSection();
         }
+
+        #region Automatic policy
 
         private static VisualElement BuildAutomaticPolicyCard()
         {
-            var card = RewiredHelperUIStyle.CreateCard("⚙️ Automatic policy per platform",
-                "Chosen from the platform of each build (Unity Build Pipeline, Build Settings or CLI): no setup needed.");
+            var card = RewiredHelperUIStyle.CreateCard("⚙️ Everything here is automatic",
+                "The policy is chosen from the platform of each build (Unity Build Pipeline, Build Settings or CLI) and the device it runs on. Nothing to configure.");
 
+            bool activeIsMobile = RewiredHelperAudit.IsMobileTarget;
             var mobile = PausePolicy.ForPlatform(true);
             var desktop = PausePolicy.ForPlatform(false);
-            card.Add(CreatePolicyRow("Setting", "Android / iOS", "Desktop / Console", header: true));
-            card.Add(CreatePolicyRow("App goes to background", mobile.AppBackground.ToString(), desktop.AppBackground.ToString()));
+
+            card.Add(CreatePolicyRow("", activeIsMobile ? "Android / iOS  ●" : "Android / iOS",
+                activeIsMobile ? "Desktop / Console / TV" : "Desktop / Console / TV  ●", header: true));
+            card.Add(CreatePolicyRow("App goes to background", Describe(mobile.AppBackground), Describe(desktop.AppBackground)));
             card.Add(CreatePolicyRow("Pause on controller disconnect", OnOff(mobile.PauseOnControllerDisconnect), OnOff(desktop.PauseOnControllerDisconnect)));
             card.Add(CreatePolicyRow("Resume on any input", OnOff(mobile.ResumeOnAnyInput), OnOff(desktop.ResumeOnAnyInput)));
             card.Add(CreatePolicyRow("Steam overlay", "n/a", "pauses, resumes on close (auto-detected)"));
-            card.Add(CreatePolicyRow("Android TV / Fire TV", "-", "uses the desktop / console policy (detected at runtime)"));
+            card.Add(CreatePolicyRow("Android TV / Fire TV", "-", "desktop policy, detected at runtime"));
 
-            var activeMobile = RewiredHelperAudit.IsMobileTarget;
             card.Add(RewiredHelperUIStyle.CreateCallout(
-                $"Active build target: {UnityEditor.EditorUserBuildSettings.activeBuildTarget} -> {(activeMobile ? "mobile" : "desktop / console")} policy. " +
-                "Every build also logs the policy it uses and warns about overrides that break it on mobile.",
+                $"● Active build target: {EditorUserBuildSettings.activeBuildTarget}. Every build logs the policy it uses and warns about a manual override that would break it on mobile.",
                 AuditSeverity.Info));
             return card;
         }
+
+        private static string Describe(AppBackgroundPauseMode mode) => mode == AppBackgroundPauseMode.Silent
+            ? "silent (no overlay, time untouched)"
+            : "freeze + pause overlay";
 
         private static string OnOff(bool value) => value ? "on" : "off";
 
         private static VisualElement CreatePolicyRow(string setting, string mobile, string desktop, bool header = false)
         {
             var row = new VisualElement { style = { flexDirection = FlexDirection.Row, paddingTop = 3, paddingBottom = 3 } };
-            foreach (var (text, grow) in new[] { (setting, 2f), (mobile, 1f), (desktop, 1.4f) })
+            foreach (var (text, grow) in new[] { (setting, 2f), (mobile, 1.4f), (desktop, 1.4f) })
             {
                 var label = new Label(text) { style = { flexGrow = grow, flexBasis = 0, whiteSpace = WhiteSpace.Normal } };
                 if (header) label.style.unityFontStyleAndWeight = UnityEngine.FontStyle.Bold;
@@ -110,18 +88,90 @@ namespace Wagenheimer.RewiredHelper.Editor
             return row;
         }
 
-        private static VisualElement BuildBestPracticesCard()
+        #endregion
+
+        #region Scene status
+
+        private VisualElement BuildSceneStatusCard(RewiredInputManager manager)
         {
-            var card = RewiredHelperUIStyle.CreateCard("✅ Mobile best practices");
-            card.Add(RewiredHelperUIStyle.CreateCallout(
-                "• Leave Override Platform Defaults off: the right policy is applied per build platform automatically.\n" +
-                "• App background: Silent. The OS already suspends the app; notification shade, ads and IAP sheets also fire OnApplicationPause, so an overlay pops up constantly.\n" +
-                "• Never rely on the manager to own Time.timeScale: it restores the value it found and never overwrites a value your game set while paused.\n" +
-                "• Controller disconnect: turn it off on touch platforms. Bluetooth pads and remotes come and go.\n" +
-                "• Resume: use an explicit Resume button (RewiredInputManager.Instance.Resume) instead of 'tap anywhere', which leaks taps into gameplay.\n" +
-                "• Ads / IAP / share sheets: wrap them in using (RewiredInputManager.BeginSystemUi()) { ... } (or call RewiredInputManager.SuppressPauseFor(seconds)) to veto automatic pauses; for custom rules pass an IPauseGate to SetGlobalConfiguration(...). Listen to RewiredInputManager.OnPauseChanged to pause your own music/gameplay.",
-                AuditSeverity.Info));
+            var card = RewiredHelperUIStyle.CreateCard("✅ This project", "Read-only status of the open scene. Nothing to press unless a row says so.");
+
+            if (manager == null)
+            {
+                card.Add(RewiredHelperUIStyle.CreateCallout(
+                    "No RewiredInputManager in the open scene, so there is nothing to check here. Add one from the Setup Audit tab.",
+                    AuditSeverity.Warning));
+                return card;
+            }
+
+            var results = new System.Collections.Generic.List<AuditResult>();
+            RewiredHelperAudit.AuditMobilePause(results, manager);
+
+            var list = new VisualElement();
+            RewiredInspectorWidgets.FillChecks(list, results, Rebuild);
+            card.Add(list);
             return card;
         }
+
+        #endregion
+
+        #region Advanced
+
+        /// <summary>The only manual controls: an explicit override of the automatic policy and the pause-screen reference.</summary>
+        private void BuildAdvancedSection(RewiredInputManager manager)
+        {
+            var section = RewiredInspectorWidgets.CreateSection(Root, "dashboard.advanced", "🔧 Advanced (rarely needed)", false,
+                "Leave everything here alone unless you need behavior that differs from the automatic policy.");
+
+            var so = new SerializedObject(manager);
+            var overrideField = new PropertyField(so.FindProperty("OverridePlatformDefaults"));
+            section.Add(overrideField);
+
+            var overrideBox = new VisualElement();
+            foreach (var field in OverrideFields)
+                overrideBox.Add(new PropertyField(so.FindProperty(field)));
+            section.Add(overrideBox);
+            overrideBox.style.display = manager.OverridePlatformDefaults ? DisplayStyle.Flex : DisplayStyle.None;
+
+            section.Add(new PropertyField(so.FindProperty("PauseOnSteamOverlay")));
+            section.Add(new PropertyField(so.FindProperty("GamePaused")));
+
+            overrideField.RegisterValueChangeCallback(_ =>
+            {
+                overrideBox.style.display = so.FindProperty("OverridePlatformDefaults").boolValue ? DisplayStyle.Flex : DisplayStyle.None;
+                section.schedule.Execute(Rebuild).ExecuteLater(200);
+            });
+
+            if (!RewiredHelperAudit.HasResumeButton(manager))
+            {
+                var create = RewiredHelperUIStyle.CreateButton("🛠 Create Pause Screen (with Resume button)",
+                    () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, new SerializedObject(manager)));
+                create.style.marginLeft = 0;
+                create.style.marginTop = 6;
+                create.style.alignSelf = Align.FlexStart;
+                create.tooltip = "Only needed for the desktop/console freeze overlay or your own RequestPause().";
+                section.Add(create);
+            }
+
+            section.Bind(so);
+        }
+
+        #endregion
+
+        #region How it works
+
+        private void BuildHowItWorksSection()
+        {
+            var section = RewiredInspectorWidgets.CreateSection(Root, "dashboard.how", "📖 How it works", false);
+            section.Add(RewiredHelperUIStyle.CreateCallout(
+                "• Mobile: the OS already suspends the app, and notification shade / ads / IAP sheets also fire OnApplicationPause, so pausing with an overlay would pop up constantly. The app-background pause is silent instead.\n" +
+                "• Bluetooth pads and remotes connect and disconnect often, so a controller disconnect does not pause a touch game.\n" +
+                "• 'Tap anywhere to resume' leaks taps into gameplay, so it is off on mobile; use a Resume button wired to RewiredInputManager.Resume().\n" +
+                "• The manager only touches Time.timeScale while it froze the game, restores the value it found, and never overwrites a value your game set meanwhile.\n" +
+                "• Ads / IAP / share sheets: using (RewiredInputManager.BeginSystemUi()) { ... } vetoes automatic pauses (only needed for Overlay mode or if you react to OnPauseChanged). Custom rules: pass an IPauseGate to SetGlobalConfiguration(...).",
+                AuditSeverity.Info));
+        }
+
+        #endregion
     }
 }

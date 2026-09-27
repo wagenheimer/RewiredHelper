@@ -393,17 +393,29 @@ namespace Wagenheimer.RewiredHelper.Editor
             _policyRows = new VisualElement();
             section.Add(_policyRows);
 
-            AddFields(section, "GamePaused", "PauseOnSteamOverlay", "OverridePlatformDefaults");
+            _pauseChecks = new VisualElement { style = { marginTop = 4 } };
+            section.Add(_pauseChecks);
+
+            var advanced = new Foldout { text = "🔧 Advanced (rarely needed)", value = SessionState.GetBool("RewiredHelper.Inspector.pauseAdvanced", false) };
+            advanced.style.marginTop = 4;
+            advanced.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.target == advanced) SessionState.SetBool("RewiredHelper.Inspector.pauseAdvanced", evt.newValue);
+            });
+            advanced.Add(new Label("Leave these alone unless you need behavior that differs from the automatic policy.")
+            {
+                style = { fontSize = 10, whiteSpace = WhiteSpace.Normal, marginBottom = 4 }
+            });
+            AddFields(advanced, "OverridePlatformDefaults");
 
             _overrideBox = new VisualElement();
             foreach (var name in new[] { "PauseOnAppBackground", "PauseOnControllerDisconnect", "ResumeOnAnyInput" })
                 _overrideBox.Add(new PropertyField(serializedObject.FindProperty(name)));
-            section.Add(_overrideBox);
+            advanced.Add(_overrideBox);
 
-            _pauseChecks = new VisualElement { style = { marginTop = 4 } };
-            section.Add(_pauseChecks);
-
-            section.Add(BuildPauseButtons());
+            AddFields(advanced, "PauseOnSteamOverlay", "GamePaused");
+            advanced.Add(BuildPauseButtons());
+            section.Add(advanced);
         }
 
         /// <summary>

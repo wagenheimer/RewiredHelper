@@ -103,7 +103,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             (Tab tab, string icon, string title)[] tabs =
             {
                 (Tab.SetupAudit, "🔍", "Setup Audit"),
-                (Tab.MobileAndPause, "📱", "Mobile & Pause"),
+                (Tab.MobileAndPause, "⚙️", "Automatic"),
                 (Tab.Checklist, "📋", "Checklist"),
                 (Tab.DocsAndUpdates, "📚", "Docs & Updates")
             };

@@ -30,7 +30,7 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   (`ActionElementMap.elementIdentifierGlyph` etc.) — Rewired's own addon already solves this
   better; this was tried and removed on 2026-07-09.
 - `Editor/RewiredHelperDashboardWindow.cs` + `Editor/UI/*` + `Editor/RewiredHelperAudit.cs` — UI Toolkit
-  dashboard (Setup Audit / Mobile & Pause / Checklist / Docs), same structure as `UnityIAPHelper`'s dashboard
+  dashboard (Setup Audit / Automatic / Checklist / Docs), same structure as `UnityIAPHelper`'s dashboard
   (`rh-` USS prefix). Audit results carry an optional one-click `Fix`. Manual items live in
   `REWIRED-CHECKLIST.md` and `RewiredHelperChecklistView.Items` — keep both in sync.
 - Pause policy is automatic per build platform: `PausePolicy.ForPlatform(isMobile)` (mobile = silent app-background

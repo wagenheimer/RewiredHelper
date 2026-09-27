@@ -113,7 +113,7 @@ public class GameBootstrap : MonoBehaviour
 Rewired Helper features professional, color-coded custom inspectors to speed up your workflow:
 
 - **Dashboard** (**Tools → Wagenheimer → Rewired Helper → Dashboard...**): UI Toolkit window like the other Wagenheimer packages, with four tabs:
-  **Setup Audit** (scene + project scan with one-click fixes, *Copy Report* and *Copy AI Fix Prompt*), **Mobile & Pause** (automatic policy per platform, optional override),
+  **Setup Audit** (scene + project scan with one-click fixes, *Copy Report* and *Copy AI Fix Prompt*), **Automatic** (the policy per platform and the status of your scene; manual overrides are tucked into a collapsed *Advanced* section),
   **Checklist** (persistent manual release checklist, mirrored in [`REWIRED-CHECKLIST.md`](REWIRED-CHECKLIST.md)) and **Docs & Updates**.
   The audit also runs headless for CI: `-executeMethod Wagenheimer.RewiredHelper.Editor.RewiredHelperAudit.RunHeadlessAndLog`.
 - **One-Click Setup Generators**: Directly from the `RewiredInputManager` inspector, you can generate a default Pause Screen or a Controller Help Form.
@@ -388,7 +388,7 @@ Build Settings or CLI) when the game runs, never from what was saved in a scene:
 
 Every player build logs the policy it uses (`RewiredBuildPreprocessor`) and warns if a scene/prefab contains an explicit
 override that breaks it on mobile. To customise, turn on **Override Platform Defaults** on the manager and edit the
-three settings (each still has an `Auto` value = the platform default). The Dashboard's *Mobile & Pause* tab shows the
+three settings (each still has an `Auto` value = the platform default). The Dashboard's *Automatic* tab shows the
 per-platform table.
 
 Why mobile differs: the OS already suspends the app, and notification shade / ads / IAP sheets / app switches

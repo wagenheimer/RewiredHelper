@@ -20,8 +20,9 @@ without hard-coding any assumptions about your game's UI or save system.
 - **Escape/Return routing** — `EscapeButton` (priority-ordered) and `ReturnEscapeEvent`
   components let any UI panel opt into Escape/Return handling without polling `Input` itself.
 - **Audio & SFX Bridge (`AutoBridgeSubmitToPointerDown`)** — automatically fires `IPointerDown` / `IPointerUp` on selected UI elements when confirming via Gamepad (`UISubmit` / Button A), ensuring audio systems like MasterAudio's `EventSounds` configured with PointerDown work seamlessly without code edits.
-- **Controller connect/disconnect handling** — auto-pauses on disconnect (with a console-aware
-  reconnect grace period), resumes on reconnect or any button press.
+- **Mobile-safe pause policy** — app-background, controller-disconnect and Steam-overlay pauses are
+  configurable per platform, never overwrite your `Time.timeScale`, and can be vetoed with `IPauseGate`.
+  See [Pause Behavior & Mobile Best Practices](#pause-behavior--mobile-best-practices).
 - **Zero forced dependencies** — no Odin Inspector, no I2 Localization required. Both are
   supported as opt-in extension points.
 - **Dependency injection** — plug in `IUiBlocker`, `IModalStackProvider`, `IControllerHelpGate` to
@@ -111,7 +112,10 @@ public class GameBootstrap : MonoBehaviour
 
 Rewired Helper features professional, color-coded custom inspectors to speed up your workflow:
 
-- **Scene Diagnostics Window** (**Tools → Wagenheimer → Rewired Helper → Setup Checker & Help**): A real-time scene scanner that validates your setup (detects missing managers, event systems, canvases, game cursors, or glyph addons) and offers **one-click quick-fixes** to generate and auto-wire components.
+- **Dashboard** (**Tools → Wagenheimer → Rewired Helper → Dashboard...**): UI Toolkit window like the other Wagenheimer packages, with four tabs:
+  **Setup Audit** (scene + project scan with one-click fixes, *Copy Report* and *Copy AI Fix Prompt*), **Mobile & Pause** (edit the pause policy, reset to the Auto preset),
+  **Checklist** (persistent manual release checklist, mirrored in [`REWIRED-CHECKLIST.md`](REWIRED-CHECKLIST.md)) and **Docs & Updates**.
+  The audit also runs headless for CI: `-executeMethod Wagenheimer.RewiredHelper.Editor.RewiredHelperAudit.RunHeadlessAndLog`.
 - **One-Click Setup Generators**: Directly from the `RewiredInputManager` inspector, you can generate a default Pause Screen or a Controller Help Form.
 - **Player Mouse Auto-Configuration**: The diagnostics window can automatically configure Rewired's Player Mouse settings for joystick cursor movement.
 - **Dialog Inspector**: Features color-coded grouping for Transition Effects, slide directions, timing, and UnityEvents.
@@ -358,12 +362,55 @@ private void UpdateCursorToggleState()
 
 ---
 
-## Steam Overlay Pause
+## Pause Behavior & Mobile Best Practices
 
-If the `com.rlabrecque.steamworks.net` package is installed, the manager auto-pauses when the
-Steam overlay opens. Set `RewiredInputManager.SteamIsInitialized = true` once your own
-`SteamManager` has initialized (or simply assign it from `SteamManager.Initialized`).
-Disable with `PauseOnSteamOverlay = false`.
+The manager can pause for four reasons (`PauseReason`): **AppBackground**, **ControllerDisconnected**,
+**SteamOverlay** and **Manual**. Several can be active at once without releasing each other.
+
+| Setting | Auto on desktop / console | Auto on Android / iOS | Notes |
+|---|---|---|---|
+| `PauseOnAppBackground` | `Overlay` | `Silent` | `Off` = nothing, `Silent` = raise `OnPauseChanged` only (no overlay, `timeScale` untouched), `Overlay` = freeze + show `GamePaused` |
+| `PauseOnControllerDisconnect` | on | **off** | Only fires when the disconnected pad was the active device and the player isn't using touch |
+| `ResumeOnAnyInput` | on | **off** | Off = the pause screen needs a Resume button wired to `RewiredInputManager.Instance.Resume()` |
+| `PauseOnSteamOverlay` | on | n/a | Resumes automatically when the overlay closes |
+
+All three default to **Auto**, which is resolved when the game runs (not when the scene is saved), so a scene
+saved under any build target behaves correctly on every platform. Only pick an explicit value to override it.
+
+Why mobile differs: the OS already suspends the app, and notification shade / ads / IAP sheets / app switches
+all raise `OnApplicationPause`, so a "GAME PAUSED" overlay popping up constantly is noise. Bluetooth pads and
+remotes connect/disconnect often, and "tap anywhere to resume" leaks taps into gameplay.
+
+`Time.timeScale` is only touched while a *frozen* pause is active: the manager saves the value it found and
+restores it, and if your game changed the time scale meanwhile, your value wins.
+
+```csharp
+// Ads / IAP / share sheets / permission prompts: one line, no setup, works from any package.
+// Automatic pauses are vetoed while it is open (+1.5 s grace); a lost Dispose expires after 3 min.
+using (RewiredInputManager.BeginSystemUi()) { ShowInterstitial(); }
+RewiredInputManager.SuppressPauseFor(3f);     // fire-and-forget variant
+
+// Custom rules (loading screens, cutscenes...). Manual pauses are never vetoed.
+class MyPauseGate : IPauseGate { public bool CanPause(PauseReason r) => !Loading.IsActive; }
+RewiredInputManager.SetGlobalConfiguration(pauseGate: new MyPauseGate());
+
+// React to any pause (silent ones have frozen == false), e.g. mute music or stop a timer.
+RewiredInputManager.OnPauseChanged += (paused, frozen) => Music.SetPaused(paused);
+
+// Your own pause menu
+RewiredInputManager.Instance.RequestPause();
+RewiredInputManager.Instance.Resume();      // wire to the Resume button
+```
+
+The **Generate Pause Screen & Link** button (inspector or Dashboard) creates a pause screen that already
+contains a Resume button wired to `Resume()`. Use **Apply Auto Preset (mobile-safe)** to reset the policy to the per-platform defaults in one click.
+With the Auto defaults an ad or IAP sheet no longer shows any overlay on mobile; `BeginSystemUi()` matters for Overlay mode and for games that react to `OnPauseChanged`.
+
+### Steam overlay
+
+If the `com.rlabrecque.steamworks.net` package is installed, the manager pauses when the Steam overlay opens
+and resumes when it closes. Set `RewiredInputManager.SteamIsInitialized = true` once your own `SteamManager`
+has initialized (or assign it from `SteamManager.Initialized`). Disable with `PauseOnSteamOverlay = false`.
 
 ---
 
@@ -407,6 +454,8 @@ _input.OnShowControllerHelp.AddListener(() => controllerHelpForm.SetActive(true)
 
 | Menu | Action |
 |---|---|
+| Tools → Wagenheimer → Rewired Helper → Dashboard... | Setup audit, mobile & pause policy, checklist, docs |
+| Tools → Wagenheimer → Rewired Helper → Verify Setup... | Opens the Dashboard on the Setup Audit tab |
 | Tools → Wagenheimer → Rewired Helper → Create Rewired Input Manager | Adds a `RewiredInputManager` GameObject to the open scene |
 | Tools → Wagenheimer → Rewired Helper → Create Controller Help Form | Generates a controller-help panel using Rewired's official glyph addon, if present |
 | Tools → Wagenheimer → Rewired Helper → Check for Updates... | Manually check for a new package version |

@@ -4,14 +4,18 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
 
 ## Structure
 
-- `Runtime/RewiredInputManager.cs` — the only `MonoBehaviour` singleton. Owns all Rewired
-  polling (`Update()`), cursor state, and Escape/Return routing decisions.
+- `Runtime/RewiredInputManager*.cs` — the only `MonoBehaviour` singleton, split as a `partial` class
+  (main: polling/cursor; `.Pause.cs`: pause policy; `.Routing.cs`: Escape/Return + submit bridge;
+  `.Glyphs.cs`: glyph selector reflection). Keep each file under ~800 lines.
+- `Runtime/PauseController.cs` — pure (no Unity/Rewired calls) pause-reason + `timeScale` ownership
+  logic, unit-tested in `Tests/Editor/PauseControllerTests.cs`. Never write `Time.timeScale` from the
+  manager directly: go through it so a host-changed scale is not overwritten.
 - `Runtime/EscapeButton.cs`, `ReturnEscapeEvent.cs`, `InputVisibilityController.cs` — generic,
   standalone components. None of them reference `RewiredInputManager` except through its public
   static surface (`IsUsingTouch`, `RegisterVisibilityController`, `PressedScape`, the two static
   flags on `ReturnEscapeEvent`).
-- `Runtime/Integration/*.cs` — the three optional extension-point interfaces
-  (`IUiBlocker`, `IModalStackProvider`, `IControllerHelpGate`), each with an internal
+- `Runtime/Integration/*.cs` — the four optional extension-point interfaces
+  (`IUiBlocker`, `IModalStackProvider`, `IControllerHelpGate`, `IPauseGate`), each with an internal
   `Null*` default implementation. `RewiredInputManager.Configure(...)` wires them in; omit any
   argument to keep the no-op default.
 - `Editor/DefaultSetupGenerator.cs` — menu items that build a `RewiredInputManager` GameObject and
@@ -25,6 +29,13 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   guarantee it's present. Do not reintroduce a hand-rolled glyph reader
   (`ActionElementMap.elementIdentifierGlyph` etc.) — Rewired's own addon already solves this
   better; this was tried and removed on 2026-07-09.
+- `Editor/RewiredHelperDashboardWindow.cs` + `Editor/UI/*` + `Editor/RewiredHelperAudit.cs` — UI Toolkit
+  dashboard (Setup Audit / Mobile & Pause / Checklist / Docs), same structure as `UnityIAPHelper`'s dashboard
+  (`rh-` USS prefix). Audit results carry an optional one-click `Fix`. Manual items live in
+  `REWIRED-CHECKLIST.md` and `RewiredHelperChecklistView.Items` — keep both in sync.
+- Mobile defaults (`#if UNITY_ANDROID || UNITY_IOS` in `RewiredInputManager.Pause.cs`): silent app-background
+  pause, no pause on controller disconnect, no tap-anywhere resume. Don't reintroduce an unconditional
+  `OnApplicationPause -> freeze + overlay`; that was the "game keeps pausing on mobile" bug.
 - `Editor/UpdateChecker.cs` + `UpdateAvailableWindow.cs` — copy-pasted-and-renamed from the
   sibling packages (UnityRateControl/UnityCloudSave/UnityNativeSocial), not a shared library. If
   you fix a bug here, port the fix to the other three `wagenheimer/Unity*` repos by hand.

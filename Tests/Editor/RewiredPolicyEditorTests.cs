@@ -22,6 +22,7 @@ namespace Wagenheimer.RewiredHelper.Tests
 
         private GameObject _go;
         private RewiredInputManager _manager;
+        private GameObject _pauseScreen;
 
         [SetUp]
         public void SetUp()
@@ -31,7 +32,11 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(_go);
+        public void TearDown()
+        {
+            if (_pauseScreen != null) Object.DestroyImmediate(_pauseScreen);
+            Object.DestroyImmediate(_go);
+        }
 
         [Test]
         public void NewManager_FollowsTheBuildPlatformWithoutAnyConfiguration()
@@ -101,8 +106,10 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
-        public void Audit_WithAutomaticPolicy_HasNoPauseWarningsAndNoFixButtons()
+        public void Audit_WithAutomaticPolicyAndAPauseScreen_HasNoPauseWarnings()
         {
+            AssignPauseScreen();
+
             var results = RunMobileAudit();
 
             Assert.IsFalse(results.Any(r => r.Severity == AuditSeverity.Fail || r.Severity == AuditSeverity.Warning));
@@ -110,8 +117,43 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void Audit_WithoutAPauseScreen_FailsAndOffersToCreateOne()
+        {
+            var failure = RunMobileAudit().Single(r => r.Title.Contains("Pause screen assigned"));
+
+            Assert.AreEqual(AuditSeverity.Fail, failure.Severity);
+            Assert.IsNotNull(failure.Fix);
+        }
+
+        [Test]
+        public void Audit_WhenNothingCanFreeze_DoesNotRequireAPauseScreen()
+        {
+            _manager.OverridePlatformDefaults = true;
+            _manager.PauseOnAppBackground = AppBackgroundPauseMode.Off;
+            _manager.PauseOnControllerDisconnect = AutoToggle.Off;
+            _manager.PauseOnSteamOverlay = false;
+
+            var results = RunMobileAudit();
+
+            Assert.IsFalse(results.Any(r => r.Severity == AuditSeverity.Fail));
+        }
+
+        [Test]
+        public void Audit_PauseScreenWithoutAWayOut_Fails()
+        {
+            AssignPauseScreen();
+            _manager.OverridePlatformDefaults = true;
+            _manager.ResumeOnAnyInput = AutoToggle.Off; // no tap-to-resume anywhere and the screen has no Resume button
+
+            var failure = RunMobileAudit().Single(r => r.Title.Contains("resumed"));
+
+            Assert.AreEqual(AuditSeverity.Fail, failure.Severity);
+        }
+
+        [Test]
         public void Audit_WithForcedOverlayOverride_WarnsButOffersNoFix()
         {
+            AssignPauseScreen();
             _manager.OverridePlatformDefaults = true;
             _manager.PauseOnAppBackground = AppBackgroundPauseMode.Overlay;
 
@@ -124,6 +166,7 @@ namespace Wagenheimer.RewiredHelper.Tests
         [Test]
         public void Audit_WithForcedDisconnectPause_WarnsButOffersNoFix()
         {
+            AssignPauseScreen();
             _manager.OverridePlatformDefaults = true;
             _manager.PauseOnControllerDisconnect = AutoToggle.On;
 
@@ -147,6 +190,12 @@ namespace Wagenheimer.RewiredHelper.Tests
             StringAssert.Contains("Warnings: 1", markdown);
             StringAssert.Contains("Passed: 1", markdown);
             StringAssert.Contains("Fix: do x", markdown);
+        }
+
+        private void AssignPauseScreen()
+        {
+            _pauseScreen = new GameObject("PauseScreen");
+            _manager.GamePaused = _pauseScreen;
         }
 
         private List<AuditResult> RunMobileAudit()

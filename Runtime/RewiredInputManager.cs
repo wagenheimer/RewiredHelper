@@ -52,7 +52,7 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("Reference to the custom game cursor")]
         public Image GameCursor;
 
-        [Tooltip("GameObject shown/hidden while the game is frozen by a pause (optional). Not shown for silent pauses.")]
+        [Tooltip("Your pause screen, shown while the game is frozen (not for silent pauses). Required on desktop/console/TV, where the game can freeze: the Setup Audit fails without it.")]
         public GameObject GamePaused;
 
         [Tooltip("If true, the Steam overlay pauses the game automatically")]

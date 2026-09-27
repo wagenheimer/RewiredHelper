@@ -416,8 +416,11 @@ RewiredInputManager.Instance.RequestPause();
 RewiredInputManager.Instance.Resume();      // wire to the Resume button
 ```
 
-The **Generate Pause Screen & Link** button (inspector or Dashboard) creates a pause screen that already
-contains a Resume button wired to `Resume()`. With the Auto defaults an ad or IAP sheet no longer shows any overlay on mobile; `BeginSystemUi()` matters for Overlay mode and for games that react to `OnPauseChanged`.
+**A pause screen is required** wherever the game can freeze (desktop / console / TV): assign your own to `Game Paused`, or use
+**Create Pause Screen** (inspector or Dashboard), which builds one with a Resume button wired to `Resume()`. The Setup Audit
+**fails** when `Game Paused` is empty (checked for every platform class, not just the active build target), and when a frozen
+game would have no way out. Desktop/console builds also log a warning if a scene/prefab has it empty. At runtime the first
+freeze without one logs a warning. With the Auto defaults an ad or IAP sheet no longer shows any overlay on mobile; `BeginSystemUi()` matters for Overlay mode and for games that react to `OnPauseChanged`.
 
 ### Steam overlay
 

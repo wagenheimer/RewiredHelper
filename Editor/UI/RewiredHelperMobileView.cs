@@ -63,6 +63,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             card.Add(CreatePolicyRow("Resume on any input", OnOff(mobile.ResumeOnAnyInput), OnOff(desktop.ResumeOnAnyInput)));
             card.Add(CreatePolicyRow("Steam overlay", "n/a", "pauses, resumes on close (auto-detected)"));
             card.Add(CreatePolicyRow("Android TV / Fire TV", "-", "desktop policy, detected at runtime"));
+            card.Add(CreatePolicyRow("Pause screen", "not shown (silent)", "yours: required, the audit fails without it"));
 
             card.Add(RewiredHelperUIStyle.CreateCallout(
                 $"● Active build target: {EditorUserBuildSettings.activeBuildTarget}. Every build logs the policy it uses and warns about a manual override that would break it on mobile.",
@@ -142,14 +143,14 @@ namespace Wagenheimer.RewiredHelper.Editor
                 section.schedule.Execute(Rebuild).ExecuteLater(200);
             });
 
-            if (!RewiredHelperAudit.HasResumeButton(manager))
+            if (RewiredHelperAudit.CanFreezeOnSomePlatform(manager) && (manager.GamePaused == null || !RewiredHelperAudit.HasResumeButton(manager)))
             {
-                var create = RewiredHelperUIStyle.CreateButton("🛠 Create Pause Screen (with Resume button)",
+                var create = RewiredHelperUIStyle.CreateButton("🛠 Create / complete Pause Screen",
                     () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, new SerializedObject(manager)));
                 create.style.marginLeft = 0;
                 create.style.marginTop = 6;
                 create.style.alignSelf = Align.FlexStart;
-                create.tooltip = "Only needed for the desktop/console freeze overlay or your own RequestPause().";
+                create.tooltip = "Creates a pause screen with a Resume button, or adds the Resume button to the one assigned to Game Paused.";
                 section.Add(create);
             }
 

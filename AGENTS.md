@@ -39,7 +39,8 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   explicitly sets `OverridePlatformDefaults`. `Editor/RewiredBuildPreprocessor.cs` (IPreprocessBuildWithReport, like
   RateControl) logs the policy per build and warns about mobile-breaking overrides (text scan in
   `RewiredOverrideScanner`, pure and unit-tested); it must stay read-only. Android TV / Fire TV are detected at
-  runtime (`RewiredInputManager.IsTelevisionDevice`) and get the desktop policy. Do not add "fix it" buttons for the
+  runtime (`RewiredInputManager.IsTelevisionDevice`) and get the desktop policy. The pause screen is deliberately NOT auto-created at runtime: a missing `GamePaused` must FAIL the audit
+  (`AuditPauseScreen`, checked for every platform class). Do not add "fix it" buttons for the
   pause policy: it is automatic, an override is a deliberate user choice and is only reported.
 - Scene checks live once in `Editor/RewiredSetupChecks.cs` and feed both the Dashboard audit and the Inspector
   (`Editor/RewiredInputManagerEditor.cs`, UI Toolkit, `rh-` USS). `Editor/AssemblyInfo.cs` exposes internals to

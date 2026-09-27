@@ -88,5 +88,18 @@ namespace Wagenheimer.RewiredHelper.Tests
 
             Assert.IsEmpty(RewiredOverrideScanner.FindMobileBreakingOverrides(yaml));
         }
+
+        [Test]
+        public void EmptyGamePausedReference_IsReportedAsMissingPauseScreen()
+        {
+            Assert.IsTrue(RewiredOverrideScanner.HasMissingPauseScreen("MonoBehaviour:\n  GamePaused: {fileID: 0}\n  PauseOnSteamOverlay: 1\n"));
+        }
+
+        [Test]
+        public void AssignedGamePausedReference_IsNotReported()
+        {
+            Assert.IsFalse(RewiredOverrideScanner.HasMissingPauseScreen("MonoBehaviour:\n  GamePaused: {fileID: 1234567}\n"));
+            Assert.IsFalse(RewiredOverrideScanner.HasMissingPauseScreen(null));
+        }
     }
 }

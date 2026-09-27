@@ -45,6 +45,8 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (isMobile)
                 WarnAboutBreakingOverrides(users);
+            else
+                WarnAboutMissingPauseScreens(users);
         }
 
         internal static bool IsMobile(BuildTarget target) => target == BuildTarget.Android || target == BuildTarget.iOS;
@@ -89,6 +91,16 @@ namespace Wagenheimer.RewiredHelper.Editor
                     Debug.LogWarning($"[RewiredHelper] {path}: {issue} Turn Override Platform Defaults off " +
                                      "(Tools > Wagenheimer > Rewired Helper > Dashboard).", AssetDatabase.LoadMainAssetAtPath(path));
                 }
+            }
+        }
+
+        /// <summary>Desktop/console/TV builds freeze the game on focus loss or controller disconnect: a pause screen must exist.</summary>
+        private static void WarnAboutMissingPauseScreens(List<string> users)
+        {
+            foreach (var path in users)
+            {
+                if (ReadYaml(path, out var text) && RewiredOverrideScanner.HasMissingPauseScreen(text))
+                    Debug.LogWarning($"[RewiredHelper] {path}: {RewiredOverrideScanner.MissingPauseScreenIssue}", AssetDatabase.LoadMainAssetAtPath(path));
             }
         }
 

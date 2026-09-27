@@ -418,25 +418,28 @@ namespace Wagenheimer.RewiredHelper.Editor
             section.Add(advanced);
         }
 
+        private static bool NeedsPauseScreenFix(RewiredInputManager manager) =>
+            RewiredHelperAudit.CanFreezeOnSomePlatform(manager) && (manager.GamePaused == null || !RewiredHelperAudit.HasResumeButton(manager));
+
         /// <summary>
         /// Only offered while there is no pause screen with a Resume button. The automatic policy on mobile never
         /// freezes the game, so this matters for the desktop/console overlay and for manual RequestPause().
         /// </summary>
         private VisualElement BuildPauseButtons()
         {
-            _pauseScreenButton = RewiredHelperUIStyle.CreateButton("🛠 Create Pause Screen (with Resume button)",
-                () => DefaultSetupGenerator.CreatePauseScreenAndWire(_manager, serializedObject));
+            _pauseScreenButton = RewiredHelperUIStyle.CreateButton("🛠 Create / complete Pause Screen",
+                () => DefaultSetupGenerator.CreatePauseScreenAndWire(_manager, new SerializedObject(_manager)));
             _pauseScreenButton.style.marginLeft = 0;
             _pauseScreenButton.style.marginTop = 4;
             _pauseScreenButton.style.alignSelf = Align.FlexStart;
-            _pauseScreenButton.tooltip = "Creates a pause screen for desktop/console (overlay) or manual RequestPause(), with a Resume button wired to Resume().";
+            _pauseScreenButton.tooltip = "Creates a pause screen with a Resume button, or adds the Resume button to the one assigned to Game Paused.";
             return _pauseScreenButton;
         }
 
         private void RefreshPolicy()
         {
             _overrideBox.style.display = _manager.OverridePlatformDefaults ? DisplayStyle.Flex : DisplayStyle.None;
-            _pauseScreenButton.style.display = RewiredHelperAudit.HasResumeButton(_manager) ? DisplayStyle.None : DisplayStyle.Flex;
+            _pauseScreenButton.style.display = NeedsPauseScreenFix(_manager) ? DisplayStyle.Flex : DisplayStyle.None;
 
             _policyRows.Clear();
             bool activeIsMobile = RewiredHelperAudit.IsMobileTarget;

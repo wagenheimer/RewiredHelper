@@ -22,6 +22,7 @@ namespace Wagenheimer.RewiredHelper
         private const float ConsoleDisconnectGraceSeconds = 2f;
 
         private PauseController _pauseController;
+        private static bool _warnedAboutMissingPauseScreen;
         private static SystemUiTracker _systemUi;
 
         private const int AndroidUiModeTypeTelevision = 4;
@@ -190,8 +191,22 @@ namespace Wagenheimer.RewiredHelper
 
         private void HandlePauseChanged(bool isPaused, bool isFrozen)
         {
-            if (GamePaused != null) GamePaused.SetActive(isFrozen);
+            if (GamePaused != null)
+                GamePaused.SetActive(isFrozen);
+            else if (isFrozen)
+                WarnAboutMissingPauseScreen();
+
             OnPauseChanged?.Invoke(isPaused, isFrozen);
+        }
+
+        /// <summary>The game froze but there is nothing on screen to tell the player: this is a setup mistake the audit fails on.</summary>
+        private static void WarnAboutMissingPauseScreen()
+        {
+            if (_warnedAboutMissingPauseScreen) return;
+
+            _warnedAboutMissingPauseScreen = true;
+            Debug.LogWarning("[RewiredHelper] The game froze but no Game Paused screen is assigned on the RewiredInputManager, so " +
+                             "players see a frozen game. Create one (Tools > Wagenheimer > Rewired Helper > Dashboard > Setup Audit).");
         }
 
         private bool TryAutoPause(PauseReason reason, bool freeze)

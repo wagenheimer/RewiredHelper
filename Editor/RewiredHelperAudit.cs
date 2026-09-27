@@ -94,7 +94,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
 
             AuditAutoDefaults(results, manager);
-            AuditResumePath(results, manager);
+            AuditPauseScreen(results, manager);
         }
 
         /// <summary>
@@ -127,21 +127,64 @@ namespace Wagenheimer.RewiredHelper.Editor
                 failSeverity: OverrideSeverity);
         }
 
+        /// <summary>
+        /// Whether the game can freeze on ANY platform the project can be built for (mobile stays silent under the automatic
+        /// policy, but the same scene ships to desktop/console/TV where it freezes), so the pause screen is checked regardless
+        /// of the active build target.
+        /// </summary>
+        internal static bool CanFreezeOnSomePlatform(RewiredInputManager manager)
+        {
+            foreach (bool isMobile in new[] { true, false })
+            {
+                var policy = ResolvePolicy(manager, isMobile);
+                if (policy.AppBackground == AppBackgroundPauseMode.Overlay || policy.PauseOnControllerDisconnect)
+                    return true;
+            }
+#if WAGENHEIMER_STEAMWORKS
+            return manager.PauseOnSteamOverlay;
+#else
+            return false;
+#endif
+        }
+
+        private static PausePolicy ResolvePolicy(RewiredInputManager manager, bool isMobile) => PausePolicy.Resolve(
+            manager.OverridePlatformDefaults, manager.PauseOnAppBackground, manager.PauseOnControllerDisconnect, manager.ResumeOnAnyInput, isMobile);
+
+        private static void AuditPauseScreen(List<AuditResult> results, RewiredInputManager manager)
+        {
+            if (!CanFreezeOnSomePlatform(manager))
+            {
+                results.Add(Result(CategoryMobile, "Pause screen", AuditSeverity.Pass, "The game never freezes with the current settings, so no pause screen is needed."));
+                return;
+            }
+
+            Add(results, CategoryMobile, "Pause screen assigned (Game Paused)", manager.GamePaused != null,
+                "Game Paused is assigned.",
+                "The game freezes on desktop/console/TV but Game Paused is empty: players would see a frozen game with no pause screen.",
+                "Creates a pause screen with a Resume button and links it to Game Paused.", "Create Pause Screen",
+                () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, new SerializedObject(manager)));
+
+            if (manager.GamePaused == null) return;
+
+            AuditResumePath(results, manager);
+        }
+
+        /// <summary>On every platform where the game can freeze there must be a way out: tap-to-resume or a Resume button.</summary>
         private static void AuditResumePath(List<AuditResult> results, RewiredInputManager manager)
         {
-            var mode = manager.EffectiveAppBackgroundMode;
-            bool canFreeze = mode == AppBackgroundPauseMode.Overlay || manager.ShouldPauseOnControllerDisconnect;
-#if WAGENHEIMER_STEAMWORKS
-            canFreeze |= manager.PauseOnSteamOverlay && !IsMobileTarget; // Steam does not exist on mobile
-#endif
-            if (!canFreeze) return;
-
             bool hasResumeButton = HasResumeButton(manager);
+            bool stuckSomewhere = false;
+            foreach (bool isMobile in new[] { true, false })
+            {
+                var policy = ResolvePolicy(manager, isMobile);
+                bool freezes = policy.AppBackground == AppBackgroundPauseMode.Overlay || policy.PauseOnControllerDisconnect;
+                if (freezes && !policy.ResumeOnAnyInput && !hasResumeButton) stuckSomewhere = true;
+            }
 
-            Add(results, CategoryMobile, "A frozen game can always be resumed", manager.ShouldResumeOnAnyInput || hasResumeButton,
-                manager.ShouldResumeOnAnyInput ? "Any input resumes." : "The pause screen has a Resume button wired to Resume().",
+            Add(results, CategoryMobile, "A frozen game can always be resumed", !stuckSomewhere,
+                hasResumeButton ? "The pause screen has a Resume button." : "Any input resumes.",
                 "The game can freeze, tap-anywhere resume is off and the pause screen has no Resume button: the player can get stuck.",
-                "Add a Resume button (wired to RewiredInputManager.Resume) to the pause screen.", "Add Resume Button",
+                "Adds a Resume button (wired to RewiredInputManager.Resume) to your pause screen.", "Add Resume Button",
                 () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, new SerializedObject(manager)));
         }
 

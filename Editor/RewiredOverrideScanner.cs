@@ -19,6 +19,15 @@ namespace Wagenheimer.RewiredHelper.Editor
             @"^\s*" + name + @":\s*" + value + @"\s*$|propertyPath:\s*" + name + @"\s*\r?\n\s*value:\s*" + value + @"\s*$",
             RegexOptions.Multiline);
 
+        private static readonly Regex GamePausedEmpty = new Regex(@"^\s*GamePaused:\s*\{fileID:\s*0\}\s*$", RegexOptions.Multiline);
+
+        public const string MissingPauseScreenIssue =
+            "The RewiredInputManager has no Game Paused screen assigned: on desktop/console/TV the game freezes and players see nothing. " +
+            "Fix it in Tools > Wagenheimer > Rewired Helper > Dashboard > Setup Audit (Create Pause Screen).";
+
+        /// <summary>True when the serialized manager (a component written directly in this scene/prefab) has an empty Game Paused reference.</summary>
+        public static bool HasMissingPauseScreen(string yaml) => !string.IsNullOrEmpty(yaml) && GamePausedEmpty.IsMatch(yaml);
+
         public const string OverlayIssue =
             "Override Platform Defaults forces PauseOnAppBackground = Overlay: on a mobile build every notification shade, ad, IAP sheet " +
             "or app switch will freeze the game and show the pause screen.";

@@ -24,7 +24,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             ("Mobile", "mob_btpad", "Connecting/disconnecting a Bluetooth pad does not pause the game", "PauseOnControllerDisconnect = Auto (off on Android/iOS)."),
             ("Mobile", "mob_back", "Android Back button closes the top modal / opens the pause menu", "Back routes to the modal stack, then EscapeButton, then ReturnEscapeEvent."),
             ("Mobile", "mob_tv", "Android TV / remote: AndroidRemote glyphs and D-pad cursor work", "Run Ensure Android Remote Glyphs; test with a real remote."),
-            ("Desktop / Console", "pc_steam", "Steam overlay pauses and resumes; SteamIsInitialized assigned", "Requires the Steamworks.NET package."),
+            ("Desktop / Console", "pc_steam", "Steam overlay pauses and resumes (SteamManager auto-detected)", "Requires the Steamworks.NET package."),
             ("Desktop / Console", "pc_disconnect", "Unplugging the active pad pauses; replugging resumes", "Consoles wait a 2 s grace period before pausing."),
             ("Desktop / Console", "pc_cursor", "Custom cursor texture is Read/Write, uncompressed, no mipmaps", "Otherwise the OS cannot read the pixels."),
             ("UI / Modal", "ui_stack", "Escape/Return hit the top-most Dialog", "DefaultModalStackProvider passed to Configure()."),

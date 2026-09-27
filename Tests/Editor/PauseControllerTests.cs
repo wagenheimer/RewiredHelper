@@ -190,4 +190,47 @@ namespace Wagenheimer.RewiredHelper.Tests
             Assert.IsFalse(_tracker.IsActive);
         }
     }
+
+    public class PausePolicyTests
+    {
+        [Test]
+        public void ForPlatform_Mobile_IsSilentWithoutDisconnectPauseOrTapResume()
+        {
+            var policy = PausePolicy.ForPlatform(isMobile: true);
+
+            Assert.AreEqual(AppBackgroundPauseMode.Silent, policy.AppBackground);
+            Assert.IsFalse(policy.PauseOnControllerDisconnect);
+            Assert.IsFalse(policy.ResumeOnAnyInput);
+        }
+
+        [Test]
+        public void ForPlatform_Desktop_KeepsClassicBehavior()
+        {
+            var policy = PausePolicy.ForPlatform(isMobile: false);
+
+            Assert.AreEqual(AppBackgroundPauseMode.Overlay, policy.AppBackground);
+            Assert.IsTrue(policy.PauseOnControllerDisconnect);
+            Assert.IsTrue(policy.ResumeOnAnyInput);
+        }
+
+        [Test]
+        public void Resolve_WithoutOverride_IgnoresStoredValues()
+        {
+            var policy = PausePolicy.Resolve(false, AppBackgroundPauseMode.Overlay, AutoToggle.On, AutoToggle.On, isMobile: true);
+
+            Assert.AreEqual(AppBackgroundPauseMode.Silent, policy.AppBackground);
+            Assert.IsFalse(policy.PauseOnControllerDisconnect);
+            Assert.IsFalse(policy.ResumeOnAnyInput);
+        }
+
+        [Test]
+        public void Resolve_WithOverride_AppliesExplicitValuesAndKeepsAutoAsPlatformDefault()
+        {
+            var policy = PausePolicy.Resolve(true, AppBackgroundPauseMode.Overlay, AutoToggle.Auto, AutoToggle.On, isMobile: true);
+
+            Assert.AreEqual(AppBackgroundPauseMode.Overlay, policy.AppBackground);
+            Assert.IsFalse(policy.PauseOnControllerDisconnect); // Auto on mobile
+            Assert.IsTrue(policy.ResumeOnAnyInput);
+        }
+    }
 }

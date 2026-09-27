@@ -58,6 +58,9 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("If true, the Steam overlay pauses the game automatically")]
         public bool PauseOnSteamOverlay = true;
 
+        [Tooltip("Off (recommended): pause behavior is chosen automatically for the build platform (mobile: silent, no tap-to-resume; desktop/console: overlay, resume on input). Turn on only to override the three settings below.")]
+        public bool OverridePlatformDefaults;
+
         [Tooltip("What happens when the app goes to the background. Auto = Silent on Android/iOS, Overlay elsewhere. Off = nothing; Silent = raises OnPauseChanged only (no overlay, Time.timeScale untouched - the OS already suspends the app); Overlay = freezes time and shows GamePaused.")]
         public AppBackgroundPauseMode PauseOnAppBackground = AppBackgroundPauseMode.Auto;
 
@@ -85,8 +88,8 @@ namespace Wagenheimer.RewiredHelper
         public bool IsSteamOverlayActive = false;
 
         /// <summary>
-        /// The host game must set this to true once Steam is initialized (e.g. from its own
-        /// SteamManager: <c>RewiredInputManager.SteamIsInitialized = SteamManager.Initialized;</c>).
+        /// Optional: Steam readiness is auto-detected from a <c>SteamManager.Initialized</c> in the project.
+        /// Set this to true yourself only if your Steam bootstrap uses a different type.
         /// Only consulted when Steamworks.NET is installed (<c>WAGENHEIMER_STEAMWORKS</c>).
         /// </summary>
         public static bool SteamIsInitialized;
@@ -288,7 +291,7 @@ namespace Wagenheimer.RewiredHelper
             _lastMouseOrTouchMoveTime = Time.time;
 
 #if WAGENHEIMER_STEAMWORKS
-            if (SteamIsInitialized) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
+            if (IsSteamReady) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
 #endif
 
             // Auto-configure using default providers if enabled and not already configured via code

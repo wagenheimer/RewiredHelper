@@ -24,19 +24,54 @@ namespace Wagenheimer.RewiredHelper
         private PauseController _pauseController;
         private static SystemUiTracker _systemUi;
 
-        /// <summary>The app-background mode after resolving <see cref="AppBackgroundPauseMode.Auto"/> for this platform.</summary>
-        public AppBackgroundPauseMode EffectiveAppBackgroundMode => PauseOnAppBackground != AppBackgroundPauseMode.Auto
-            ? PauseOnAppBackground
-            : (AutoIsMobile ? AppBackgroundPauseMode.Silent : AppBackgroundPauseMode.Overlay);
+        private PausePolicy Policy => PausePolicy.Resolve(
+            OverridePlatformDefaults, PauseOnAppBackground, PauseOnControllerDisconnect, ResumeOnAnyInput, AutoIsMobile);
 
-        /// <summary><see cref="PauseOnControllerDisconnect"/> after resolving Auto for this platform.</summary>
-        public bool ShouldPauseOnControllerDisconnect => Resolve(PauseOnControllerDisconnect, !AutoIsMobile);
+        /// <summary>The app-background mode in effect on this platform (platform best practice unless overridden).</summary>
+        public AppBackgroundPauseMode EffectiveAppBackgroundMode => Policy.AppBackground;
 
-        /// <summary><see cref="ResumeOnAnyInput"/> after resolving Auto for this platform.</summary>
-        public bool ShouldResumeOnAnyInput => Resolve(ResumeOnAnyInput, !AutoIsMobile);
+        /// <summary>Whether a controller disconnect pauses on this platform.</summary>
+        public bool ShouldPauseOnControllerDisconnect => Policy.PauseOnControllerDisconnect;
 
-        private static bool Resolve(AutoToggle toggle, bool autoValue) =>
-            toggle == AutoToggle.Auto ? autoValue : toggle == AutoToggle.On;
+        /// <summary>Whether any input resumes a frozen game on this platform.</summary>
+        public bool ShouldResumeOnAnyInput => Policy.ResumeOnAnyInput;
+
+        private static Func<bool> _steamManagerProbe;
+        private static bool _steamProbeResolved;
+
+        /// <summary>
+        /// True when Steam is up: <see cref="SteamIsInitialized"/> if the host set it, otherwise auto-detected from a
+        /// <c>SteamManager.Initialized</c> found in any loaded assembly (the standard Steamworks.NET bootstrap).
+        /// </summary>
+        private static bool IsSteamReady
+        {
+            get
+            {
+                if (SteamIsInitialized) return true;
+                if (!_steamProbeResolved)
+                {
+                    _steamProbeResolved = true;
+                    _steamManagerProbe = BuildSteamManagerProbe();
+                }
+                return _steamManagerProbe != null && _steamManagerProbe();
+            }
+        }
+
+        private static Func<bool> BuildSteamManagerProbe()
+        {
+            var type = FindType("SteamManager");
+            if (type == null) return null;
+
+            var property = type.GetProperty("Initialized", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            if (property != null && property.PropertyType == typeof(bool))
+                return () => (bool)property.GetValue(null);
+
+            var field = type.GetField("Initialized", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            if (field != null && field.FieldType == typeof(bool))
+                return () => (bool)field.GetValue(null);
+
+            return null;
+        }
 
         private static SystemUiTracker SystemUi => _systemUi ??= new SystemUiTracker(() => Time.realtimeSinceStartup);
 
@@ -116,7 +151,7 @@ namespace Wagenheimer.RewiredHelper
         private void UpdatePauseState()
         {
 #if WAGENHEIMER_STEAMWORKS
-            if (PauseOnSteamOverlay && SteamIsInitialized)
+            if (PauseOnSteamOverlay && IsSteamReady)
             {
                 if (IsSteamOverlayActive && !Pause.Has(PauseReason.SteamOverlay))
                     TryAutoPause(PauseReason.SteamOverlay, freeze: true);

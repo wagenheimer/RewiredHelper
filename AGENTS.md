@@ -33,8 +33,11 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   dashboard (Setup Audit / Mobile & Pause / Checklist / Docs), same structure as `UnityIAPHelper`'s dashboard
   (`rh-` USS prefix). Audit results carry an optional one-click `Fix`. Manual items live in
   `REWIRED-CHECKLIST.md` and `RewiredHelperChecklistView.Items` — keep both in sync.
-- Mobile defaults (`#if UNITY_ANDROID || UNITY_IOS` in `RewiredInputManager.Pause.cs`): silent app-background
-  pause, no pause on controller disconnect, no tap-anywhere resume. Don't reintroduce an unconditional
+- Pause policy is automatic per build platform: `PausePolicy.ForPlatform(isMobile)` (mobile = silent app-background
+  pause, no pause on controller disconnect, no tap-anywhere resume), resolved at runtime from the compile-time
+  platform (`AutoIsMobile` in `RewiredInputManager.Pause.cs`), never from serialized values, unless the scene
+  explicitly sets `OverridePlatformDefaults`. `Editor/RewiredBuildPreprocessor.cs` (IPreprocessBuildWithReport, like
+  RateControl) logs the policy per build and warns about mobile-breaking overrides; it must stay read-only. Don't reintroduce an unconditional
   `OnApplicationPause -> freeze + overlay`; that was the "game keeps pausing on mobile" bug.
 - `Editor/UpdateChecker.cs` + `UpdateAvailableWindow.cs` — copy-pasted-and-renamed from the
   sibling packages (UnityRateControl/UnityCloudSave/UnityNativeSocial), not a shared library. If

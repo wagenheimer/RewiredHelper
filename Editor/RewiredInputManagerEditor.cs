@@ -68,20 +68,29 @@ namespace Wagenheimer.RewiredHelper.Editor
                 new GUIContent("Cursor Texture", "Texture used by the standalone custom cursor when Custom Cursor Enabled is checked.")
             }, ColAccent);
 
-            // 2. Pause Policy
-            DrawSettingsGroup("Pause Policy", "🎮", new[] {
+            // 2. Pause Policy: automatic per platform unless explicitly overridden
+            var pauseProps = new System.Collections.Generic.List<SerializedProperty>
+            {
                 serializedObject.FindProperty("GamePaused"),
-                serializedObject.FindProperty("PauseOnAppBackground"),
-                serializedObject.FindProperty("PauseOnControllerDisconnect"),
-                serializedObject.FindProperty("ResumeOnAnyInput"),
-                serializedObject.FindProperty("PauseOnSteamOverlay")
-            }, new[] {
+                serializedObject.FindProperty("OverridePlatformDefaults")
+            };
+            var pauseLabels = new System.Collections.Generic.List<GUIContent>
+            {
                 new GUIContent("Game Paused", "GameObject shown while the game is frozen (not for silent pauses)."),
-                new GUIContent("Pause On App Background", "Auto = Silent on Android/iOS, Overlay elsewhere. Off = nothing. Silent = raises OnPauseChanged only (no overlay, timeScale untouched). Overlay = freezes time and shows Game Paused."),
-                new GUIContent("Pause On Controller Disconnect", "Auto = off on Android/iOS (Bluetooth pads/remotes come and go), on elsewhere."),
-                new GUIContent("Resume On Any Input", "While frozen, any tap/click/Back resumes. Auto = off on Android/iOS (use a Resume button wired to Resume()), on elsewhere."),
-                new GUIContent("Pause On Steam Overlay", "Automatically pauses the game when Steam overlay opens.")
-            }, ColAccent);
+                new GUIContent("Override Platform Defaults", "Off (recommended): the pause behavior is picked automatically for the build platform. Mobile: silent app-background pause, no pause on controller disconnect, no tap-to-resume. Desktop/console: overlay, pause on disconnect, resume on input. Turn on only to override.")
+            };
+            if (serializedObject.FindProperty("OverridePlatformDefaults").boolValue)
+            {
+                pauseProps.Add(serializedObject.FindProperty("PauseOnAppBackground"));
+                pauseLabels.Add(new GUIContent("Pause On App Background", "Auto = the platform default. Off = nothing. Silent = raises OnPauseChanged only. Overlay = freezes time and shows Game Paused."));
+                pauseProps.Add(serializedObject.FindProperty("PauseOnControllerDisconnect"));
+                pauseLabels.Add(new GUIContent("Pause On Controller Disconnect", "Auto = the platform default (off on Android/iOS)."));
+                pauseProps.Add(serializedObject.FindProperty("ResumeOnAnyInput"));
+                pauseLabels.Add(new GUIContent("Resume On Any Input", "While frozen, any tap/click/Back resumes. Auto = the platform default (off on Android/iOS)."));
+            }
+            pauseProps.Add(serializedObject.FindProperty("PauseOnSteamOverlay"));
+            pauseLabels.Add(new GUIContent("Pause On Steam Overlay", "Automatically pauses the game when Steam overlay opens (Steam readiness is auto-detected)."));
+            DrawSettingsGroup("Pause Policy", "🎮", pauseProps.ToArray(), pauseLabels.ToArray(), ColAccent);
             DrawMobilePauseWarning();
 
             // 3. Controller Help Events
@@ -526,15 +535,16 @@ namespace Wagenheimer.RewiredHelper.Editor
         private void DrawMobilePauseWarning()
         {
             var manager = (RewiredInputManager)serializedObject.targetObject;
+            if (!manager.OverridePlatformDefaults) return;
+
             bool forcesOverlay = manager.PauseOnAppBackground == AppBackgroundPauseMode.Overlay;
             bool forcesDisconnectPause = manager.PauseOnControllerDisconnect == AutoToggle.On;
             if (!forcesOverlay && !forcesDisconnectPause) return;
 
             EditorGUILayout.HelpBox(
-                "Forced values are saved in the scene and also apply to Android/iOS builds: an Overlay pause on app background " +
-                "(notification shade, ads, IAP sheets) or a pause on controller disconnect freezes a touch game and shows the pause screen. " +
-                "Use Auto to get Silent/off on mobile and the classic behavior on desktop/console.", MessageType.Warning);
-            if (GUILayout.Button("📱  Apply Auto Preset (mobile-safe)", GUILayout.Height(20)))
+                "Overridden values also apply to Android/iOS builds: an Overlay pause on app background (notification shade, ads, " +
+                "IAP sheets) or a pause on controller disconnect freezes a touch game and shows the pause screen.", MessageType.Warning);
+            if (GUILayout.Button("📱  Use Platform Defaults (automatic)", GUILayout.Height(20)))
             {
                 RewiredHelperAudit.ApplyAutoPreset(manager);
                 serializedObject.Update();

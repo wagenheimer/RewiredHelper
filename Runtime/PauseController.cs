@@ -209,3 +209,48 @@ namespace Wagenheimer.RewiredHelper
         }
     }
 }
+
+namespace Wagenheimer.RewiredHelper
+{
+    /// <summary>
+    /// The pause behavior for one platform class. By default it is derived from the platform alone (the
+    /// best practice), so nothing has to be configured by hand; the manager fields only apply when
+    /// "Override Platform Defaults" is on.
+    /// </summary>
+    public readonly struct PausePolicy
+    {
+        public PausePolicy(AppBackgroundPauseMode appBackground, bool pauseOnControllerDisconnect, bool resumeOnAnyInput)
+        {
+            AppBackground = appBackground;
+            PauseOnControllerDisconnect = pauseOnControllerDisconnect;
+            ResumeOnAnyInput = resumeOnAnyInput;
+        }
+
+        public AppBackgroundPauseMode AppBackground { get; }
+        public bool PauseOnControllerDisconnect { get; }
+        public bool ResumeOnAnyInput { get; }
+
+        /// <summary>
+        /// Mobile: the OS already suspends the app, touch play has no controller to lose, and tap-anywhere
+        /// resume leaks taps into gameplay. Desktop/console: classic freeze + overlay behavior.
+        /// </summary>
+        public static PausePolicy ForPlatform(bool isMobile) => isMobile
+            ? new PausePolicy(AppBackgroundPauseMode.Silent, false, false)
+            : new PausePolicy(AppBackgroundPauseMode.Overlay, true, true);
+
+        public static PausePolicy Resolve(bool overridePlatformDefaults, AppBackgroundPauseMode appBackground,
+            AutoToggle pauseOnControllerDisconnect, AutoToggle resumeOnAnyInput, bool isMobile)
+        {
+            var platform = ForPlatform(isMobile);
+            if (!overridePlatformDefaults) return platform;
+
+            return new PausePolicy(
+                appBackground == AppBackgroundPauseMode.Auto ? platform.AppBackground : appBackground,
+                Pick(pauseOnControllerDisconnect, platform.PauseOnControllerDisconnect),
+                Pick(resumeOnAnyInput, platform.ResumeOnAnyInput));
+        }
+
+        private static bool Pick(AutoToggle toggle, bool autoValue) =>
+            toggle == AutoToggle.Auto ? autoValue : toggle == AutoToggle.On;
+    }
+}

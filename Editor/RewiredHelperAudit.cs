@@ -169,23 +169,31 @@ namespace Wagenheimer.RewiredHelper.Editor
         }
 
         /// <summary>
-        /// Explicit Overlay/On values are saved in the scene and win over the per-platform Auto defaults, so
-        /// they are the way a mobile build ends up with the "GAME PAUSED on every app switch" behavior.
+        /// The pause policy is automatic per build platform. Only an explicit override can put a mobile
+        /// build back into the "GAME PAUSED on every app switch" behavior, so that is all worth flagging.
         /// </summary>
         private static void AuditAutoDefaults(List<AuditResult> results, RewiredInputManager manager)
         {
-            Add(results, CategoryMobile, "App background pause follows the platform default",
+            Add(results, CategoryMobile, "Pause policy is automatic for the build platform", !manager.OverridePlatformDefaults,
+                "Following platform best practices (mobile: silent pause, no tap-to-resume; desktop/console: overlay, resume on input).",
+                "Override Platform Defaults is on: the values below replace the automatic per-platform policy.",
+                "Turn Override Platform Defaults off unless you really need custom behavior.", "Use Platform Defaults",
+                () => ApplyAutoPreset(manager), AuditSeverity.Info);
+
+            if (!manager.OverridePlatformDefaults) return;
+
+            Add(results, CategoryMobile, "Overridden app-background pause is safe on mobile",
                 manager.PauseOnAppBackground != AppBackgroundPauseMode.Overlay,
                 $"PauseOnAppBackground = {manager.PauseOnAppBackground}.",
-                "PauseOnAppBackground is forced to Overlay: on Android/iOS every notification shade, ad, IAP sheet or app switch freezes the game and shows 'GAME PAUSED'.",
-                "Set it to Auto (Silent on mobile, Overlay on desktop/console).", "Set to Auto",
+                "PauseOnAppBackground = Overlay: on Android/iOS every notification shade, ad, IAP sheet or app switch freezes the game and shows 'GAME PAUSED'.",
+                "Use Auto/Silent for mobile builds.", "Use Platform Defaults",
                 () => ApplyAutoPreset(manager), AuditSeverity.Warning);
 
-            Add(results, CategoryMobile, "Controller-disconnect pause follows the platform default",
+            Add(results, CategoryMobile, "Overridden controller-disconnect pause is safe on mobile",
                 manager.PauseOnControllerDisconnect != AutoToggle.On,
                 $"PauseOnControllerDisconnect = {manager.PauseOnControllerDisconnect}.",
-                "PauseOnControllerDisconnect is forced On: Bluetooth pads/remotes connecting and disconnecting will pause a touch game on Android/iOS.",
-                "Set it to Auto (off on mobile, on elsewhere).", "Set to Auto",
+                "PauseOnControllerDisconnect = On: Bluetooth pads/remotes connecting and disconnecting pause a touch game on Android/iOS.",
+                "Use Auto/Off for mobile builds.", "Use Platform Defaults",
                 () => ApplyAutoPreset(manager), AuditSeverity.Warning);
         }
 
@@ -230,6 +238,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             if (manager == null) return;
 
             Undo.RecordObject(manager, "Apply Rewired Helper auto pause preset");
+            manager.OverridePlatformDefaults = false;
             manager.PauseOnAppBackground = AppBackgroundPauseMode.Auto;
             manager.PauseOnControllerDisconnect = AutoToggle.Auto;
             manager.ResumeOnAnyInput = AutoToggle.Auto;
@@ -289,10 +298,11 @@ namespace Wagenheimer.RewiredHelper.Editor
 #if WAGENHEIMER_STEAMWORKS
             if (manager == null || !manager.PauseOnSteamOverlay) return;
 
-            bool isAssigned = scripts.Any(s => s.Text.Contains("RewiredInputManager.SteamIsInitialized"));
-            Add(results, CategoryProject, "SteamIsInitialized is assigned", isAssigned,
-                "Assigned in project scripts.", "Never assigned: the Steam overlay will not pause the game.",
-                "Set RewiredInputManager.SteamIsInitialized = SteamManager.Initialized once Steam is up.",
+            bool isDetectable = FindType("SteamManager") != null || scripts.Any(t => t.Text.Contains("RewiredInputManager.SteamIsInitialized"));
+            Add(results, CategoryProject, "Steam readiness can be detected", isDetectable,
+                "SteamManager (or an explicit SteamIsInitialized assignment) found.",
+                "No SteamManager type found and SteamIsInitialized is never assigned: the Steam overlay will not pause the game.",
+                "Add the standard Steamworks.NET SteamManager, or set RewiredInputManager.SteamIsInitialized = true once Steam is up.",
                 failSeverity: AuditSeverity.Warning);
 #endif
         }

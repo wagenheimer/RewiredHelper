@@ -11,13 +11,13 @@ This file lists the items that cannot be verified from source. The Dashboard **C
       (`IUiBlocker`, `IModalStackProvider`, `IControllerHelpGate`, `IPauseGate`).
 
 ## Mobile (Android / iOS)
-- [ ] Backgrounding the app shows **no** "GAME PAUSED" overlay (`PauseOnAppBackground = Auto`, resolves to Silent on mobile).
+- [ ] Backgrounding the app shows **no** "GAME PAUSED" overlay (automatic: Silent on mobile; leave Override Platform Defaults off).
       Test: home button, notification shade, app switcher, ad, IAP sheet.
 - [ ] `Time.timeScale` is correct after an ad / IAP sheet / notification shade. The manager restores the
       value it found and never overwrites a value the game set while paused.
 - [ ] Ads / IAP sheets / share sheets are wrapped in `using (RewiredInputManager.BeginSystemUi())` if the game reacts to `OnPauseChanged`.
 - [ ] Touch works with no controller attached; the game cursor is hidden on touch.
-- [ ] Connecting/disconnecting a Bluetooth pad does not pause (`PauseOnControllerDisconnect = Auto`).
+- [ ] Connecting/disconnecting a Bluetooth pad does not pause (automatic on mobile).
 - [ ] Android Back closes the top modal / opens the pause menu.
 - [ ] Android TV / remote: AndroidRemote glyphs and D-pad cursor work on a real remote.
 - [ ] Any pause screen has an explicit Resume button wired to `RewiredInputManager.Resume()`

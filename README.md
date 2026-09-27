@@ -113,7 +113,7 @@ public class GameBootstrap : MonoBehaviour
 Rewired Helper features professional, color-coded custom inspectors to speed up your workflow:
 
 - **Dashboard** (**Tools → Wagenheimer → Rewired Helper → Dashboard...**): UI Toolkit window like the other Wagenheimer packages, with four tabs:
-  **Setup Audit** (scene + project scan with one-click fixes, *Copy Report* and *Copy AI Fix Prompt*), **Mobile & Pause** (edit the pause policy, reset to the Auto preset),
+  **Setup Audit** (scene + project scan with one-click fixes, *Copy Report* and *Copy AI Fix Prompt*), **Mobile & Pause** (automatic policy per platform, optional override),
   **Checklist** (persistent manual release checklist, mirrored in [`REWIRED-CHECKLIST.md`](REWIRED-CHECKLIST.md)) and **Docs & Updates**.
   The audit also runs headless for CI: `-executeMethod Wagenheimer.RewiredHelper.Editor.RewiredHelperAudit.RunHeadlessAndLog`.
 - **One-Click Setup Generators**: Directly from the `RewiredInputManager` inspector, you can generate a default Pause Screen or a Controller Help Form.
@@ -367,15 +367,20 @@ private void UpdateCursorToggleState()
 The manager can pause for four reasons (`PauseReason`): **AppBackground**, **ControllerDisconnected**,
 **SteamOverlay** and **Manual**. Several can be active at once without releasing each other.
 
-| Setting | Auto on desktop / console | Auto on Android / iOS | Notes |
-|---|---|---|---|
-| `PauseOnAppBackground` | `Overlay` | `Silent` | `Off` = nothing, `Silent` = raise `OnPauseChanged` only (no overlay, `timeScale` untouched), `Overlay` = freeze + show `GamePaused` |
-| `PauseOnControllerDisconnect` | on | **off** | Only fires when the disconnected pad was the active device and the player isn't using touch |
-| `ResumeOnAnyInput` | on | **off** | Off = the pause screen needs a Resume button wired to `RewiredInputManager.Instance.Resume()` |
-| `PauseOnSteamOverlay` | on | n/a | Resumes automatically when the overlay closes |
+**Nothing to configure.** The policy is chosen automatically from the platform of each build (Unity Build Pipeline,
+Build Settings or CLI) when the game runs, never from what was saved in a scene:
 
-All three default to **Auto**, which is resolved when the game runs (not when the scene is saved), so a scene
-saved under any build target behaves correctly on every platform. Only pick an explicit value to override it.
+| Setting | Android / iOS | Desktop / console |
+|---|---|---|
+| App goes to background | `Silent` (event only, no overlay, `timeScale` untouched) | `Overlay` (freeze + `GamePaused`) |
+| Pause on controller disconnect | **off** | on (only if the disconnected pad was the active device and the player isn't using touch) |
+| Resume on any input | **off** (use a Resume button wired to `Resume()`) | on |
+| Steam overlay | n/a | pauses, resumes on close; Steam readiness is auto-detected from `SteamManager.Initialized` |
+
+Every player build logs the policy it uses (`RewiredBuildPreprocessor`) and warns if a scene/prefab contains an explicit
+override that breaks it on mobile. To customise, turn on **Override Platform Defaults** on the manager and edit the
+three settings (each still has an `Auto` value = the platform default). The Dashboard's *Mobile & Pause* tab shows the
+per-platform table and the **Use Platform Defaults** button.
 
 Why mobile differs: the OS already suspends the app, and notification shade / ads / IAP sheets / app switches
 all raise `OnApplicationPause`, so a "GAME PAUSED" overlay popping up constantly is noise. Bluetooth pads and
@@ -403,14 +408,13 @@ RewiredInputManager.Instance.Resume();      // wire to the Resume button
 ```
 
 The **Generate Pause Screen & Link** button (inspector or Dashboard) creates a pause screen that already
-contains a Resume button wired to `Resume()`. Use **Apply Auto Preset (mobile-safe)** to reset the policy to the per-platform defaults in one click.
-With the Auto defaults an ad or IAP sheet no longer shows any overlay on mobile; `BeginSystemUi()` matters for Overlay mode and for games that react to `OnPauseChanged`.
+contains a Resume button wired to `Resume()`. With the Auto defaults an ad or IAP sheet no longer shows any overlay on mobile; `BeginSystemUi()` matters for Overlay mode and for games that react to `OnPauseChanged`.
 
 ### Steam overlay
 
 If the `com.rlabrecque.steamworks.net` package is installed, the manager pauses when the Steam overlay opens
-and resumes when it closes. Set `RewiredInputManager.SteamIsInitialized = true` once your own `SteamManager`
-has initialized (or assign it from `SteamManager.Initialized`). Disable with `PauseOnSteamOverlay = false`.
+and resumes when it closes. Steam readiness is detected from `SteamManager.Initialized` (standard Steamworks.NET
+bootstrap); set `RewiredInputManager.SteamIsInitialized = true` yourself only if you use a different bootstrap. Disable with `PauseOnSteamOverlay = false`.
 
 ---
 

@@ -27,7 +27,7 @@ namespace Wagenheimer.RewiredHelper
     /// <see cref="IControllerHelpGate"/> interfaces. None of them are required.
     /// </summary>
     [MovedFrom(true, sourceClassName: "RewiredHelper")]
-    public class RewiredInputManager : MonoBehaviour
+    public partial class RewiredInputManager : MonoBehaviour
     {
         #region Singleton Pattern
         public static RewiredInputManager Instance { get; protected set; }
@@ -52,11 +52,20 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("Reference to the custom game cursor")]
         public Image GameCursor;
 
-        [Tooltip("GameObject shown/hidden when pausing the game (optional)")]
+        [Tooltip("GameObject shown/hidden while the game is frozen by a pause (optional). Not shown for silent pauses.")]
         public GameObject GamePaused;
 
         [Tooltip("If true, the Steam overlay pauses the game automatically")]
         public bool PauseOnSteamOverlay = true;
+
+        [Tooltip("What happens when the app goes to the background. Auto = Silent on Android/iOS, Overlay elsewhere. Off = nothing; Silent = raises OnPauseChanged only (no overlay, Time.timeScale untouched - the OS already suspends the app); Overlay = freezes time and shows GamePaused.")]
+        public AppBackgroundPauseMode PauseOnAppBackground = AppBackgroundPauseMode.Auto;
+
+        [Tooltip("Pause when the active controller disconnects. Auto = off on Android/iOS (Bluetooth pads and remotes come and go, touch play does not need it), on elsewhere.")]
+        public AutoToggle PauseOnControllerDisconnect = AutoToggle.Auto;
+
+        [Tooltip("While frozen, any tap/click/Back press resumes. Auto = off on Android/iOS (taps leak into gameplay; use a Resume button wired to Resume()), on elsewhere.")]
+        public AutoToggle ResumeOnAnyInput = AutoToggle.Auto;
 
         /// <summary>Indicates whether the custom cursor can be displayed.</summary>
         public static bool CanShowCustomCursor { get; private set; }
@@ -143,6 +152,7 @@ namespace Wagenheimer.RewiredHelper
         private IUiBlocker _uiBlocker = NullUiBlocker.Instance;
         private IModalStackProvider _modalStack = NullModalStackProvider.Instance;
         private IControllerHelpGate _controllerHelpGate = NullControllerHelpGate.Instance;
+        private IPauseGate _pauseGate = NullPauseGate.Instance;
         #endregion
 
         #region Properties
@@ -198,6 +208,7 @@ namespace Wagenheimer.RewiredHelper
         private static IUiBlocker _pendingUiBlocker;
         private static IModalStackProvider _pendingModalStack;
         private static IControllerHelpGate _pendingControllerHelpGate;
+        private static IPauseGate _pendingPauseGate;
         private static bool _hasPendingConfig;
 
         /// <summary>
@@ -205,16 +216,17 @@ namespace Wagenheimer.RewiredHelper
         /// applies immediately. Otherwise, stores configuration to apply as soon as the instance awakes.
         /// </summary>
         public static void SetGlobalConfiguration(IUiBlocker uiBlocker = null, IModalStackProvider modalStack = null,
-            IControllerHelpGate controllerHelpGate = null)
+            IControllerHelpGate controllerHelpGate = null, IPauseGate pauseGate = null)
         {
             _pendingUiBlocker = uiBlocker;
             _pendingModalStack = modalStack;
             _pendingControllerHelpGate = controllerHelpGate;
+            _pendingPauseGate = pauseGate;
             _hasPendingConfig = true;
 
             if (Instance != null)
             {
-                Instance.Configure(uiBlocker, modalStack, controllerHelpGate);
+                Instance.Configure(uiBlocker, modalStack, controllerHelpGate, pauseGate);
             }
         }
 
@@ -225,11 +237,12 @@ namespace Wagenheimer.RewiredHelper
         /// the harmless default (never blocked, no modals, help always allowed).
         /// </summary>
         public void Configure(IUiBlocker uiBlocker = null, IModalStackProvider modalStack = null,
-            IControllerHelpGate controllerHelpGate = null)
+            IControllerHelpGate controllerHelpGate = null, IPauseGate pauseGate = null)
         {
             _uiBlocker = uiBlocker ?? NullUiBlocker.Instance;
             _modalStack = modalStack ?? NullModalStackProvider.Instance;
             _controllerHelpGate = controllerHelpGate ?? NullControllerHelpGate.Instance;
+            _pauseGate = pauseGate ?? NullPauseGate.Instance;
             IsConfigured = true;
         }
         #endregion
@@ -240,7 +253,7 @@ namespace Wagenheimer.RewiredHelper
             InitializeSingleton();
             if (_hasPendingConfig)
             {
-                Configure(_pendingUiBlocker, _pendingModalStack, _pendingControllerHelpGate);
+                Configure(_pendingUiBlocker, _pendingModalStack, _pendingControllerHelpGate, _pendingPauseGate);
             }
         }
 
@@ -326,14 +339,7 @@ namespace Wagenheimer.RewiredHelper
             if (_controllerWasDisconnected && Player != null && Time.time - _controllerDisconnectedTime > CONTROLLER_RECONNECT_DELAY)
                 CheckForControllerReconnection();
 
-            if (GamePaused != null && GamePaused.activeSelf && anyButton)
-                PauseGame(false);
-
-#if WAGENHEIMER_STEAMWORKS
-            if (PauseOnSteamOverlay && SteamIsInitialized && IsSteamOverlayActive &&
-                (GamePaused == null || !GamePaused.activeSelf))
-                PauseGame(true);
-#endif
+            UpdatePauseState();
         }
 
 
@@ -371,114 +377,10 @@ namespace Wagenheimer.RewiredHelper
             if (currentController != null && currentController.type == ControllerType.Joystick)
             {
                 _controllerWasDisconnected = false;
+                ReleaseControllerDisconnectPause();
                 LastActiveController = currentController;
                 _lastKnownControllerType = currentController.type;
             }
-        }
-
-        /// <summary>Routes Escape/Return to the host's modal stack when present, otherwise to the generic EscapeButton/ReturnEscapeEvent components.</summary>
-        private void HandleEscapeButtons()
-        {
-            if (_uiBlocker.IsUiBlocked) return;
-
-            _modalStack.PruneInactiveTop();
-
-            bool escapePressed = Input.GetKeyDown(KeyCode.Escape);
-            if (Player != null)
-            {
-                escapePressed |= Player.GetButtonDown("MenuButton") || Player.GetButtonDown("BackButton");
-            }
-
-            if (escapePressed)
-            {
-                if (_modalStack.ModalCount > 0 && _modalStack.TryGetTopEscapeButton(out var escapeButton) &&
-                    escapeButton != null && escapeButton.interactable && escapeButton.gameObject.activeSelf)
-                {
-                    escapeButton.onClick.Invoke();
-                }
-                else if (!EscapeButton.PressedScape())
-                {
-                    ReturnEscapeEvent.TriggerEscape();
-                }
-            }
-
-            if (Input.GetKeyDown(KeyCode.Return))
-            {
-                if (_modalStack.ModalCount > 0 && _modalStack.TryGetTopOkButton(out var okButton) &&
-                    okButton != null && okButton.interactable && okButton.gameObject.activeSelf)
-                {
-                    okButton.onClick.Invoke();
-                }
-                else
-                {
-                    ReturnEscapeEvent.TriggerOk();
-                }
-            }
-
-            if (AutoBridgeSubmitToPointerDown)
-            {
-                HandleSubmitPointerBridge();
-            }
-        }
-
-        /// <summary>
-        /// When joystick/keyboard confirmation (UISubmit / Submit / Button A / Return) is pressed on a selected UI element,
-        /// automatically dispatches PointerDown/PointerUp/PointerClick so audio listeners (like EventSounds / PointerDown SFX) trigger naturally.
-        /// </summary>
-        private void HandleSubmitPointerBridge()
-        {
-            var es = UnityEngine.EventSystems.EventSystem.current;
-            if (es == null) return;
-
-            var selected = es.currentSelectedGameObject;
-            if (selected == null || !selected.activeInHierarchy) return;
-
-            bool submitPressed = false;
-            if (Player != null)
-            {
-                submitPressed = Player.GetButtonDown("UISubmit") || Player.GetButtonDown("Submit");
-            }
-            if (!submitPressed)
-            {
-                submitPressed = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.JoystickButton0);
-            }
-
-            if (!submitPressed) return;
-
-            var eventData = new UnityEngine.EventSystems.PointerEventData(es)
-            {
-                selectedObject = selected,
-                button = UnityEngine.EventSystems.PointerEventData.InputButton.Left
-            };
-
-            // 1. Dispatch pointerDown / pointerUp / pointerClick hierarchy (upwards)
-            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler);
-            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler);
-            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
-
-            // 2. Also dispatch to any child handlers (e.g. EventSounds components attached to child objects)
-            var pointerDownChildren = selected.GetComponentsInChildren<UnityEngine.EventSystems.IPointerDownHandler>();
-            foreach (var handler in pointerDownChildren)
-            {
-                if (handler is Component c && c.gameObject != selected)
-                {
-                    handler.OnPointerDown(eventData);
-                }
-            }
-
-            var pointerClickChildren = selected.GetComponentsInChildren<UnityEngine.EventSystems.IPointerClickHandler>();
-            foreach (var handler in pointerClickChildren)
-            {
-                if (handler is Component c && c.gameObject != selected)
-                {
-                    handler.OnPointerClick(eventData);
-                }
-            }
-        }
-
-        void OnApplicationPause(bool pauseStatus)
-        {
-            if (pauseStatus) PauseGame(true);
         }
 
         void OnApplicationFocus(bool hasFocus)
@@ -499,127 +401,20 @@ namespace Wagenheimer.RewiredHelper
             UpdateUIForInputType();
         }
 
-        private void PauseGame(bool pause)
-        {
-            if (GamePaused != null) GamePaused.SetActive(pause);
-            Time.timeScale = pause ? 0 : 1;
-        }
-
         private void OnDestroy()
         {
             UnsubscribeFromEvents();
+            if (_pauseController != null)
+            {
+                // Never leave Time.timeScale frozen with no owner (a scene load would strand it).
+                _pauseController.ResumeAll();
+                _pauseController.Changed -= HandlePauseChanged;
+            }
             if (_isDelegateRegistered && ReInput.isReady)
             {
                 ReInput.controllers.RemoveLastActiveControllerChangedDelegate(OnLastActiveControllerChangedCallback);
             }
             if (Instance == this) Instance = null;
-        }
-        #endregion
-
-        #region Glyph Selector Configuration
-        /// <summary>
-        /// Places Custom Controllers last in the Rewired glyph selector's controller type order.
-        /// The Rewired default order is [Joystick, Custom, Mouse, Keyboard], which means binds on
-        /// auxiliary/orphaned Custom Controllers (e.g. AndroidRemote) take precedence over mouse/keyboard
-        /// glyphs on desktop, causing raw element names to be displayed instead of glyphs.
-        /// Applied via reflection because the Rewired glyph system scripts live in Assembly-CSharp,
-        /// which this package's assembly cannot reference directly.
-        /// </summary>
-        private void ConfigureGlyphControllerTypeOrder()
-        {
-            if (!ReInput.isReady) return;
-            _glyphSelectorConfigured = true;
-
-            if (!ForceGlyphCustomControllerLast) return;
-
-            try
-            {
-                var optionsType = FindType("Rewired.Glyphs.ControllerElementGlyphSelectorOptions");
-                if (optionsType == null) return; // Rewired glyph system not installed in this project
-
-                var orderProperty = optionsType.GetProperty("controllerTypeOrder");
-                if (orderProperty == null || !orderProperty.CanWrite)
-                {
-                    Debug.LogWarning("[RewiredHelper] Could not find a writable controllerTypeOrder property on ControllerElementGlyphSelectorOptions.");
-                    return;
-                }
-
-                var newOrder = new[]
-                {
-                    ControllerType.Joystick,
-                    ControllerType.Mouse,
-                    ControllerType.Keyboard,
-                    ControllerType.Custom
-                };
-
-                // 1. Patch the global default options (used by glyph helpers with no options asset assigned)
-                var defaultOptionsProperty = optionsType.GetProperty("defaultOptions", BindingFlags.Public | BindingFlags.Static);
-                var defaultOptions = defaultOptionsProperty?.GetValue(null);
-                if (defaultOptions != null)
-                {
-                    orderProperty.SetValue(defaultOptions, newOrder);
-                }
-
-                // 2. Patch glyph helper components that use an assigned options asset,
-                //    since those serialize their own copy of the controller type order.
-                PatchGlyphHelperGlyphOptions("Rewired.Glyphs.UnityUI.UnityUITextMeshProGlyphHelper", orderProperty, newOrder);
-                PatchGlyphHelperGlyphOptions("Rewired.Glyphs.UnityUI.UnityUIPlayerControllerElementGlyph", orderProperty, newOrder);
-                PatchGlyphHelperGlyphOptions("Rewired.Glyphs.UnityUI.UnityUIControllerElementGlyph", orderProperty, newOrder);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning("[RewiredHelper] Failed to configure glyph controller type order: " + ex.Message);
-            }
-        }
-
-        private static void PatchGlyphHelperGlyphOptions(string helperTypeName, PropertyInfo orderProperty, ControllerType[] newOrder)
-        {
-            var helperType = FindType(helperTypeName);
-            if (helperType == null) return;
-
-            var optionsProperty = helperType.GetProperty("options");
-            if (optionsProperty == null || !optionsProperty.CanRead) return;
-
-#pragma warning disable 0618
-            var components = UnityEngine.Object.FindObjectsOfType(helperType, true);
-#pragma warning restore 0618
-
-            foreach (var component in components)
-            {
-                try
-                {
-                    // The helper's "options" property returns the ScriptableObject wrapper
-                    // (ControllerElementGlyphSelectorOptionsSOBase); the actual options live
-                    // in its own "options" property.
-                    var wrapper = optionsProperty.GetValue(component);
-                    if (wrapper == null) continue;
-
-                    var wrapperType = wrapper.GetType();
-                    var innerOptionsProperty = wrapperType.GetProperty("options");
-                    if (innerOptionsProperty == null || !innerOptionsProperty.CanRead) continue;
-
-                    var innerOptions = innerOptionsProperty.GetValue(wrapper);
-                    if (innerOptions == null) continue;
-
-                    orderProperty.SetValue(innerOptions, newOrder);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[RewiredHelper] Failed to patch glyph options on '{helperTypeName}': {ex.Message}");
-                }
-            }
-        }
-
-        private static Type FindType(string fullName)
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                Type type;
-                try { type = assembly.GetType(fullName, false); }
-                catch { continue; }
-                if (type != null) return type;
-            }
-            return null;
         }
         #endregion
 
@@ -872,19 +667,8 @@ namespace Wagenheimer.RewiredHelper
             {
                 _lastKnownControllerType = args.controller.type;
 
-                if (IsConsole)
-                    StartCoroutine(DelayedControllerDisconnectAction());
-                else
-                    PauseGame(true);
+                OnJoystickDisconnected(args.controller);
             }
-        }
-
-        private System.Collections.IEnumerator DelayedControllerDisconnectAction()
-        {
-            yield return new WaitForSeconds(2f);
-
-            if (_controllerWasDisconnected && Player.controllers.GetLastActiveController() == null)
-                PauseGame(true);
         }
 
         private void OnControllerConnected(ControllerStatusChangedEventArgs args)
@@ -892,6 +676,7 @@ namespace Wagenheimer.RewiredHelper
             if (args.controller.type == ControllerType.Joystick)
             {
                 _controllerWasDisconnected = false;
+                ReleaseControllerDisconnectPause();
                 LastActiveController = args.controller;
                 _lastKnownControllerType = args.controller.type;
                 OnLastActiveControllerChanged();

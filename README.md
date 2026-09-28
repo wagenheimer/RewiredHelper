@@ -467,6 +467,27 @@ _input.OnShowControllerHelp.AddListener(() => controllerHelpForm.SetActive(true)
 
 ---
 
+## On-Screen Keyboard (gamepad text input, Steam Deck)
+
+Steam Deck's "Deck Verified" checklist fails a game whose text fields have no way to type with only a
+controller — its Gaming Mode has no physical keyboard by default. `RewiredOnScreenKeyboard` (ported from this
+project's own `Assets/OSK`, with the hard MasterAudio dependency replaced by a `UnityEvent OnKeyPressed` you
+can wire to your own SFX) covers this with **no per-field setup**: put one in the scene and
+`RewiredInputManager` shows/hides it automatically whenever a `TMP_InputField` is selected while the active
+input is a joystick (Steam Deck, Xbox/PlayStation pads, any Rewired joystick). Touch already gets the OS's own
+keyboard for free; mouse/keyboard needs none.
+
+```csharp
+// Optional: your own theme, or wire your own key art. Otherwise skip this entirely —
+// Tools → Wagenheimer → Rewired Helper → Create On-Screen Keyboard builds a plain, fully working one.
+RewiredInputManager.RegisterOnScreenKeyboard(myKeyboard);  // only if you built it by hand, not via the generator
+```
+
+The Setup Audit warns when the scene has `TMP_InputField`s but no `RewiredOnScreenKeyboard`, with a **Create
+On-Screen Keyboard** one-click fix (builds a plain QWERTY + digits + backspace/space/enter/caps keyboard from
+code — no art assets, restyle it however you like afterwards). Turn off the automatic show/hide with
+`RewiredInputManager.Instance.ShowOnScreenKeyboardOnGamepadTextInput = false` if you wire it yourself.
+
 ## Legacy `RewiredHelper` Component
 
 Projects that never renamed their `RewiredHelper` GameObject/component still work: the package ships a

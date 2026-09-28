@@ -343,6 +343,7 @@ namespace Wagenheimer.RewiredHelper
                 CheckForControllerReconnection();
 
             UpdatePauseState();
+            HandleOnScreenKeyboard();
         }
 
 

@@ -50,6 +50,12 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   `Editor/RewiredLegacyMigrator.cs` detects it (surfaced as a Setup Audit warning with a fix) and migrates it by
   swapping the component's `m_Script` reference in place, never destroying/recreating the Component — that
   preserves every other asset's reference to it, unlike an add-new+copy-fields+destroy-old approach.
+- `Runtime/UI/RewiredOnScreenKeyboard.cs` + `RewiredOnScreenKeyboardKey.cs` + `Runtime/RewiredInputManager.Keyboard.cs` —
+  on-screen keyboard for gamepad/Steam Deck text input, ported from this project's own `Assets/OSK` (renamed,
+  `DarkTonic.MasterAudio` hard dependency replaced by `OnKeyPressed`). `RewiredInputManager` auto-shows/hides any
+  registered instance when a `TMP_InputField` is selected with a joystick — do not require per-field wiring, that
+  defeats the point. `DefaultSetupGenerator.CreateOnScreenKeyboardAndWire()` builds a plain functional one from
+  code (`GridLayoutGroup`, no art assets) since a real prefab can't be hand-authored blind in this repo.
 - Scene checks live once in `Editor/RewiredSetupChecks.cs` and feed both the Dashboard audit and the Inspector
   (`Editor/RewiredInputManagerEditor.cs`, UI Toolkit, `rh-` USS). `Editor/AssemblyInfo.cs` exposes internals to
   `Wagenheimer.RewiredHelper.EditorTests`. Don't reintroduce an unconditional

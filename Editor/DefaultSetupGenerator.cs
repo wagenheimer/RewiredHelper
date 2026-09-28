@@ -643,6 +643,140 @@ namespace Wagenheimer.RewiredHelper.Editor
             Debug.Log("[RewiredHelper] Created Pause Screen and linked to GamePaused field.");
         }
 
+        #region On-Screen Keyboard
+
+        internal static Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard FindOnScreenKeyboardInScene() =>
+            RewiredHelperAudit.FindAll<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard>().FirstOrDefault();
+
+        private const float KeyboardHeight = 340f;
+        private const float KeyWidth = 88f;
+        private const float KeyHeight = 60f;
+        private const float KeySpacing = 6f;
+        private const int KeyboardColumns = 10;
+
+        [MenuItem("Tools/Wagenheimer/Rewired Helper/Create On-Screen Keyboard", priority = 144)]
+        internal static void CreateOnScreenKeyboard() => CreateOnScreenKeyboardAndWire();
+
+        /// <summary>
+        /// Builds a plain but fully working QWERTY + digits + backspace/space/enter/caps/hide on-screen
+        /// keyboard from code (no art assets, so nothing to author blind) and registers it. Once in the
+        /// scene, <see cref="RewiredInputManager"/> shows/hides it automatically for any TMP_InputField
+        /// selected with a gamepad — no per-field wiring needed. Re-running when one already exists is a no-op.
+        /// </summary>
+        internal static Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard CreateOnScreenKeyboardAndWire()
+        {
+            var existing = FindOnScreenKeyboardInScene();
+            if (existing != null)
+            {
+                Debug.Log("[RewiredHelper] An On-Screen Keyboard already exists in the scene.");
+                Selection.activeGameObject = existing.gameObject;
+                return existing;
+            }
+
+            var canvas = FindOrCreateCanvas();
+
+            var root = new GameObject("OnScreenKeyboard", typeof(RectTransform), typeof(Image),
+                typeof(GridLayoutGroup), typeof(Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard));
+            var rootRect = (RectTransform)root.transform;
+            rootRect.SetParent(canvas.transform, false);
+            rootRect.anchorMin = new Vector2(0f, 0f);
+            rootRect.anchorMax = new Vector2(1f, 0f);
+            rootRect.pivot = new Vector2(0.5f, 0f);
+            rootRect.sizeDelta = new Vector2(0f, KeyboardHeight);
+            rootRect.anchoredPosition = Vector2.zero;
+
+            root.GetComponent<Image>().color = new Color(0.12f, 0.12f, 0.14f, 0.96f);
+
+            var grid = root.GetComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(KeyWidth, KeyHeight);
+            grid.spacing = new Vector2(KeySpacing, KeySpacing);
+            grid.padding = new RectOffset(12, 12, 12, 12);
+            grid.childAlignment = TextAnchor.UpperCenter;
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = KeyboardColumns;
+
+            var keyboard = root.GetComponent<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard>();
+            var keys = new List<GameObject>();
+            var specialKeys = new List<GameObject>();
+
+            foreach (char c in "qwertyuiopasdfghjklzxcvbnm1234567890")
+                keys.Add(CreateOnScreenKey(rootRect, keyboard, c.ToString(), specialKey: -1));
+
+            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "⌫", specialKey: 0));   // backspace
+            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "SPACE", specialKey: -1, spaceKey: true));
+            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "OK", specialKey: 1));  // submit
+            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "CAPS", specialKey: 2)); // toggle caps
+            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "✕ CLOSE", specialKey: 3)); // hide
+
+            keyboard.panels = new[] { root };
+            keyboard.keys = keys.ToArray();
+            keyboard.specialKeys = specialKeys.ToArray();
+            keyboard.backgroundColor = new Color32(31, 31, 36, 245);
+            keyboard.mainColor = new Color32(58, 58, 66, 255);
+            keyboard.specialColor = new Color32(34, 92, 217, 255);
+            keyboard.textColor = Color.white;
+
+            root.SetActive(false);
+
+            Undo.RegisterCreatedObjectUndo(root, "Create On-Screen Keyboard");
+            Selection.activeGameObject = root;
+            MarkSceneDirty();
+
+            Debug.Log("[RewiredHelper] Created a default On-Screen Keyboard. RewiredInputManager will show it " +
+                      "automatically whenever a TMP_InputField is selected with a gamepad.");
+            return keyboard;
+        }
+
+        /// <summary>A single key button: a colored Image + centered TMP label + RewiredOnScreenKeyboardKey, wired to Press().</summary>
+        private static GameObject CreateOnScreenKey(Transform parent, Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard keyboard,
+            string glyph, int specialKey, bool spaceKey = false)
+        {
+            var go = new GameObject(spaceKey ? "Key_Space" : $"Key_{glyph}", typeof(RectTransform), typeof(Image), typeof(Button),
+                typeof(Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboardKey));
+            go.transform.SetParent(parent, false);
+
+            // GridLayoutGroup enforces a uniform cellSize on every child (it ignores LayoutElement), so the
+            // space key is the same size as the others here — functional, just not visually widened.
+
+            var labelGo = new GameObject("Label", typeof(RectTransform));
+            var labelRect = (RectTransform)labelGo.transform;
+            labelRect.SetParent(go.transform, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+
+            var label = labelGo.AddComponent<TextMeshProUGUI>();
+            label.text = spaceKey ? string.Empty : glyph.ToUpperInvariant();
+            label.fontSize = specialKey >= 0 ? 16 : 22;
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = Color.white;
+
+            var key = go.GetComponent<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboardKey>();
+            key.keyboard = keyboard;
+            key.label = label;
+            key.specialKey = specialKey;
+            if (spaceKey) key.label = null; // types a literal space via WriteKey below
+
+            var button = go.GetComponent<Button>();
+            UnityEditor.Events.UnityEventTools.AddPersistentListener(button.onClick, key.Press);
+
+            if (spaceKey)
+            {
+                // WriteKey needs a TMP_Text carrying the character to type: a hidden label with a single space.
+                var spaceLabelGo = new GameObject("SpaceGlyph", typeof(RectTransform));
+                spaceLabelGo.transform.SetParent(go.transform, false);
+                var spaceLabel = spaceLabelGo.AddComponent<TextMeshProUGUI>();
+                spaceLabel.text = " ";
+                spaceLabelGo.SetActive(false);
+                key.label = spaceLabel;
+            }
+
+            return go;
+        }
+
+        #endregion
+
         internal static void CreateGameCursorAndWire(RewiredInputManager manager, SerializedObject serializedObject)
         {
             var canvas = FindOrCreateCanvas();

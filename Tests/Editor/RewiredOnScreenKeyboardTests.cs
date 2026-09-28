@@ -1,0 +1,196 @@
+using NUnit.Framework;
+
+using TMPro;
+
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+using Wagenheimer.RewiredHelper.UI;
+
+namespace Wagenheimer.RewiredHelper.Tests
+{
+    /// <summary>
+    /// The on-screen keyboard's own logic (independent of how it is skinned/built): typing, backspace, the
+    /// character limit, case toggling, and the Setup Audit / RewiredInputManager wiring around it.
+    /// </summary>
+    public class RewiredOnScreenKeyboardTests
+    {
+        private GameObject _keyboardGo;
+        private RewiredOnScreenKeyboard _keyboard;
+        private GameObject _fieldGo;
+        private TMP_InputField _field;
+        private GameObject _eventSystemGo;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _eventSystemGo = new GameObject("EventSystem", typeof(EventSystem));
+
+            _keyboardGo = new GameObject("Keyboard", typeof(RectTransform));
+            _keyboard = _keyboardGo.AddComponent<RewiredOnScreenKeyboard>();
+
+            _fieldGo = new GameObject("Field", typeof(RectTransform));
+            _field = _fieldGo.AddComponent<TMP_InputField>();
+            _field.characterLimit = 0;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            Object.DestroyImmediate(_keyboardGo);
+            Object.DestroyImmediate(_fieldGo);
+            Object.DestroyImmediate(_eventSystemGo);
+        }
+
+        private TMP_Text CreateLabel(string text)
+        {
+            var go = new GameObject("Label");
+            var label = go.AddComponent<TextMeshProUGUI>();
+            label.text = text;
+            return label;
+        }
+
+        [Test]
+        public void WriteKey_AppendsTheLabelTextToTheFocusedField()
+        {
+            _keyboard.SetFocus(_field);
+            _field.text = "ab";
+
+            _keyboard.WriteKey(CreateLabel("c"));
+
+            Assert.AreEqual("abc", _field.text);
+        }
+
+        [Test]
+        public void WriteKey_WithNoFocus_DoesNothing()
+        {
+            Assert.DoesNotThrow(() => _keyboard.WriteKey(CreateLabel("x")));
+        }
+
+        [Test]
+        public void WriteKey_RespectsTheCharacterLimit()
+        {
+            _keyboard.SetFocus(_field);
+            _field.characterLimit = 3;
+            _field.text = "ab";
+
+            _keyboard.WriteKey(CreateLabel("cd")); // would push it to 4 chars
+
+            Assert.AreEqual("abc", _field.text);
+        }
+
+        [Test]
+        public void Backspace_RemovesTheLastCharacter()
+        {
+            _keyboard.SetFocus(_field);
+            _field.text = "abc";
+
+            _keyboard.WriteSpecialKey(0);
+
+            Assert.AreEqual("ab", _field.text);
+        }
+
+        [Test]
+        public void Backspace_OnEmptyField_DoesNothing()
+        {
+            _keyboard.SetFocus(_field);
+            _field.text = "";
+
+            Assert.DoesNotThrow(() => _keyboard.WriteSpecialKey(0));
+            Assert.AreEqual("", _field.text);
+        }
+
+        [Test]
+        public void SetActiveFocus_ShowsTheKeyboardAndMovesTheCaretToTheEnd()
+        {
+            _keyboard.SetActiveFocus(_field);
+
+            Assert.IsTrue(_keyboard.isActive);
+            Assert.AreSame(_field, _keyboard.focus);
+        }
+
+        [Test]
+        public void SetActive_False_TogglesActiveOffWithNoAnimator()
+        {
+            _keyboard.SetActiveFocus(_field);
+
+            _keyboard.SetActive(false);
+
+            Assert.IsFalse(_keyboard.isActive);
+        }
+
+        [Test]
+        public void SwitchCaps_UppercasesConfiguredKeyLabels()
+        {
+            var keyGo = new GameObject("Key_a");
+            keyGo.transform.SetParent(_keyboardGo.transform);
+            var keyLabel = keyGo.AddComponent<TextMeshProUGUI>();
+            keyLabel.text = "a";
+            _keyboard.keys = new[] { keyGo };
+
+            _keyboard.SwitchCaps();
+
+            Assert.AreEqual("A", keyLabel.text);
+            Assert.IsTrue(_keyboard.capsEnabled);
+
+            _keyboard.SwitchCaps();
+            Assert.AreEqual("a", keyLabel.text);
+        }
+
+        [Test]
+        public void OnKeyPressed_FiresOnEveryKeyPress()
+        {
+            int presses = 0;
+            _keyboard.OnKeyPressed.AddListener(() => presses++);
+            _keyboard.SetFocus(_field);
+
+            _keyboard.WriteKey(CreateLabel("a"));
+            _keyboard.WriteSpecialKey(0);
+
+            Assert.AreEqual(2, presses);
+        }
+    }
+
+    public class RewiredOnScreenKeyboardWiringTests
+    {
+        private GameObject _managerGo;
+        private RewiredInputManager _manager;
+        private GameObject _keyboardGo;
+        private RewiredOnScreenKeyboard _keyboard;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _managerGo = new GameObject("Manager");
+            _manager = _managerGo.AddComponent<RewiredInputManager>();
+
+            _keyboardGo = new GameObject("Keyboard");
+            _keyboard = _keyboardGo.AddComponent<RewiredOnScreenKeyboard>();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            RewiredInputManager.UnregisterOnScreenKeyboard(_keyboard);
+            Object.DestroyImmediate(_managerGo);
+            Object.DestroyImmediate(_keyboardGo);
+        }
+
+        [Test]
+        public void RegisterAndUnregister_ControlWhetherItCountsAsActive()
+        {
+            _keyboard.SetActiveFocus(null);
+            RewiredInputManager.RegisterOnScreenKeyboard(_keyboard);
+            Assert.IsTrue(RewiredInputManager.IsOnScreenKeyboardActive);
+
+            RewiredInputManager.UnregisterOnScreenKeyboard(_keyboard);
+            Assert.IsFalse(RewiredInputManager.IsOnScreenKeyboardActive);
+        }
+
+        [Test]
+        public void ManagerDefaultsToShowingTheKeyboardOnGamepadTextInput()
+        {
+            Assert.IsTrue(_manager.ShowOnScreenKeyboardOnGamepadTextInput);
+        }
+    }
+}

@@ -6,6 +6,8 @@ using System.Text;
 
 using UnityEditor;
 
+using TMPro;
+
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -53,6 +55,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             CheckGlyphs(results, manager);
             CheckI2(results);
+            CheckOnScreenKeyboard(results, manager);
         }
 
         #region Core
@@ -213,6 +216,30 @@ namespace Wagenheimer.RewiredHelper.Editor
                     return true;
             }
             return false;
+        }
+
+        #endregion
+
+        #region On-Screen Keyboard
+
+        /// <summary>
+        /// Steam Deck's "Deck Verified" checklist fails a game whose text fields have no way to type with only a
+        /// controller. A single RewiredOnScreenKeyboard in the scene covers every TMP_InputField automatically
+        /// (RewiredInputManager shows/hides it when one is selected with a joystick), so this only needs one check.
+        /// </summary>
+        private static void CheckOnScreenKeyboard(List<AuditResult> results, RewiredInputManager manager)
+        {
+            int inputFields = RewiredHelperAudit.FindAll<TMP_InputField>().Count;
+            if (inputFields == 0) return;
+
+            bool hasKeyboard = DefaultSetupGenerator.FindOnScreenKeyboardInScene() != null;
+            RewiredHelperAudit.Add(results, Category, "On-Screen Keyboard for gamepad text input", hasKeyboard,
+                $"Found, covering all {inputFields} TMP_InputField(s) in the scene.",
+                $"{inputFields} TMP_InputField(s) in the scene but no RewiredOnScreenKeyboard: a gamepad or Steam Deck " +
+                "player has no way to type (fails Valve's Deck Verified on-screen-keyboard requirement).",
+                "Builds a plain, fully working QWERTY keyboard and registers it; shown automatically for any TMP_InputField selected with a gamepad.",
+                "Create On-Screen Keyboard", () => DefaultSetupGenerator.CreateOnScreenKeyboardAndWire(),
+                manager != null && !manager.ShowOnScreenKeyboardOnGamepadTextInput ? AuditSeverity.Info : AuditSeverity.Warning);
         }
 
         #endregion

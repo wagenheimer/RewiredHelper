@@ -20,6 +20,7 @@ This file lists the items that cannot be verified from source. The Dashboard **C
 - [ ] Connecting/disconnecting a Bluetooth pad does not pause (automatic on mobile).
 - [ ] Android Back closes the top modal / opens the pause menu.
 - [ ] Android TV / remote: AndroidRemote glyphs and D-pad cursor work on a real remote.
+- [ ] Every TMP_InputField can be typed into with a gamepad only (Steam Deck Verified requires this): a `RewiredOnScreenKeyboard` exists in the scene.
 - [ ] `Game Paused` is assigned (the audit fails without it) and has an explicit Resume button wired to `RewiredInputManager.Resume()`
       (or `ResumeOnAnyInput` is on).
 

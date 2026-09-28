@@ -1,0 +1,242 @@
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.Events;
+using UnityEngine.UI;
+using TMPro;
+
+namespace Wagenheimer.RewiredHelper.UI
+{
+    /// <summary>
+    /// On-screen virtual keyboard for typing into a <see cref="TMP_InputField"/> with a gamepad — required
+    /// on Steam Deck (Valve's "Deck Verified" checklist fails a game whose text fields have no way to type with
+    /// only a controller) and useful on any platform where a physical keyboard is Xbox/PlayStation-pad users.
+    /// <see cref="RewiredInputManager"/> shows/hides it automatically whenever a <c>TMP_InputField</c> is
+    /// selected while the active input is a joystick; no per-field wiring is required.
+    ///
+    /// Ported from this project's own <c>Assets/OSK</c> (used across several Green Sauce Games titles), renamed
+    /// to avoid clashing with that global-namespace script, and with the hard MasterAudio dependency replaced by
+    /// <see cref="OnKeyPressed"/> so the host game can hook its own SFX (or none) — this package never takes a
+    /// hard third-party dependency. The optional <c>Animator</c> "Hide" bool trigger from the original is kept for
+    /// projects that bring their own show/hide animation; without one, it just toggles active state.
+    /// </summary>
+    public class RewiredOnScreenKeyboard : MonoBehaviour
+    {
+        [Tooltip("The input field currently receiving keystrokes.")]
+        public TMP_InputField focus;
+
+        public bool showNumeric = false;
+
+        [Header("Theming (optional)")]
+        public Color32 textColor = Color.black;
+        public Color32 mainColor = Color.white;
+        public Color32 specialColor = Color.gray;
+        public Color32 backgroundColor = Color.white;
+        public Sprite mainSprite;
+        public Sprite specialSprite;
+
+        [Header("Layout")]
+        [Tooltip("panels[0] = lowercase letters, [1] = uppercase/caps, [2] = optional extra symbol panel, [3] = numeric (toggled by ShowNumeric).")]
+        public GameObject[] panels;
+        [Tooltip("Character keys: each must have a child named \"Text\" holding the glyph to type.")]
+        public GameObject[] keys;
+        [Tooltip("Non-character keys (backspace, enter, caps, hide, switch panel...) driven by WriteSpecialKey.")]
+        public GameObject[] specialKeys;
+
+        [Tooltip("Invoked on every key press (character or special). Wire your own SFX here.")]
+        public UnityEvent OnKeyPressed;
+
+        [HideInInspector] public bool isActive;
+        [HideInInspector] public bool capsEnabled;
+
+        private Animator _animator;
+
+        private void Awake()
+        {
+            _animator = GetComponent<Animator>();
+        }
+
+        private void Start()
+        {
+            ShowNumeric(showNumeric);
+            SetTextColor(textColor);
+            SetMainColor(mainColor);
+            SetSpecialColor(specialColor);
+            SetBackgroundColor(backgroundColor);
+            SetMainSprite(mainSprite);
+            SetSpecialSprite(specialSprite);
+        }
+
+        public void ShowNumeric(bool show)
+        {
+            if (panels != null && panels.Length > 3 && panels[3] != null)
+                panels[3].SetActive(show);
+            showNumeric = show;
+        }
+
+        public void SetTextColor(Color32 color)
+        {
+            ForEachLabel(keys, t => t.color = color);
+            ForEachLabel(specialKeys, t => t.color = color);
+        }
+
+        public void SetMainColor(Color32 color) => ForEachImage(keys, img => img.color = color);
+
+        public void SetSpecialColor(Color32 color) => ForEachImage(specialKeys, img => img.color = color);
+
+        public void SetBackgroundColor(Color32 color)
+        {
+            var background = GetComponent<Image>();
+            if (background != null) background.color = color;
+        }
+
+        public void SetMainSprite(Sprite sprite)
+        {
+            if (sprite == null) return;
+            ForEachImage(keys, img => img.sprite = sprite);
+        }
+
+        public void SetSpecialSprite(Sprite sprite)
+        {
+            if (sprite == null) return;
+            ForEachImage(specialKeys, img => img.sprite = sprite);
+        }
+
+        public void SetFocus(TMP_InputField inputField) => focus = inputField;
+
+        /// <summary>Shows the keyboard already bound to <paramref name="inputField"/>, cursor at the end.</summary>
+        public void SetActiveFocus(TMP_InputField inputField)
+        {
+            focus = inputField;
+            SetActive(true);
+            if (focus != null) focus.MoveTextEnd(true);
+        }
+
+        public void WriteKey(TMP_Text label)
+        {
+            OnKeyPressed?.Invoke();
+            if (focus == null || label == null) return;
+
+            focus.text += label.text;
+            if (focus.characterLimit > 0 && focus.text.Length > focus.characterLimit)
+                focus.text = focus.text.Substring(0, focus.characterLimit);
+        }
+
+        /// <summary>0 = backspace, 1 = submit/enter, 2 = toggle caps, 3 = hide, 4/5/8 = switch panel, 6/7 = focus prev/next.</summary>
+        public void WriteSpecialKey(int key)
+        {
+            OnKeyPressed?.Invoke();
+            switch (key)
+            {
+                case 0: Backspace(); break;
+                case 1: Submit(); break;
+                case 2: SwitchCaps(); break;
+                case 3: SetActive(false); break;
+                case 4: SetKeyboardType(1); break;
+                case 5: SetKeyboardType(2); break;
+                case 6: FocusPrevious(); break;
+                case 7: FocusNext(); break;
+                case 8: SetKeyboardType(0); break;
+            }
+        }
+
+        public void Backspace()
+        {
+            if (focus == null || focus.text.Length == 0) return;
+            focus.text = focus.text.Substring(0, focus.text.Length - 1);
+        }
+
+        public void Submit()
+        {
+            if (focus == null) return;
+            focus.OnSubmit(new PointerEventData(EventSystem.current));
+        }
+
+        public void SetActive(bool show)
+        {
+            if (show)
+            {
+                if (!isActive)
+                {
+                    if (_animator != null)
+                    {
+                        _animator.Rebind();
+                        _animator.enabled = true;
+                    }
+                    else
+                    {
+                        gameObject.SetActive(true);
+                    }
+                }
+            }
+            else if (isActive)
+            {
+                if (_animator != null)
+                    _animator.SetBool("Hide", true);
+                else
+                    gameObject.SetActive(false);
+            }
+
+            isActive = show;
+        }
+
+        public void SetCaps(bool enabled)
+        {
+            ForEachLabel(keys, t => t.text = enabled ? t.text.ToUpperInvariant() : t.text.ToLowerInvariant());
+            capsEnabled = enabled;
+        }
+
+        public void SwitchCaps() => SetCaps(!capsEnabled);
+
+        public void FocusPrevious() => MoveFocus(s => s.FindSelectableOnLeft() ?? s.FindSelectableOnUp());
+
+        public void FocusNext() => MoveFocus(s => s.FindSelectableOnRight() ?? s.FindSelectableOnDown());
+
+        private void MoveFocus(System.Func<Selectable, Selectable> pick)
+        {
+            if (focus == null) return;
+
+            var current = focus.GetComponent<Selectable>();
+            var next = current != null ? pick(current) : null;
+            if (next == null) return;
+
+            var eventSystem = EventSystem.current;
+            var nextField = next.GetComponent<TMP_InputField>();
+            if (nextField != null)
+            {
+                nextField.OnPointerClick(new PointerEventData(eventSystem));
+                focus = nextField;
+            }
+            eventSystem.SetSelectedGameObject(next.gameObject);
+        }
+
+        /// <summary>0 = lowercase, 1 = uppercase, 2 = the optional extra symbol panel.</summary>
+        public void SetKeyboardType(int type)
+        {
+            if (panels == null) return;
+            for (int i = 0; i < panels.Length && i < 3; i++)
+            {
+                if (panels[i] != null) panels[i].SetActive(i == type);
+            }
+        }
+
+        private static void ForEachLabel(GameObject[] targets, System.Action<TMP_Text> apply)
+        {
+            if (targets == null) return;
+            foreach (var go in targets)
+            {
+                var label = go != null ? go.GetComponentInChildren<TMP_Text>(true) : null;
+                if (label != null) apply(label);
+            }
+        }
+
+        private static void ForEachImage(GameObject[] targets, System.Action<Image> apply)
+        {
+            if (targets == null) return;
+            foreach (var go in targets)
+            {
+                var image = go != null ? go.GetComponent<Image>() : null;
+                if (image != null) apply(image);
+            }
+        }
+    }
+}

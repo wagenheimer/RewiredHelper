@@ -467,6 +467,16 @@ _input.OnShowControllerHelp.AddListener(() => controllerHelpForm.SetActive(true)
 
 ---
 
+## Legacy `RewiredHelper` Component
+
+Projects that never renamed their `RewiredHelper` GameObject/component still work: the package ships a
+backward-compatibility subclass (`global::RewiredHelper : RewiredInputManager`), and the Inspector/Dashboard
+customization applies to it too. The Setup Audit flags it (Warning) with a one-click **Migrate to
+RewiredInputManager** fix that swaps the component's script reference in place — the same technique Unity
+uses for an in-place class rename, so no data is lost and no other object's reference to that exact component
+breaks. For a project-wide sweep (every scene and prefab, not just the open scene), use
+**Tools → Wagenheimer → Rewired Helper → Migrate Legacy RewiredHelper Component...**.
+
 ## Editor Utilities
 
 | Menu | Action |

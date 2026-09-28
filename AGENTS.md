@@ -42,6 +42,14 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   runtime (`RewiredInputManager.IsTelevisionDevice`) and get the desktop policy. The pause screen is deliberately NOT auto-created at runtime: a missing `GamePaused` must FAIL the audit
   (`AuditPauseScreen`, checked for every platform class). Do not add "fix it" buttons for the
   pause policy: it is automatic, an override is a deliberate user choice and is only reported.
+- `Runtime/RewiredHelper.cs` — a global-namespace `RewiredHelper : RewiredInputManager` backward-compatibility
+  subclass (`[AddComponentMenu("")]`, hidden from the Add Component menu) for projects that never renamed their
+  component. `[CustomEditor(typeof(RewiredInputManager), editorForChildClasses: true)]` makes the custom
+  Inspector apply to it too — do not drop `editorForChildClasses`, or this legacy component silently falls
+  back to Unity's plain reflection-based inspector with no visible error (this exact regression happened once).
+  `Editor/RewiredLegacyMigrator.cs` detects it (surfaced as a Setup Audit warning with a fix) and migrates it by
+  swapping the component's `m_Script` reference in place, never destroying/recreating the Component — that
+  preserves every other asset's reference to it, unlike an add-new+copy-fields+destroy-old approach.
 - Scene checks live once in `Editor/RewiredSetupChecks.cs` and feed both the Dashboard audit and the Inspector
   (`Editor/RewiredInputManagerEditor.cs`, UI Toolkit, `rh-` USS). `Editor/AssemblyInfo.cs` exposes internals to
   `Wagenheimer.RewiredHelper.EditorTests`. Don't reintroduce an unconditional

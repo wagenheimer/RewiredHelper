@@ -17,7 +17,7 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// "Setup Health" list with one-click fixes, the automatic per-platform pause policy, and collapsible settings.
     /// Shares its checks and theme with the Dashboard window.
     /// </summary>
-    [CustomEditor(typeof(RewiredInputManager))]
+    [CustomEditor(typeof(RewiredInputManager), editorForChildClasses: true)]
     public class RewiredInputManagerEditor : UnityEditor.Editor
     {
         private const long LiveRefreshMs = 250;

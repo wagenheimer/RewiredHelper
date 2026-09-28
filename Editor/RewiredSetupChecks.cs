@@ -42,6 +42,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             CheckDuplicateEventSystems(results);
             CheckCanvas(results);
+            CheckLegacyComponent(results, manager);
 
             if (manager != null)
             {
@@ -95,6 +96,22 @@ namespace Wagenheimer.RewiredHelper.Editor
                     "Cursor Texture assigned.", "Custom Cursor Enabled is on, but no Cursor Texture is assigned.",
                     "Assign a Read/Write, uncompressed, no-mipmap texture to Cursor Texture.", failSeverity: AuditSeverity.Warning);
             }
+        }
+
+        /// <summary>
+        /// Flags the legacy backward-compatibility subclass (<c>global::RewiredHelper</c>, kept for projects that
+        /// never renamed it). It works fine as-is, but the Dashboard/Inspector customization only applied to the
+        /// exact <see cref="RewiredInputManager"/> type until the CustomEditor was made to also cover subclasses;
+        /// migrating removes the extra indirection for good.
+        /// </summary>
+        private static void CheckLegacyComponent(List<AuditResult> results, RewiredInputManager manager)
+        {
+            if (manager == null || !RewiredLegacyMigrator.IsLegacyComponent(manager)) return;
+
+            RewiredHelperAudit.Add(results, Category, "Using the legacy RewiredHelper component", false,
+                null, $"'{manager.gameObject.name}' still uses the old 'RewiredHelper' class name (a compatibility subclass of RewiredInputManager).",
+                "Swaps the component's script reference to RewiredInputManager in place: same data, no reference to this GameObject breaks.",
+                "Migrate to RewiredInputManager", RewiredLegacyMigrator.MigrateOpenScenes, AuditSeverity.Warning);
         }
 
         private static void CheckRuntimeConfiguration(List<AuditResult> results, RewiredInputManager manager)

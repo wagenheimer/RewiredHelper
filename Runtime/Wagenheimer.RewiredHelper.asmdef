@@ -14,6 +14,11 @@
       "name": "com.rlabrecque.steamworks.net",
       "expression": "0.0.0",
       "define": "WAGENHEIMER_STEAMWORKS"
+    },
+    {
+      "name": "com.rlabrecque.steamworks.net",
+      "expression": "2025.165.0",
+      "define": "WAGENHEIMER_STEAM_DECK_DETECTION"
     }
   ],
   "noEngineReferences": false

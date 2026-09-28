@@ -21,6 +21,9 @@ This file lists the items that cannot be verified from source. The Dashboard **C
 - [ ] Android Back closes the top modal / opens the pause menu.
 - [ ] Android TV / remote: AndroidRemote glyphs and D-pad cursor work on a real remote.
 - [ ] Every TMP_InputField can be typed into with a gamepad only (Steam Deck Verified requires this): a `RewiredOnScreenKeyboard` exists in the scene.
+- [ ] On Steam Deck, suspending (power button / lid close) and resuming pauses/resumes cleanly (no stuck or crashed state) — needs `Game Paused` assigned.
+- [ ] Steamworks.NET is 2025.165.0+ so Deck hardware is actually detected (`RewiredInputManager.SupportsSteamDeckDetection`); the Setup Audit flags an older install.
+- [ ] Mouse cursor never shows while a gamepad/Deck controls the game (already automatic; verify after any custom cursor changes).
 - [ ] `Game Paused` is assigned (the audit fails without it) and has an explicit Resume button wired to `RewiredInputManager.Resume()`
       (or `ResumeOnAnyInput` is on).
 

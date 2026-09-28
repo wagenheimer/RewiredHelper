@@ -240,6 +240,26 @@ namespace Wagenheimer.RewiredHelper.Editor
                 "Builds a plain, fully working QWERTY keyboard and registers it; shown automatically for any TMP_InputField selected with a gamepad.",
                 "Create On-Screen Keyboard", () => DefaultSetupGenerator.CreateOnScreenKeyboardAndWire(),
                 manager != null && !manager.ShowOnScreenKeyboardOnGamepadTextInput ? AuditSeverity.Info : AuditSeverity.Warning);
+
+            CheckSteamDeckDetection(results);
+        }
+
+        /// <summary>
+        /// Steam Deck hardware detection (used for suspend/resume handling) needs Steamworks.NET 2025.165.0+
+        /// (<c>SteamUtils.IsRunningOnSteamHardware</c>, which replaced the older, now-removed
+        /// <c>IsSteamRunningOnSteamDeck</c>). Only relevant when Steamworks.NET is installed at all.
+        /// </summary>
+        private static void CheckSteamDeckDetection(List<AuditResult> results)
+        {
+            if (FindType("Steamworks.SteamUtils") == null) return; // Steamworks.NET not installed: nothing to check
+
+            RewiredHelperAudit.Add(results, Category, "Steamworks.NET supports Steam Deck detection",
+                RewiredInputManager.SupportsSteamDeckDetection,
+                "Steamworks.NET is new enough (2025.165.0+): Deck suspend/resume is detected automatically.",
+                "Steamworks.NET is older than 2025.165.0: RewiredInputManager.IsSteamDeck always reports false, so " +
+                "Deck's suspend/resume falls back to the general desktop pause instead of being specifically detected.",
+                "Update the package: https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net",
+                failSeverity: AuditSeverity.Info);
         }
 
         #endregion

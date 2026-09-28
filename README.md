@@ -385,6 +385,7 @@ Build Settings or CLI) when the game runs, never from what was saved in a scene:
 | Resume on any input | **off** (use a Resume button wired to `Resume()`) | on |
 | Steam overlay | n/a | pauses, resumes on close; Steam readiness is auto-detected from `SteamManager.Initialized` |
 | Android TV / Fire TV | uses the desktop / console column (detected at runtime with `UiModeManager`) | |
+| Steam Deck | n/a | app-background pause also fires on `OnApplicationFocus` (suspend/resume), detected with `RewiredInputManager.IsSteamDeck` |
 
 Every player build logs the policy it uses (`RewiredBuildPreprocessor`) and warns if a scene/prefab contains an explicit
 override that breaks it on mobile. To customise, turn on **Override Platform Defaults** on the manager and edit the
@@ -466,6 +467,18 @@ _input.OnShowControllerHelp.AddListener(() => controllerHelpForm.SetActive(true)
 ```
 
 ---
+
+## Steam Deck Suspend/Resume
+
+Unity does not reliably call `OnApplicationPause` on a Standalone build (only mobile/console are guaranteed), so a
+Deck suspend (lid close, power button, Steam's "Suspend Game") could otherwise slip past the pause policy entirely.
+`RewiredInputManager.IsSteamDeck` (compiled against `Steamworks.SteamUtils.IsRunningOnSteamHardware()`, gated on
+Steamworks.NET 2025.165.0+ via `versionDefines` — that API replaced the older, now-removed
+`IsSteamRunningOnSteamDeck`; `RewiredInputManager.SupportsSteamDeckDetection` reports whether the installed version
+is new enough, and the Setup Audit flags it when it isn't) makes `OnApplicationFocus` also drive the same
+app-background pause/resume path on Deck specifically, leaving other desktop/console games unaffected. This is what Valve's "Deck Verified" checklist calls
+"seamless suspend": the game freezes cleanly and resumes without a stuck or crashed state — exactly the classic
+Overlay pause screen this package already has, as long as `Game Paused` is assigned (the Setup Audit fails without it).
 
 ## On-Screen Keyboard (gamepad text input, Steam Deck)
 

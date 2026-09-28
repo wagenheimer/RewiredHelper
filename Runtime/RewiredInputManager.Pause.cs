@@ -3,6 +3,10 @@ using System.Collections;
 
 using Rewired;
 
+#if WAGENHEIMER_STEAM_DECK_DETECTION
+using Steamworks;
+#endif
+
 using UnityEngine;
 
 namespace Wagenheimer.RewiredHelper
@@ -125,6 +129,55 @@ namespace Wagenheimer.RewiredHelper
                 return () => (bool)initialized.GetValue(null);
 
             return () => (instanceField.GetValue(null) as UnityEngine.Object) != null && (bool)initialized.GetValue(null);
+        }
+
+        private static bool? _isSteamDeckCache;
+
+        /// <summary>
+        /// True when running on Steam Deck. Only meaningful once Steam is up (see <see cref="IsSteamReady"/>); returns
+        /// false (and is not cached) until then, so it keeps re-checking rather than latching a false negative during
+        /// startup. Compiled directly against <c>Steamworks.SteamUtils.IsRunningOnSteamHardware()</c> when the
+        /// installed Steamworks.NET is new enough (see <see cref="SupportsSteamDeckDetection"/>); on an older one
+        /// this is always false instead of failing to compile — the Setup Audit flags that case.
+        /// </summary>
+        public static bool IsSteamDeck
+        {
+            get
+            {
+                if (_isSteamDeckCache.HasValue) return _isSteamDeckCache.Value;
+                if (!IsSteamReady) return false;
+
+                _isSteamDeckCache = DetectSteamDeck();
+                return _isSteamDeckCache.Value;
+            }
+        }
+
+        /// <summary>
+        /// True when this package was compiled against a Steamworks.NET version new enough to detect Steam Deck
+        /// hardware (<c>SteamUtils.IsRunningOnSteamHardware</c>, verified present in 2025.165.0 — the API that
+        /// replaced the older, now-removed <c>IsSteamRunningOnSteamDeck</c>). False on an older install: update
+        /// Steamworks.NET (<c>https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net</c>)
+        /// to enable Deck-specific suspend/resume handling.
+        /// </summary>
+        public const bool SupportsSteamDeckDetection =
+#if WAGENHEIMER_STEAM_DECK_DETECTION
+            true;
+#else
+            false;
+#endif
+
+        private static bool DetectSteamDeck()
+        {
+#if WAGENHEIMER_STEAM_DECK_DETECTION
+            try { return SteamUtils.IsRunningOnSteamHardware() == ESteamHardwareType.k_ESteamHardwareTypeSteamDeck; }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RewiredHelper] Could not query IsRunningOnSteamHardware: " + ex.Message);
+                return false;
+            }
+#else
+            return false;
+#endif
         }
 
         private static SystemUiTracker SystemUi => _systemUi ??= new SystemUiTracker(() => Time.realtimeSinceStartup);

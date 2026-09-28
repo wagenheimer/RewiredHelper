@@ -50,6 +50,22 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void IsSteamDeck_WithoutSteamworksInstalled_IsFalseAndNeverThrows()
+        {
+            // No SteamManager type is loaded in this test environment, so IsSteamReady short-circuits IsSteamDeck
+            // to false before ever calling Steamworks.SteamUtils.IsRunningOnSteamHardware.
+            Assert.DoesNotThrow(() => Assert.IsFalse(RewiredInputManager.IsSteamDeck));
+        }
+
+        [Test]
+        public void SupportsSteamDeckDetection_IsACompileTimeConstant()
+        {
+            // Whatever it resolves to in this build, reading it must never throw; it's a straight #if-compiled
+            // const, not reflection, so there's nothing to probe at runtime.
+            Assert.DoesNotThrow(() => { var _ = RewiredInputManager.SupportsSteamDeckDetection; });
+        }
+
+        [Test]
         public void MobilePolicyActive_MatchesTheBuildPlatformInTheEditor()
         {
             Assert.AreEqual(BuildIsMobile, RewiredInputManager.IsMobileBuild);

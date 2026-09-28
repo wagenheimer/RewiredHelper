@@ -305,7 +305,11 @@ namespace Wagenheimer.RewiredHelper.Editor
                 ("Controller help",
                  "Shown once, the first time a gamepad button is pressed in an allowed scene. Never on touch."),
                 ("Every build",
-                 "The Unity Build Pipeline, Build Settings and CLI builds log the policy in use and warn about overrides that would break mobile.")
+                 "The Unity Build Pipeline, Build Settings and CLI builds log the policy in use and warn about overrides that would break mobile."),
+                ("Steam Deck suspend/resume",
+                 "Detected via IsSteamRunningOnSteamDeck; OnApplicationFocus also drives the app-background pause so suspend/resume behaves like the classic desktop pause (needs Game Paused assigned)."),
+                ("Gamepad text input",
+                 "A RewiredOnScreenKeyboard in the scene is shown/hidden automatically for any selected TMP_InputField — required for Steam Deck Verified.")
             };
 
             foreach (var (title, detail) in rows)

@@ -50,6 +50,17 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   `Editor/RewiredLegacyMigrator.cs` detects it (surfaced as a Setup Audit warning with a fix) and migrates it by
   swapping the component's `m_Script` reference in place, never destroying/recreating the Component — that
   preserves every other asset's reference to it, unlike an add-new+copy-fields+destroy-old approach.
+- `RewiredInputManager.IsSteamDeck`/`SupportsSteamDeckDetection` (in `.Pause.cs`) compile directly against
+  `Steamworks.SteamUtils.IsRunningOnSteamHardware()` (verified present in Steamworks.NET 2025.165.0, which
+  replaced the older, now-removed `IsSteamRunningOnSteamDeck`), gated by a SECOND `versionDefines` entry in
+  `Runtime/Wagenheimer.RewiredHelper.asmdef` (`WAGENHEIMER_STEAM_DECK_DETECTION`, expression `"2025.165.0"`) on
+  top of the existing `WAGENHEIMER_STEAMWORKS` one. A REFLECTION-BASED probe was tried first and reverted: this
+  package is used across many of Cezar's own projects where Steamworks.NET is a raw `Assets/` drop with no
+  `package.json` at all (so `versionDefines` never fires there either) or an OLD version — always verify a
+  Steamworks.NET API actually exists in a REAL resolved copy (`Library/PackageCache/com.rlabrecque.steamworks.net@*`)
+  before assuming it, API names change across SDK versions (this one did). `OnApplicationFocus` reuses
+  `OnApplicationPause` on Deck specifically, since Unity does not reliably call `OnApplicationPause` on a
+  Standalone build.
 - `Runtime/UI/RewiredOnScreenKeyboard.cs` + `RewiredOnScreenKeyboardKey.cs` + `Runtime/RewiredInputManager.Keyboard.cs` —
   on-screen keyboard for gamepad/Steam Deck text input, ported from this project's own `Assets/OSK` (renamed,
   `DarkTonic.MasterAudio` hard dependency replaced by `OnKeyPressed`). `RewiredInputManager` auto-shows/hides any

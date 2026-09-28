@@ -64,6 +64,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             card.Add(CreatePolicyRow("Steam overlay", "n/a", "pauses, resumes on close (auto-detected)"));
             card.Add(CreatePolicyRow("Android TV / Fire TV", "-", "desktop policy, detected at runtime"));
             card.Add(CreatePolicyRow("Pause screen", "not shown (silent)", "yours: required, the audit fails without it"));
+            card.Add(CreatePolicyRow("Steam Deck suspend/resume", "n/a", "detected automatically, pauses/resumes like app-background"));
+            card.Add(CreatePolicyRow("Gamepad text input", "native OS keyboard (touch)", "RewiredOnScreenKeyboard, shown automatically"));
 
             card.Add(RewiredHelperUIStyle.CreateCallout(
                 $"● Active build target: {EditorUserBuildSettings.activeBuildTarget}. Every build logs the policy it uses and warns about a manual override that would break it on mobile.",

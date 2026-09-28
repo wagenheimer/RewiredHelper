@@ -391,6 +391,12 @@ namespace Wagenheimer.RewiredHelper
         {
             if (Application.platform == RuntimePlatform.Switch && !hasFocus)
                 StartCoroutine(HandleSwitchModeChange());
+
+            // Steam Deck's suspend/resume (lid close, power button, Steam's own "Suspend Game") is delivered here
+            // on a Standalone build, not through OnApplicationPause (which Unity does not reliably call outside
+            // mobile/console) — reuse the exact same pause/resume path so Deck suspend behaves like any other
+            // app-background pause (Valve's "seamless suspend" Deck Verified requirement).
+            if (IsSteamDeck) OnApplicationPause(!hasFocus);
         }
 
         private System.Collections.IEnumerator HandleSwitchModeChange()

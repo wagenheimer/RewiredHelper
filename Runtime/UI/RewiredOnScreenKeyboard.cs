@@ -145,10 +145,18 @@ namespace Wagenheimer.RewiredHelper.UI
             focus.text = focus.text.Substring(0, focus.text.Length - 1);
         }
 
+        /// <summary>
+        /// Submits the focused field, then triggers the same "Return pressed" dialog-confirm routing a
+        /// physical Enter key gets from <see cref="RewiredInputManager.TriggerReturnConfirm"/> — so this
+        /// key also fires the enclosing <see cref="Dialog.OkButton"/> (its "Default OK") when this keyboard
+        /// is being used inside a modal dialog, not just the input field's own OnSubmit.
+        /// </summary>
         public void Submit()
         {
-            if (focus == null) return;
-            focus.OnSubmit(new PointerEventData(EventSystem.current));
+            if (focus != null)
+                focus.OnSubmit(new PointerEventData(EventSystem.current));
+
+            RewiredInputManager.Instance?.TriggerReturnConfirm();
         }
 
         public void SetActive(bool show)

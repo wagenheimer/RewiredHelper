@@ -35,20 +35,32 @@ namespace Wagenheimer.RewiredHelper
 
             if (Input.GetKeyDown(KeyCode.Return))
             {
-                if (_modalStack.ModalCount > 0 && _modalStack.TryGetTopOkButton(out var okButton) &&
-                    okButton != null && okButton.interactable && okButton.gameObject.activeSelf)
-                {
-                    okButton.onClick.Invoke();
-                }
-                else
-                {
-                    ReturnEscapeEvent.TriggerOk();
-                }
+                TriggerReturnConfirm();
             }
 
             if (AutoBridgeSubmitToPointerDown)
             {
                 HandleSubmitPointerBridge();
+            }
+        }
+
+        /// <summary>
+        /// The same "Return was pressed" routing <see cref="HandleEscapeButtons"/> runs for a physical Return
+        /// key: invokes the top modal dialog's <see cref="UI.Dialog.OkButton"/> if one is active, otherwise
+        /// raises <see cref="ReturnEscapeEvent.TriggerOk"/>. Exposed so other confirm sources — the on-screen
+        /// keyboard's "OK" key, in particular — can trigger the exact same dialog-confirm behavior a real
+        /// Enter key press would, instead of only submitting the focused TMP_InputField.
+        /// </summary>
+        public void TriggerReturnConfirm()
+        {
+            if (_modalStack.ModalCount > 0 && _modalStack.TryGetTopOkButton(out var okButton) &&
+                okButton != null && okButton.interactable && okButton.gameObject.activeSelf)
+            {
+                okButton.onClick.Invoke();
+            }
+            else
+            {
+                ReturnEscapeEvent.TriggerOk();
             }
         }
 

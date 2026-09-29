@@ -189,10 +189,24 @@ namespace Wagenheimer.RewiredHelper
                                             Instance.Player.GetButton("BackButton") ||
                                             (Input.touchCount > 0));
 
+#if UNITY_EDITOR
+        /// <summary>
+        /// Editor-only test override. When set, <see cref="CurrentControllerType"/> returns this value
+        /// regardless of what is actually plugged in, so gamepad-only behavior (e.g. the on-screen keyboard
+        /// popping up on a TMP_InputField) can be previewed in Play Mode without a physical controller.
+        /// Never compiled into a build; set from the Rewired Helper dashboard's Advanced section.
+        /// </summary>
+        public static ControllerType? DebugForceControllerType;
+#endif
+
         public ControllerType CurrentControllerType
         {
             get
             {
+#if UNITY_EDITOR
+                if (DebugForceControllerType.HasValue)
+                    return DebugForceControllerType.Value;
+#endif
                 if (Instance == null)
                     return ControllerType.Joystick;
 

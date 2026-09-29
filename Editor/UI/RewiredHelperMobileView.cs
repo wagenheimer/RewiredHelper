@@ -1,5 +1,7 @@
 using System.Linq;
 
+using Rewired;
+
 using UnityEditor;
 using UnityEditor.UIElements;
 
@@ -144,6 +146,25 @@ namespace Wagenheimer.RewiredHelper.Editor
                 overrideBox.style.display = so.FindProperty("OverridePlatformDefaults").boolValue ? DisplayStyle.Flex : DisplayStyle.None;
                 section.schedule.Execute(Rebuild).ExecuteLater(200);
             });
+
+            if (EditorApplication.isPlaying)
+            {
+                var simRow = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap, alignItems = Align.Center, marginTop = 10 } };
+                var current = RewiredInputManager.DebugForceControllerType;
+                simRow.Add(new Label(current.HasValue ? $"🧪 Simulating: {current.Value}" : "🧪 Simulate text-input device:")
+                    { style = { marginRight = 6, unityTextAlign = TextAnchor.MiddleLeft } });
+                simRow.Add(RewiredHelperUIStyle.CreateButton("Gamepad (shows on-screen keyboard)",
+                    () => { RewiredInputManager.DebugForceControllerType = ControllerType.Joystick; Rebuild(); }));
+                simRow.Add(RewiredHelperUIStyle.CreateButton("Touch",
+                    () => { RewiredInputManager.DebugForceControllerType = ControllerType.Custom; Rebuild(); }));
+                simRow.Add(RewiredHelperUIStyle.CreateButton("Stop simulating (auto-detect)",
+                    () => { RewiredInputManager.DebugForceControllerType = null; Rebuild(); }));
+                section.Add(simRow);
+                section.Add(RewiredHelperUIStyle.CreateCallout(
+                    "Forces CurrentControllerType so you can preview gamepad-only behavior — like the RewiredOnScreenKeyboard popping up when a TMP_InputField is selected — without a physical controller plugged in. " +
+                    "Only affects this Editor session while in Play Mode; it is compiled out of builds entirely and resets when you stop Play Mode.",
+                    AuditSeverity.Info));
+            }
 
             if (RewiredHelperAudit.CanFreezeOnSomePlatform(manager) && (manager.GamePaused == null || !RewiredHelperAudit.HasResumeButton(manager)))
             {

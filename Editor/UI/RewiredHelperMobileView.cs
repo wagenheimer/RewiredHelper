@@ -5,6 +5,7 @@ using Rewired;
 using UnityEditor;
 using UnityEditor.UIElements;
 
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Wagenheimer.RewiredHelper.Editor

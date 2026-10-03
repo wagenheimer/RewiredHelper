@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.62.2] - 2026-10-03
+
+### Fixed
+- Steam/Steam Deck code is now excluded from Android and iOS builds (Steamworks.NET ships no mobile assembly), preventing CS0246 "The type or namespace name 'Steamworks' could not be found" on those targets.
+
 ## [0.62.1] - 2026-09-29
 
 ### Fixed

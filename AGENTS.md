@@ -109,3 +109,13 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   push to `main` — do not manually edit `package.json`'s `version` or add CHANGELOG entries by
   hand for released versions; the workflow derives the bump type from Conventional Commit
   prefixes (`feat:` → minor, `fix:`/other → patch, `!`/`BREAKING CHANGE` → major).
+
+## UI Toolkit: leading-icon text (do not regress)
+
+Never put an emoji/symbol inline at the start of a `Button.text` (or a lone `Label`). On Windows the
+fallback emoji glyph draws wider than Unity measures it, so the following text runs over the icon
+(e.g. "heck Updates" on top of the update glyph). Instead use `RewiredHelperUIStyle.CreateButton`
+(which routes through `RewiredHelperUIStyle.ApplyIconText`) or call
+`RewiredHelperUIStyle.ApplyIconText(button, text)` directly; for title labels use
+`RewiredHelperUIStyle.CreateIconLabel`. This splits the leading icon into its own `min-width` element
+so the two never overlap. This is the only supported way to show an icon before a label.

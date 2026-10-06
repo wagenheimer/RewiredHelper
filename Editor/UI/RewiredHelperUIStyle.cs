@@ -74,7 +74,8 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         public static Button CreateButton(string text, System.Action onClick, bool primary = false)
         {
-            var button = new Button(onClick) { text = text };
+            var button = new Button(onClick);
+            ApplyIconText(button, text);
             button.AddToClassList("rh-toolbar-btn");
             if (primary) button.AddToClassList("rh-toolbar-btn-primary");
             return button;
@@ -102,9 +103,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             var box = new VisualElement();
             box.AddToClassList("rh-code-box");
 
-            var label = new Label(code);
-            label.AddToClassList("rh-code-text");
-            box.Add(label);
+            var header = new VisualElement();
+            header.AddToClassList("rh-code-header");
 
             var copy = new Button { text = "Copy" };
             copy.AddToClassList("rh-toolbar-btn");
@@ -112,11 +112,95 @@ namespace Wagenheimer.RewiredHelper.Editor
             copy.clicked += () =>
             {
                 UnityEngine.GUIUtility.systemCopyBuffer = code;
-                copy.text = "✓";
+                copy.text = "✓ Copied";
                 copy.schedule.Execute(() => copy.text = "Copy").ExecuteLater(1200);
             };
-            box.Add(copy);
+            header.Add(copy);
+            box.Add(header);
+
+            var label = new Label(code);
+            label.AddToClassList("rh-code-text");
+            box.Add(label);
+
             return box;
         }
+
+        /// <summary>
+        /// Renders <paramref name="text"/> on the button, splitting a leading icon (emoji/symbol) into its own
+        /// element with a reserved width. Inline, a fallback emoji glyph draws wider than it measures, so the
+        /// following text runs over it ("◻heck Updates"); a separate, min-width'd element keeps them apart.
+        /// </summary>
+        public static void ApplyIconText(Button button, string text)
+        {
+            // Idempotent: drop icon/text children from a previous call so live updates can re-apply cleanly.
+            for (int i = button.childCount - 1; i >= 0; i--)
+            {
+                var child = button[i];
+                if (child.ClassListContains("rh-btn-icon") || child.ClassListContains("rh-btn-text"))
+                    child.RemoveFromHierarchy();
+            }
+
+            SplitLeadingIcon(text, out var icon, out var label);
+
+            if (string.IsNullOrEmpty(icon))
+            {
+                button.text = text;
+                return;
+            }
+
+            button.text = string.Empty;
+            var iconElement = CreateIconElement(icon);
+            if (string.IsNullOrEmpty(label)) iconElement.style.marginRight = 0;
+            button.Add(iconElement);
+
+            if (!string.IsNullOrEmpty(label))
+            {
+                var textLabel = new Label(label);
+                textLabel.AddToClassList("rh-btn-text");
+                textLabel.pickingMode = PickingMode.Ignore;
+                button.Add(textLabel);
+            }
+        }
+
+        private static Label CreateIconElement(string icon)
+        {
+            var iconLabel = new Label(icon);
+            iconLabel.AddToClassList("rh-btn-icon");
+            iconLabel.pickingMode = PickingMode.Ignore;
+            return iconLabel;
+        }
+
+        /// <summary>
+        /// Splits a leading run of icon code points from the rest of a label. Deliberately conservative: only
+        /// arrows/symbols and pictographic emoji count, so ordinary words (including accented ones) stay intact.
+        /// </summary>
+        internal static void SplitLeadingIcon(string text, out string icon, out string label)
+        {
+            icon = null;
+            label = text;
+            if (string.IsNullOrEmpty(text)) return;
+
+            int i = 0;
+            while (i < text.Length)
+            {
+                int codePoint = char.IsHighSurrogate(text[i]) && i + 1 < text.Length
+                    ? char.ConvertToUtf32(text[i], text[i + 1])
+                    : text[i];
+
+                if (!IsIconCodePoint(codePoint)) break;
+                i += char.IsHighSurrogate(text[i]) ? 2 : 1;
+            }
+
+            if (i == 0) return;
+
+            icon = text.Substring(0, i).TrimEnd();
+            label = text.Substring(i).TrimStart();
+        }
+
+        private static bool IsIconCodePoint(int codePoint) =>
+            (codePoint >= 0x2190 && codePoint <= 0x2BFF)     // arrows, geometric shapes, misc symbols (↗ ▶ ⏸ ⚡ ✔ ⚙ ✓ ✕ …)
+            || (codePoint >= 0x1F000 && codePoint <= 0x1FAFF) // emoji & pictographs (🔄 🌐 📦 🔍 🛠 …)
+            || codePoint == 0xFE0F                             // emoji variation selector (✉️ 🛠️ …)
+            || codePoint == 0x20E3;                            // combining enclosing keycap
     }
 }

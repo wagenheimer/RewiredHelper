@@ -317,6 +317,10 @@ namespace Wagenheimer.RewiredHelper
                     null
                 );
             }
+
+            // The generated on-screen keyboard starts inactive, so it never runs OnEnable to register itself.
+            // Find it (and any other, active or not) now that the scene is fully loaded.
+            DiscoverOnScreenKeyboards();
         }
 
 #if WAGENHEIMER_STEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
@@ -483,6 +487,10 @@ namespace Wagenheimer.RewiredHelper
             // Allow the glyph controller type order to be re-applied to glyph helpers
             // that were instantiated with the newly loaded scene.
             _glyphSelectorConfigured = false;
+
+            // Re-scan for on-screen keyboards on every (un)load: the registry is static and survives scene
+            // changes, so this also drops keyboards destroyed with the previous scene.
+            DiscoverOnScreenKeyboards();
         }
         #endregion
 

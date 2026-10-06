@@ -85,9 +85,9 @@ namespace Wagenheimer.RewiredHelper.Editor
                 onFixed?.Invoke();
             })
             {
-                text = "🛠 " + result.FixLabel,
                 tooltip = result.FixHint
             };
+            RewiredHelperUIStyle.ApplyIconText(button, "🛠 " + result.FixLabel);
             button.AddToClassList("rh-toolbar-btn");
             button.AddToClassList("rh-toolbar-btn-primary");
             button.AddToClassList("rh-check-fix");

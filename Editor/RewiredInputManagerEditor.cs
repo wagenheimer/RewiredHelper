@@ -7,6 +7,8 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEditor.UIElements;
 
+using TMPro;
+
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -35,6 +37,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         private Button _pauseScreenButton;
         private VisualElement _blockedScenesInfo;
         private VisualElement _liveCard;
+        private VisualElement _onScreenKeyboardStatus;
+        private Button _createKeyboardButton;
         private readonly Dictionary<string, Label> _liveValues = new Dictionary<string, Label>();
         private bool _refreshQueued;
         private bool _isSceneContext;
@@ -76,6 +80,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
             BuildBootSection();
             BuildCursorSection();
+            BuildOnScreenKeyboardSection();
             BuildPauseSection();
             BuildControllerHelpSection();
             BuildRuntimeStateSection();
@@ -164,6 +169,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 }
                 RefreshPolicy();
                 RefreshBlockedScenes();
+                RefreshOnScreenKeyboard();
             }
             catch (Exception ex)
             {
@@ -201,6 +207,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             _headerBadge = new Label("checking...");
             _headerBadge.AddToClassList("rh-badge");
+            _headerBadge.AddToClassList("rh-badge-info");
             _headerBadge.style.marginLeft = 8;
             left.Add(_headerBadge);
             row.Add(left);
@@ -211,6 +218,11 @@ namespace Wagenheimer.RewiredHelper.Editor
             row.Add(actions);
 
             banner.Add(row);
+
+            var subtitle = new Label("Input-type detection, cursor, Escape routing and a mobile-safe pause policy on top of Rewired.");
+            subtitle.AddToClassList("rh-header-subtitle");
+            banner.Add(subtitle);
+
             return banner;
         }
 
@@ -403,6 +415,59 @@ namespace Wagenheimer.RewiredHelper.Editor
         {
             var section = RewiredInspectorWidgets.CreateSection(_root, "cursor", "🖱 Cursor & Glyphs", false);
             AddFields(section, "GameCursor", "CustomCursorEnabled", "CursorTexture", "ForceGlyphCustomControllerLast");
+        }
+
+        private void BuildOnScreenKeyboardSection()
+        {
+            var section = RewiredInspectorWidgets.CreateSection(_root, "osk", "⌨ On-Screen Keyboard", false,
+                "Shown automatically when a TMP_InputField is selected with a gamepad. Touch uses the OS keyboard; mouse/keyboard needs none.");
+            AddFields(section, "ShowOnScreenKeyboardOnGamepadTextInput");
+
+            // The scene status / create button only make sense for an object in the open scene, like the Setup Health section.
+            if (!_isSceneContext) return;
+
+            _onScreenKeyboardStatus = new VisualElement { style = { marginTop = 4 } };
+            section.Add(_onScreenKeyboardStatus);
+
+            _createKeyboardButton = RewiredHelperUIStyle.CreateButton("⌨ Create On-Screen Keyboard", () =>
+            {
+                DefaultSetupGenerator.CreateOnScreenKeyboardAndWire();
+                RefreshDynamic();
+            });
+            _createKeyboardButton.style.marginLeft = 0;
+            _createKeyboardButton.style.marginTop = 4;
+            _createKeyboardButton.style.alignSelf = Align.FlexStart;
+            _createKeyboardButton.tooltip = "Builds a plain QWERTY + digits keyboard from code and registers it; shown automatically for any TMP_InputField selected with a gamepad.";
+            section.Add(_createKeyboardButton);
+        }
+
+        private void RefreshOnScreenKeyboard()
+        {
+            if (_onScreenKeyboardStatus == null) return;
+
+            _onScreenKeyboardStatus.Clear();
+
+            int inputFields = RewiredHelperAudit.FindAll<TMP_InputField>().Count;
+            bool hasKeyboard = DefaultSetupGenerator.FindOnScreenKeyboardInScene() != null;
+
+            if (inputFields == 0)
+            {
+                _onScreenKeyboardStatus.Add(RewiredHelperUIStyle.CreateCallout(
+                    "No TMP_InputField in this scene yet — the on-screen keyboard has nothing to type into.", AuditSeverity.Info));
+            }
+            else if (hasKeyboard)
+            {
+                _onScreenKeyboardStatus.Add(RewiredHelperUIStyle.CreateCallout(
+                    $"On-screen keyboard found — covers all {inputFields} TMP_InputField(s) in the scene.", AuditSeverity.Pass));
+            }
+            else
+            {
+                _onScreenKeyboardStatus.Add(RewiredHelperUIStyle.CreateCallout(
+                    $"{inputFields} TMP_InputField(s) in the scene but no RewiredOnScreenKeyboard — a gamepad / Steam Deck player has no way to type.", AuditSeverity.Warning));
+            }
+
+            if (_createKeyboardButton != null)
+                _createKeyboardButton.style.display = hasKeyboard ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
         private void BuildControllerHelpSection()

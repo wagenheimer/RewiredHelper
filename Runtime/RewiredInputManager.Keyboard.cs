@@ -33,6 +33,22 @@ namespace Wagenheimer.RewiredHelper
             if (keyboard != null) _onScreenKeyboards.Remove(keyboard);
         }
 
+        /// <summary>
+        /// Registers every <see cref="UI.RewiredOnScreenKeyboard"/> already in the scene, including inactive
+        /// ones. The generated keyboard starts inactive (so it never runs <c>OnEnable</c> to register itself),
+        /// which is why the manager must scan for it rather than rely on self-registration alone. Safe to call
+        /// repeatedly: it drops entries destroyed with a previous scene and uses a set, so re-adding is a no-op.
+        /// </summary>
+        internal void DiscoverOnScreenKeyboards()
+        {
+            _onScreenKeyboards.RemoveWhere(keyboard => keyboard == null);
+
+#pragma warning disable 0618 // FindObjectsOfType(Type, bool) is the only active+inactive overload on Unity 2021.3
+            foreach (var keyboard in UnityEngine.Object.FindObjectsOfType<UI.RewiredOnScreenKeyboard>(true))
+                _onScreenKeyboards.Add(keyboard);
+#pragma warning restore 0618
+        }
+
         /// <summary>True while any registered on-screen keyboard is showing.</summary>
         public static bool IsOnScreenKeyboardActive
         {

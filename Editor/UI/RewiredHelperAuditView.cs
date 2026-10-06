@@ -211,16 +211,17 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private static Button CreateCopyButton(string label, string tooltip, Func<string> getText, string copiedLabel = "✓ Copied")
         {
-            var button = new Button { text = label, tooltip = tooltip };
+            var button = new Button { tooltip = tooltip };
+            RewiredHelperUIStyle.ApplyIconText(button, label);
             button.AddToClassList("rh-toolbar-btn");
             button.clicked += () =>
             {
                 var text = getText();
-                button.text = string.IsNullOrEmpty(text) ? "Run the audit first" : copiedLabel;
+                RewiredHelperUIStyle.ApplyIconText(button, string.IsNullOrEmpty(text) ? "Run the audit first" : copiedLabel);
                 if (!string.IsNullOrEmpty(text))
                     GUIUtility.systemCopyBuffer = text;
 
-                button.schedule.Execute(() => button.text = label).ExecuteLater(CopiedFeedbackMs);
+                button.schedule.Execute(() => RewiredHelperUIStyle.ApplyIconText(button, label)).ExecuteLater(CopiedFeedbackMs);
             };
             return button;
         }

@@ -55,6 +55,15 @@ namespace Wagenheimer.RewiredHelper.UI
             _animator = GetComponent<Animator>();
         }
 
+        // Registering on enable (and unregistering on destroy, never on disable) lets the manager find a
+        // keyboard spawned/activated at runtime. A keyboard that starts inactive — like the one the setup
+        // generator builds — never runs OnEnable, so RewiredInputManager.DiscoverOnScreenKeyboards() also
+        // scans the scene for it. Do NOT unregister on OnDisable: hiding the keyboard deactivates the
+        // GameObject, and it must stay registered so the manager can show it again later.
+        private void OnEnable() => RewiredInputManager.RegisterOnScreenKeyboard(this);
+
+        private void OnDestroy() => RewiredInputManager.UnregisterOnScreenKeyboard(this);
+
         private void Start()
         {
             ShowNumeric(showNumeric);

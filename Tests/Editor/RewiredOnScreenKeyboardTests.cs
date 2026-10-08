@@ -149,6 +149,66 @@ namespace Wagenheimer.RewiredHelper.Tests
 
             Assert.AreEqual(2, presses);
         }
+
+        [Test]
+        public void WriteKey_KeepsOnlyDigits_WhenTheFieldIsDigitOnly()
+        {
+            _keyboard.SetFocus(_field);
+            _field.characterValidation = TMP_InputField.CharacterValidation.Digit;
+            _field.text = string.Empty;
+
+            _keyboard.WriteKey(CreateLabel("a7b"));
+
+            Assert.AreEqual("7", _field.text);
+        }
+
+        [Test]
+        public void WriteKey_DoesNothing_WhenTheFieldIsReadOnly()
+        {
+            _keyboard.SetFocus(_field);
+            _field.text = "ab";
+            _field.readOnly = true;
+
+            _keyboard.WriteKey(CreateLabel("c"));
+
+            Assert.AreEqual("ab", _field.text);
+        }
+
+        [Test]
+        public void Close_HidesTheKeyboardAndRemembersTheField()
+        {
+            _keyboard.SetActiveFocus(_field);
+
+            _keyboard.Close();
+
+            Assert.IsFalse(_keyboard.isActive);
+            Assert.AreSame(_field, _keyboard.DismissedFor);
+        }
+
+        [Test]
+        public void ClearDismissed_ForAnotherSelection_AllowsTheKeyboardToReopen()
+        {
+            _keyboard.SetActiveFocus(_field);
+            _keyboard.Close();
+
+            _keyboard.ClearDismissed(_field);
+            Assert.AreSame(_field, _keyboard.DismissedFor, "Still on the same field: must stay dismissed.");
+
+            _keyboard.ClearDismissed(null);
+            Assert.IsNull(_keyboard.DismissedFor);
+        }
+
+        [Test]
+        public void ContainsSelection_IsTrueOnlyForTheKeyboardAndItsChildren()
+        {
+            var key = new GameObject("Key", typeof(RectTransform));
+            key.transform.SetParent(_keyboardGo.transform);
+
+            Assert.IsTrue(_keyboard.ContainsSelection(key));
+            Assert.IsTrue(_keyboard.ContainsSelection(_keyboardGo));
+            Assert.IsFalse(_keyboard.ContainsSelection(_fieldGo));
+            Assert.IsFalse(_keyboard.ContainsSelection(null));
+        }
     }
 
     public class RewiredOnScreenKeyboardWiringTests

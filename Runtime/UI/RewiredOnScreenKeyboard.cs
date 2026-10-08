@@ -31,13 +31,23 @@ namespace Wagenheimer.RewiredHelper.UI
         public Color32 mainColor = Color.white;
         public Color32 specialColor = Color.gray;
         public Color32 backgroundColor = Color.white;
+        [Tooltip("Tint of the key currently selected with the gamepad (D-pad / stick).")]
+        public Color32 selectedColor = new Color32(51, 119, 255, 255);
+        [Tooltip("Optional font for every key label. Leave empty to keep each label's own font (the project default TMP font can carry an outline that looks wrong on keys).")]
+        public TMP_FontAsset font;
         public Sprite mainSprite;
         public Sprite specialSprite;
+
+        [Header("Behaviour")]
+        [Tooltip("Hide the keyboard after the OK key submits the field.")]
+        public bool hideOnSubmit = true;
+        [Tooltip("When the keyboard opens, move the gamepad selection to the first key so it can be navigated immediately.")]
+        public bool selectFirstKeyOnShow = true;
 
         [Header("Layout")]
         [Tooltip("panels[0] = lowercase letters, [1] = uppercase/caps, [2] = optional extra symbol panel, [3] = numeric (toggled by ShowNumeric).")]
         public GameObject[] panels;
-        [Tooltip("Character keys: each must have a child named \"Text\" holding the glyph to type.")]
+        [Tooltip("Character keys: each needs a TMP_Text child holding the glyph to type.")]
         public GameObject[] keys;
         [Tooltip("Non-character keys (backspace, enter, caps, hide, switch panel...) driven by WriteSpecialKey.")]
         public GameObject[] specialKeys;
@@ -49,6 +59,10 @@ namespace Wagenheimer.RewiredHelper.UI
         [HideInInspector] public bool capsEnabled;
 
         private Animator _animator;
+        private TMP_InputField _dismissedFor;
+
+        /// <summary>The field the player closed the keyboard on; it is not reopened until the selection moves to another object.</summary>
+        public TMP_InputField DismissedFor => _dismissedFor;
 
         private void Awake()
         {
@@ -67,12 +81,20 @@ namespace Wagenheimer.RewiredHelper.UI
         private void Start()
         {
             ShowNumeric(showNumeric);
+            ApplyTheme();
+        }
+
+        /// <summary>Applies every theming field to the keys. Also callable from the Editor to preview the look without Play Mode.</summary>
+        [ContextMenu("Apply Theme")]
+        public void ApplyTheme()
+        {
             SetTextColor(textColor);
             SetMainColor(mainColor);
             SetSpecialColor(specialColor);
             SetBackgroundColor(backgroundColor);
             SetMainSprite(mainSprite);
             SetSpecialSprite(specialSprite);
+            SetFont(font);
         }
 
         public void ShowNumeric(bool show)
@@ -98,6 +120,13 @@ namespace Wagenheimer.RewiredHelper.UI
             if (background != null) background.color = color;
         }
 
+        public void SetFont(TMP_FontAsset fontAsset)
+        {
+            if (fontAsset == null) return;
+            ForEachLabel(keys, t => t.font = fontAsset);
+            ForEachLabel(specialKeys, t => t.font = fontAsset);
+        }
+
         public void SetMainSprite(Sprite sprite)
         {
             if (sprite == null) return;
@@ -118,14 +147,29 @@ namespace Wagenheimer.RewiredHelper.UI
             focus = inputField;
             SetActive(true);
             if (focus != null) focus.MoveTextEnd(true);
+            SelectFirstKeyIfNeeded();
+        }
+
+        /// <summary>True when <paramref name="selected"/> is this keyboard or one of its keys (the gamepad is navigating the keyboard).</summary>
+        public bool ContainsSelection(GameObject selected) =>
+            selected != null && selected.transform.IsChildOf(transform);
+
+        /// <summary>Forgets a previous Close so the keyboard may open again for <paramref name="inputField"/>.</summary>
+        public void ClearDismissed(TMP_InputField inputField)
+        {
+            if (_dismissedFor != null && _dismissedFor != inputField)
+                _dismissedFor = null;
         }
 
         public void WriteKey(TMP_Text label)
         {
             OnKeyPressed?.Invoke();
-            if (focus == null || label == null) return;
+            if (focus == null || label == null || focus.readOnly) return;
 
-            focus.text += label.text;
+            var typed = FilterAccepted(label.text);
+            if (typed.Length == 0) return;
+
+            focus.text += typed;
             if (focus.characterLimit > 0 && focus.text.Length > focus.characterLimit)
                 focus.text = focus.text.Substring(0, focus.characterLimit);
         }
@@ -139,7 +183,7 @@ namespace Wagenheimer.RewiredHelper.UI
                 case 0: Backspace(); break;
                 case 1: Submit(); break;
                 case 2: SwitchCaps(); break;
-                case 3: SetActive(false); break;
+                case 3: Close(); break;
                 case 4: SetKeyboardType(1); break;
                 case 5: SetKeyboardType(2); break;
                 case 6: FocusPrevious(); break;
@@ -150,7 +194,7 @@ namespace Wagenheimer.RewiredHelper.UI
 
         public void Backspace()
         {
-            if (focus == null || focus.text.Length == 0) return;
+            if (focus == null || focus.readOnly || focus.text.Length == 0) return;
             focus.text = focus.text.Substring(0, focus.text.Length - 1);
         }
 
@@ -166,6 +210,24 @@ namespace Wagenheimer.RewiredHelper.UI
                 focus.OnSubmit(new PointerEventData(EventSystem.current));
 
             RewiredInputManager.Instance?.TriggerReturnConfirm();
+
+            if (hideOnSubmit) Close();
+        }
+
+        /// <summary>
+        /// Hides the keyboard and hands the gamepad selection back to the field it was typing into. The field is
+        /// remembered as dismissed so <see cref="RewiredInputManager"/> does not reopen the keyboard immediately
+        /// (the field becomes selected again, which is what normally opens it).
+        /// </summary>
+        public void Close()
+        {
+            var field = focus;
+            _dismissedFor = field;
+            SetActive(false);
+
+            var eventSystem = EventSystem.current;
+            if (eventSystem != null && field != null && field.gameObject.activeInHierarchy)
+                eventSystem.SetSelectedGameObject(field.gameObject);
         }
 
         public void SetActive(bool show)
@@ -233,6 +295,61 @@ namespace Wagenheimer.RewiredHelper.UI
             for (int i = 0; i < panels.Length && i < 3; i++)
             {
                 if (panels[i] != null) panels[i].SetActive(i == type);
+            }
+        }
+
+        /// <summary>Moves the gamepad selection onto the first key so the player can navigate the keyboard right away.</summary>
+        private void SelectFirstKeyIfNeeded()
+        {
+            var eventSystem = EventSystem.current;
+            if (!selectFirstKeyOnShow || eventSystem == null || keys == null || !gameObject.activeInHierarchy) return;
+
+            foreach (var key in keys)
+            {
+                if (key == null || !key.activeInHierarchy) continue;
+
+                var selectable = key.GetComponent<Selectable>();
+                if (selectable == null || !selectable.IsInteractable()) continue;
+
+                eventSystem.SetSelectedGameObject(key);
+                return;
+            }
+        }
+
+        /// <summary>Keeps only the characters the focused field would accept (digits-only fields, custom validators).</summary>
+        private string FilterAccepted(string text)
+        {
+            if (string.IsNullOrEmpty(text) || focus == null) return string.Empty;
+
+            var accepted = new System.Text.StringBuilder(text.Length);
+            var current = focus.text;
+            foreach (var c in text)
+            {
+                if (Accepts(current, c))
+                {
+                    accepted.Append(c);
+                    current += c;
+                }
+            }
+
+            return accepted.ToString();
+        }
+
+        private bool Accepts(string currentText, char c)
+        {
+            if (focus.onValidateInput != null)
+                return focus.onValidateInput(currentText, currentText.Length, c) != '\0';
+
+            switch (focus.characterValidation)
+            {
+                case TMP_InputField.CharacterValidation.Digit:
+                    return c >= '0' && c <= '9';
+                case TMP_InputField.CharacterValidation.Integer:
+                    return (c >= '0' && c <= '9') || (c == '-' && currentText.Length == 0);
+                case TMP_InputField.CharacterValidation.Alphanumeric:
+                    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+                default:
+                    return true;
             }
         }
 

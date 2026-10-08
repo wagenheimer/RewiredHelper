@@ -648,20 +648,113 @@ namespace Wagenheimer.RewiredHelper.Editor
         internal static Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard FindOnScreenKeyboardInScene() =>
             RewiredHelperAudit.FindAll<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard>().FirstOrDefault();
 
-        private const float KeyboardHeight = 340f;
-        private const float KeyWidth = 88f;
-        private const float KeyHeight = 60f;
+        private const float KeyHeight = 64f;
         private const float KeySpacing = 6f;
-        private const int KeyboardColumns = 10;
+        private const float KeyboardPadding = 12f;
+        private const int RowCount = 5;
+        private const float KeyboardHeight = RowCount * KeyHeight + (RowCount - 1) * KeySpacing + 2 * KeyboardPadding;
+
+        // Special key ids understood by RewiredOnScreenKeyboard.WriteSpecialKey.
+        private const int KeyBackspace = 0;
+        private const int KeySubmit = 1;
+        private const int KeyCaps = 2;
+        private const int KeyClose = 3;
+        private const int NotSpecial = -1;
+
+        /// <summary>One entry of a keyboard row: a spacer, a character key or a special key, with its relative width.</summary>
+        private readonly struct KeySpec
+        {
+            public readonly string Glyph;
+            public readonly int Special;
+            public readonly float Weight;
+            public readonly bool IsSpace;
+            public readonly bool IsSpacer;
+
+            private KeySpec(string glyph, int special, float weight, bool isSpace, bool isSpacer)
+            {
+                Glyph = glyph;
+                Special = special;
+                Weight = weight;
+                IsSpace = isSpace;
+                IsSpacer = isSpacer;
+            }
+
+            public static KeySpec Letter(char c) => new KeySpec(c.ToString(), NotSpecial, 1f, false, false);
+            public static KeySpec Key(string label, int id, float weight) => new KeySpec(label, id, weight, false, false);
+            public static KeySpec Space(float weight) => new KeySpec(string.Empty, NotSpecial, weight, true, false);
+            public static KeySpec Spacer(float weight) => new KeySpec(string.Empty, NotSpecial, weight, false, true);
+        }
+
+        /// <summary>
+        /// A real QWERTY layout whose rows all add up to 12 units, so the keys line up. ASCII-only labels: glyphs such as
+        /// the backspace symbol are missing from most TMP fonts and render as a replacement box.
+        /// </summary>
+        private static readonly KeySpec[][] KeyboardRows =
+        {
+            Row(Chars("1234567890"), KeySpec.Key("DEL", KeyBackspace, 2f)),
+            Row(KeySpec.Spacer(1f), Chars("qwertyuiop"), KeySpec.Spacer(1f)),
+            Row(KeySpec.Spacer(1.5f), Chars("asdfghjkl"), KeySpec.Spacer(1.5f)),
+            Row(KeySpec.Key("CAPS", KeyCaps, 2f), Chars("zxcvbnm"), Chars(".-@")),
+            Row(KeySpec.Key("CLOSE", KeyClose, 2f), KeySpec.Space(8f), KeySpec.Key("OK", KeySubmit, 2f)),
+        };
+
+        private static KeySpec[] Chars(string characters)
+        {
+            var specs = new KeySpec[characters.Length];
+            for (var i = 0; i < characters.Length; i++)
+                specs[i] = KeySpec.Letter(characters[i]);
+            return specs;
+        }
+
+        private static KeySpec[] Row(params object[] parts)
+        {
+            var row = new List<KeySpec>();
+            foreach (var part in parts)
+            {
+                if (part is KeySpec single) row.Add(single);
+                else row.AddRange((KeySpec[])part);
+            }
+            return row.ToArray();
+        }
+
+        /// <summary>The plain TextMeshPro font asset, if present: the project's default TMP font may carry an outline that looks wrong on keys.</summary>
+        private static TMP_FontAsset FindCleanKeyboardFont()
+        {
+            foreach (var guid in AssetDatabase.FindAssets("LiberationSans SDF t:TMP_FontAsset"))
+            {
+                var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(AssetDatabase.GUIDToAssetPath(guid));
+                if (font != null && font.name == "LiberationSans SDF") return font;
+            }
+
+            return null;
+        }
 
         [MenuItem(RewiredHelperMenu.CreateOnScreenKeyboard, priority = RewiredHelperMenu.CreateOnScreenKeyboardPriority)]
         internal static void CreateOnScreenKeyboard() => CreateOnScreenKeyboardAndWire();
 
         /// <summary>
-        /// Builds a plain but fully working QWERTY + digits + backspace/space/enter/caps/hide on-screen
-        /// keyboard from code (no art assets, so nothing to author blind) and registers it. Once in the
-        /// scene, <see cref="RewiredInputManager"/> shows/hides it automatically for any TMP_InputField
-        /// selected with a gamepad — no per-field wiring needed. Re-running when one already exists is a no-op.
+        /// True for a keyboard built by an older version of this generator (uniform GridLayoutGroup, white keys, uppercase
+        /// labels, glyphs missing from most fonts). Only those are offered the upgrade; a hand-made keyboard is never touched.
+        /// </summary>
+        internal static bool IsLegacyGeneratedKeyboard(Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard keyboard) =>
+            keyboard != null && keyboard.gameObject.name == "OnScreenKeyboard" && keyboard.GetComponent<GridLayoutGroup>() != null;
+
+        /// <summary>Replaces a legacy generated keyboard with the current layout (undoable).</summary>
+        internal static Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard UpgradeLegacyOnScreenKeyboard()
+        {
+            var existing = FindOnScreenKeyboardInScene();
+            if (!IsLegacyGeneratedKeyboard(existing))
+                return existing;
+
+            Undo.DestroyObjectImmediate(existing.gameObject);
+            return CreateOnScreenKeyboardAndWire();
+        }
+
+        /// <summary>
+        /// Builds a plain but fully working QWERTY + digits + punctuation keyboard from code (no art assets, so nothing to
+        /// author blind) and registers it. Rows use layout groups, so keys have proper widths (wide SPACE/OK/CAPS) and the
+        /// gamepad can navigate them. Once in the scene, <see cref="RewiredInputManager"/> shows/hides it automatically for any
+        /// TMP_InputField selected with a gamepad — no per-field wiring needed. Re-running when one already exists is a no-op.
         /// </summary>
         internal static Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard CreateOnScreenKeyboardAndWire()
         {
@@ -676,7 +769,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             var canvas = FindOrCreateCanvas();
 
             var root = new GameObject("OnScreenKeyboard", typeof(RectTransform), typeof(Image),
-                typeof(GridLayoutGroup), typeof(Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard));
+                typeof(VerticalLayoutGroup), typeof(Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard));
             var rootRect = (RectTransform)root.transform;
             rootRect.SetParent(canvas.transform, false);
             rootRect.anchorMin = new Vector2(0f, 0f);
@@ -685,36 +778,49 @@ namespace Wagenheimer.RewiredHelper.Editor
             rootRect.sizeDelta = new Vector2(0f, KeyboardHeight);
             rootRect.anchoredPosition = Vector2.zero;
 
-            root.GetComponent<Image>().color = new Color(0.12f, 0.12f, 0.14f, 0.96f);
-
-            var grid = root.GetComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(KeyWidth, KeyHeight);
-            grid.spacing = new Vector2(KeySpacing, KeySpacing);
-            grid.padding = new RectOffset(12, 12, 12, 12);
-            grid.childAlignment = TextAnchor.UpperCenter;
-            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = KeyboardColumns;
+            var layout = root.GetComponent<VerticalLayoutGroup>();
+            layout.spacing = KeySpacing;
+            var padding = Mathf.RoundToInt(KeyboardPadding);
+            layout.padding = new RectOffset(padding, padding, padding, padding);
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = true;
 
             var keyboard = root.GetComponent<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard>();
+            var font = FindCleanKeyboardFont();
             var keys = new List<GameObject>();
             var specialKeys = new List<GameObject>();
 
-            foreach (char c in "qwertyuiopasdfghjklzxcvbnm1234567890")
-                keys.Add(CreateOnScreenKey(rootRect, keyboard, c.ToString(), specialKey: -1));
+            foreach (var rowSpec in KeyboardRows)
+            {
+                var row = CreateKeyboardRow(rootRect);
+                foreach (var spec in rowSpec)
+                {
+                    if (spec.IsSpacer)
+                    {
+                        CreateRowSpacer(row, spec.Weight);
+                        continue;
+                    }
 
-            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "⌫", specialKey: 0));   // backspace
-            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "SPACE", specialKey: -1, spaceKey: true));
-            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "OK", specialKey: 1));  // submit
-            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "CAPS", specialKey: 2)); // toggle caps
-            specialKeys.Add(CreateOnScreenKey(rootRect, keyboard, "✕ CLOSE", specialKey: 3)); // hide
+                    var key = CreateOnScreenKey(row, keyboard, spec, font);
+                    // Space has no glyph of its own but is still a "typing" key, so it themes with the character keys.
+                    (spec.Special >= 0 ? specialKeys : keys).Add(key);
+                }
+            }
 
             keyboard.panels = new[] { root };
             keyboard.keys = keys.ToArray();
             keyboard.specialKeys = specialKeys.ToArray();
-            keyboard.backgroundColor = new Color32(31, 31, 36, 245);
-            keyboard.mainColor = new Color32(58, 58, 66, 255);
-            keyboard.specialColor = new Color32(34, 92, 217, 255);
+            keyboard.backgroundColor = new Color32(24, 24, 28, 245);
+            keyboard.mainColor = new Color32(70, 70, 80, 255);
+            keyboard.specialColor = new Color32(40, 100, 220, 255);
+            keyboard.selectedColor = new Color32(255, 170, 40, 255);
             keyboard.textColor = Color.white;
+            keyboard.font = font;
+
+            // Bake the look into the objects now so it is correct in the Scene view, not only after Play starts.
+            keyboard.ApplyTheme();
 
             root.SetActive(false);
 
@@ -727,16 +833,44 @@ namespace Wagenheimer.RewiredHelper.Editor
             return keyboard;
         }
 
+        private static RectTransform CreateKeyboardRow(Transform parent)
+        {
+            var go = new GameObject("Row", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+
+            var layout = go.GetComponent<HorizontalLayoutGroup>();
+            layout.spacing = KeySpacing;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = true;
+            return rect;
+        }
+
+        /// <summary>An invisible, non-interactive gap that keeps shorter rows (letters only) aligned with the wider ones.</summary>
+        private static void CreateRowSpacer(Transform row, float weight)
+        {
+            var go = new GameObject("Spacer", typeof(RectTransform), typeof(LayoutElement));
+            go.transform.SetParent(row, false);
+            ConfigureWeight(go.GetComponent<LayoutElement>(), weight);
+        }
+
+        private static void ConfigureWeight(LayoutElement element, float weight)
+        {
+            element.minWidth = 0f;
+            element.preferredWidth = 0f;
+            element.flexibleWidth = weight;
+        }
+
         /// <summary>A single key button: a colored Image + centered TMP label + RewiredOnScreenKeyboardKey, wired to Press().</summary>
         private static GameObject CreateOnScreenKey(Transform parent, Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard keyboard,
-            string glyph, int specialKey, bool spaceKey = false)
+            KeySpec spec, TMP_FontAsset font)
         {
-            var go = new GameObject(spaceKey ? "Key_Space" : $"Key_{glyph}", typeof(RectTransform), typeof(Image), typeof(Button),
+            var go = new GameObject(KeyObjectName(spec), typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement),
                 typeof(Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboardKey));
             go.transform.SetParent(parent, false);
-
-            // GridLayoutGroup enforces a uniform cellSize on every child (it ignores LayoutElement), so the
-            // space key is the same size as the others here — functional, just not visually widened.
+            ConfigureWeight(go.GetComponent<LayoutElement>(), spec.Weight);
 
             var labelGo = new GameObject("Label", typeof(RectTransform));
             var labelRect = (RectTransform)labelGo.transform;
@@ -747,21 +881,27 @@ namespace Wagenheimer.RewiredHelper.Editor
             labelRect.offsetMax = Vector2.zero;
 
             var label = labelGo.AddComponent<TextMeshProUGUI>();
-            label.text = spaceKey ? string.Empty : glyph.ToUpperInvariant();
-            label.fontSize = specialKey >= 0 ? 16 : 22;
+            label.text = spec.IsSpace ? string.Empty : spec.Glyph;
             label.alignment = TextAlignmentOptions.Center;
             label.color = Color.white;
+            label.raycastTarget = false;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 12f;
+            label.fontSizeMax = spec.Special >= 0 ? 26f : 34f;
+            label.fontStyle = FontStyles.Bold;
+            if (font != null) label.font = font;
 
             var key = go.GetComponent<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboardKey>();
             key.keyboard = keyboard;
             key.label = label;
-            key.specialKey = specialKey;
-            if (spaceKey) key.label = null; // types a literal space via WriteKey below
+            key.specialKey = spec.Special;
 
+            // The key tints itself when selected (RewiredOnScreenKeyboardKey), so the Button's own tint would fight it.
             var button = go.GetComponent<Button>();
+            button.transition = Selectable.Transition.None;
             UnityEditor.Events.UnityEventTools.AddPersistentListener(button.onClick, key.Press);
 
-            if (spaceKey)
+            if (spec.IsSpace)
             {
                 // WriteKey needs a TMP_Text carrying the character to type: a hidden label with a single space.
                 var spaceLabelGo = new GameObject("SpaceGlyph", typeof(RectTransform));
@@ -774,6 +914,9 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             return go;
         }
+
+        private static string KeyObjectName(KeySpec spec) =>
+            spec.IsSpace ? "Key_Space" : $"Key_{spec.Glyph}";
 
         #endregion
 

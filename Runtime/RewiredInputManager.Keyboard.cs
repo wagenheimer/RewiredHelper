@@ -78,13 +78,19 @@ namespace Wagenheimer.RewiredHelper
             {
                 if (keyboard == null) continue;
 
-                if (wantsKeyboard)
+                // The player closed the keyboard on this field: stay closed until the selection moves elsewhere.
+                keyboard.ClearDismissed(inputField);
+                bool dismissed = inputField != null && keyboard.DismissedFor == inputField;
+
+                if (wantsKeyboard && !dismissed)
                 {
                     if (!keyboard.isActive || keyboard.focus != inputField)
                         keyboard.SetActiveFocus(inputField);
                 }
-                else if (keyboard.isActive)
+                else if (keyboard.isActive && !keyboard.ContainsSelection(selected))
                 {
+                    // Selecting one of the keyboard's own keys (D-pad / stick) must NOT count as leaving the field,
+                    // otherwise the keyboard would close the moment the player tried to type.
                     keyboard.SetActive(false);
                 }
             }

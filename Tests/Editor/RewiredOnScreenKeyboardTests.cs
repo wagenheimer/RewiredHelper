@@ -261,7 +261,7 @@ namespace Wagenheimer.RewiredHelper.Tests
 
         [TestCase(true, false, false, false)]  // Steam Deck only, not a Deck, no simulation: hidden
         [TestCase(true, true, false, true)]    // on a Steam Deck: shown
-        [TestCase(true, false, true, true)]    // Editor device simulation: shown
+        [TestCase(true, false, true, true)]    // testing in the Editor: shown
         [TestCase(false, false, false, true)]  // restriction turned off: any gamepad
         public void IsOnScreenKeyboardAllowed_FollowsTheSteamDeckRule(bool onlyOnDeck, bool isDeck, bool simulated, bool expected)
         {

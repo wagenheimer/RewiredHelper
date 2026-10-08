@@ -502,7 +502,7 @@ code — no art assets, restyle it however you like afterwards). Turn off the au
 `RewiredInputManager.Instance.ShowOnScreenKeyboardOnGamepadTextInput = false` if you wire it yourself.
 
 By default the keyboard only opens **on Steam Deck** (`OnScreenKeyboardOnlyOnSteamDeck`); other gamepads keep their own system
-keyboard. In the Editor, the Play Mode device simulation (Dashboard > Automatic > On-Screen Keyboard) still shows it for testing.
+keyboard. The Unity Editor always shows it when a gamepad is active, so it can be tested without a Deck.
 
 **Keep the field visible.** Add `RewiredKeyboardAvoider` to a form's root (optionally assign the input field) and the form is lifted
 just enough to stay above the soft keyboard: the OS keyboard on mobile and this on-screen keyboard on Steam Deck. It only moves when

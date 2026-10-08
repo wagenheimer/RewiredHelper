@@ -64,16 +64,14 @@ namespace Wagenheimer.RewiredHelper.Editor
                 Debug.LogException(ex);
                 _root.Clear();
                 _root.Add(RewiredHelperUIStyle.CreateCallout(
-                    $"The Rewired Helper dashboard failed to build: {ex.GetType().Name}: {ex.Message}
-See the Console for the full stack trace.",
+                    $"The Rewired Helper dashboard failed to build: {ex.GetType().Name}: {ex.Message}\nSee the Console for the full stack trace.",
                     AuditSeverity.Warning));
             }
         }
 
         private void BuildPage()
         {
-
-            // One centered column capped at MaxPageWidth so wide/maximized windows don't stretch the cards.
+            // One centered column capped at 960 px (.rh-page) so wide/maximized windows don't stretch the cards.
             var page = new VisualElement();
             page.AddToClassList("rh-page");
             _root.Add(page);
@@ -173,8 +171,7 @@ See the Console for the full stack trace.",
                 // A throwing tab constructor used to leave the window blank with only a console error.
                 Debug.LogException(ex);
                 view = RewiredHelperUIStyle.CreateCallout(
-                    $"The '{_currentTab}' tab failed to build: {ex.GetType().Name}: {ex.Message}
-See the Console for the full stack trace.",
+                    $"The '{_currentTab}' tab failed to build: {ex.GetType().Name}: {ex.Message}\nSee the Console for the full stack trace.",
                     AuditSeverity.Warning);
             }
 

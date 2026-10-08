@@ -26,6 +26,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         public const int CreateControllerHelpPriority = 23;
         public const string EnsureAndroidGlyphs = SetupGroup + "Ensure Android Remote Glyphs";
         public const int EnsureAndroidGlyphsPriority = 24;
+        public const string CreateUiActions = SetupGroup + "Create Rewired UI Actions (menu navigation)";
+        public const int CreateUiActionsPriority = 25;
 
         // Fix/ (repair existing wiring)
         private const string FixGroup = Root + "/Fix/";

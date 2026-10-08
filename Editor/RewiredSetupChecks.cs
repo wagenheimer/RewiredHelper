@@ -76,41 +76,19 @@ namespace Wagenheimer.RewiredHelper.Editor
             var module = UnityEngine.Object.FindObjectOfType(moduleType) as Component;
             if (module == null) return;
 
-            var available = ReadRewiredActionNames(inputManager);
+            var available = RewiredUiActionsSetup.ReadActionNames(inputManager);
             if (available == null) return;
 
-            var moduleSo = new SerializedObject(module);
-            var missing = new List<string>();
-            foreach (var field in new[] { "m_HorizontalAxis", "m_VerticalAxis", "m_SubmitButton", "m_CancelButton" })
-            {
-                var name = moduleSo.FindProperty(field)?.stringValue;
-                if (!string.IsNullOrEmpty(name) && !available.Contains(name) && !missing.Contains(name))
-                    missing.Add(name);
-            }
+            var names = RewiredUiActionsSetup.NamesFromModule(module);
+            var missing = names.Values.Where(name => !available.Contains(name)).Distinct().ToList();
 
             RewiredHelperAudit.Add(results, Category, "Rewired actions used by the Event System exist", missing.Count == 0,
                 "Every action the input module reads is defined in the Rewired Input Manager.",
                 $"The Event System's input module reads {string.Join(", ", missing)}, but the Rewired Input Manager has no such action(s): " +
                 "gamepad/keyboard menu navigation and Submit/Cancel cannot work.",
-                "In Rewired's Input Manager create the actions (UIHorizontal/UIVertical = axes on D-pad, left stick, arrow keys; UISubmit = A / Enter; " +
-                "UICancel = B / Escape) and map them, or point the module's action names at actions you already have.",
-                "Select Rewired Input Manager", () => Selection.activeObject = inputManager, AuditSeverity.Fail);
-        }
-
-        /// <summary>The action names defined in the scene's Rewired Input Manager, or null if its serialized layout is not recognised.</summary>
-        private static HashSet<string> ReadRewiredActionNames(Component inputManager)
-        {
-            var actions = new SerializedObject(inputManager).FindProperty("_userData.actions");
-            if (actions == null) return null;
-
-            var names = new HashSet<string>();
-            for (var i = 0; i < actions.arraySize; i++)
-            {
-                var name = actions.GetArrayElementAtIndex(i).FindPropertyRelative("_name")?.stringValue;
-                if (!string.IsNullOrEmpty(name)) names.Add(name);
-            }
-
-            return names;
+                "Creates the missing actions and maps them: UIHorizontal/UIVertical = left stick, D-pad and arrow keys; " +
+                "UISubmit = A / Enter; UICancel = B / Escape. Existing actions are never modified.",
+                "Create UI Actions", () => RewiredUiActionsSetup.EnsureUiActions(inputManager, names), AuditSeverity.Fail);
         }
 
         private static void CheckDuplicateEventSystems(List<AuditResult> results)

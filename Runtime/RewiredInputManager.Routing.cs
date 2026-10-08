@@ -64,6 +64,36 @@ namespace Wagenheimer.RewiredHelper
             }
         }
 
+        private static readonly string[] SubmitActionNames = { "UISubmit", "Submit" };
+
+        // Action ids resolved once. Asking Rewired for a name that does not exist (Player.GetButtonDown("UISubmit"))
+        // logs "The Action ... does not exist" on every call, i.e. every frame in a project without UI actions.
+        private int[] _submitActionIds;
+
+        private bool IsSubmitActionPressed()
+        {
+            if (Player == null || !ReInput.isReady) return false;
+
+            if (_submitActionIds == null)
+            {
+                var ids = new System.Collections.Generic.List<int>();
+                foreach (var name in SubmitActionNames)
+                {
+                    var id = ReInput.mapping.GetActionId(name);
+                    if (id >= 0) ids.Add(id);
+                }
+
+                _submitActionIds = ids.ToArray();
+            }
+
+            foreach (var id in _submitActionIds)
+            {
+                if (Player.GetButtonDown(id)) return true;
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// When joystick/keyboard confirmation (UISubmit / Submit / Button A / Return) is pressed on a selected UI element,
         /// automatically dispatches PointerDown/PointerUp/PointerClick so audio listeners (like EventSounds / PointerDown SFX) trigger naturally.
@@ -76,11 +106,7 @@ namespace Wagenheimer.RewiredHelper
             var selected = es.currentSelectedGameObject;
             if (selected == null || !selected.activeInHierarchy) return;
 
-            bool submitPressed = false;
-            if (Player != null)
-            {
-                submitPressed = Player.GetButtonDown("UISubmit") || Player.GetButtonDown("Submit");
-            }
+            bool submitPressed = IsSubmitActionPressed();
             if (!submitPressed)
             {
                 submitPressed = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.JoystickButton0);

@@ -42,6 +42,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 "Creates an Event System using Rewired's RewiredStandaloneInputModule.", "Create Event System",
                 DefaultSetupGenerator.EnsureRewiredEventSystem);
 
+            CheckEventSystemActions(results);
             CheckDuplicateEventSystems(results);
             CheckCanvas(results);
             CheckLegacyComponent(results, manager);
@@ -59,6 +60,58 @@ namespace Wagenheimer.RewiredHelper.Editor
         }
 
         #region Core
+
+        /// <summary>
+        /// RewiredStandaloneInputModule drives menu navigation and clicks from four named Rewired actions (UIHorizontal,
+        /// UIVertical, UISubmit, UICancel by default). If the project's Rewired Input Manager does not define them, gamepad and
+        /// keyboard navigation and the Submit/Cancel buttons silently do nothing in menus, which looks like "joystick clicks
+        /// don't work".
+        /// </summary>
+        private static void CheckEventSystemActions(List<AuditResult> results)
+        {
+            var moduleType = DefaultSetupGenerator.FindRewiredInputModuleType();
+            var inputManager = DefaultSetupGenerator.FindInputManagerInScene();
+            if (moduleType == null || inputManager == null) return;
+
+            var module = UnityEngine.Object.FindObjectOfType(moduleType) as Component;
+            if (module == null) return;
+
+            var available = ReadRewiredActionNames(inputManager);
+            if (available == null) return;
+
+            var moduleSo = new SerializedObject(module);
+            var missing = new List<string>();
+            foreach (var field in new[] { "m_HorizontalAxis", "m_VerticalAxis", "m_SubmitButton", "m_CancelButton" })
+            {
+                var name = moduleSo.FindProperty(field)?.stringValue;
+                if (!string.IsNullOrEmpty(name) && !available.Contains(name) && !missing.Contains(name))
+                    missing.Add(name);
+            }
+
+            RewiredHelperAudit.Add(results, Category, "Rewired actions used by the Event System exist", missing.Count == 0,
+                "Every action the input module reads is defined in the Rewired Input Manager.",
+                $"The Event System's input module reads {string.Join(", ", missing)}, but the Rewired Input Manager has no such action(s): " +
+                "gamepad/keyboard menu navigation and Submit/Cancel cannot work.",
+                "In Rewired's Input Manager create the actions (UIHorizontal/UIVertical = axes on D-pad, left stick, arrow keys; UISubmit = A / Enter; " +
+                "UICancel = B / Escape) and map them, or point the module's action names at actions you already have.",
+                "Select Rewired Input Manager", () => Selection.activeObject = inputManager, AuditSeverity.Fail);
+        }
+
+        /// <summary>The action names defined in the scene's Rewired Input Manager, or null if its serialized layout is not recognised.</summary>
+        private static HashSet<string> ReadRewiredActionNames(Component inputManager)
+        {
+            var actions = new SerializedObject(inputManager).FindProperty("_userData.actions");
+            if (actions == null) return null;
+
+            var names = new HashSet<string>();
+            for (var i = 0; i < actions.arraySize; i++)
+            {
+                var name = actions.GetArrayElementAtIndex(i).FindPropertyRelative("_name")?.stringValue;
+                if (!string.IsNullOrEmpty(name)) names.Add(name);
+            }
+
+            return names;
+        }
 
         private static void CheckDuplicateEventSystems(List<AuditResult> results)
         {

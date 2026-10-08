@@ -19,7 +19,27 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("Automatically show the on-screen keyboard when a TMP_InputField is selected with a gamepad (required for Steam Deck's on-screen-keyboard certification requirement). Off has no effect unless a RewiredOnScreenKeyboard exists in the scene.")]
         public bool ShowOnScreenKeyboardOnGamepadTextInput = true;
 
+        [Tooltip("Only show the on-screen keyboard on Steam Deck. Other gamepads (Xbox/PlayStation pads on a PC or console) usually have a system keyboard or a physical one. In the Editor, the Play Mode device simulation still shows it so it can be tested.")]
+        public bool OnScreenKeyboardOnlyOnSteamDeck = true;
+
         private static readonly System.Collections.Generic.HashSet<UI.RewiredOnScreenKeyboard> _onScreenKeyboards = new();
+
+        /// <summary>The on-screen keyboard that is showing right now, or null. Used to lift forms above it (see <see cref="UI.RewiredKeyboardAvoider"/>).</summary>
+        public static UI.RewiredOnScreenKeyboard ActiveOnScreenKeyboard
+        {
+            get
+            {
+                foreach (var keyboard in _onScreenKeyboards)
+                {
+                    if (keyboard != null && keyboard.isActive) return keyboard;
+                }
+                return null;
+            }
+        }
+
+        /// <summary>Pure rule for whether the keyboard may open on this device. A simulated device (Editor testing) always counts.</summary>
+        public static bool IsOnScreenKeyboardAllowed(bool onlyOnSteamDeck, bool isSteamDeck, bool deviceSimulated) =>
+            !onlyOnSteamDeck || isSteamDeck || deviceSimulated;
 
         private GameObject _lastKeyboardSelection;
 
@@ -72,7 +92,8 @@ namespace Wagenheimer.RewiredHelper
             _lastKeyboardSelection = selected;
 
             var inputField = selected != null ? selected.GetComponent<TMP_InputField>() : null;
-            bool wantsKeyboard = inputField != null && CurrentControllerType == ControllerType.Joystick;
+            bool wantsKeyboard = inputField != null && CurrentControllerType == ControllerType.Joystick &&
+                                 IsOnScreenKeyboardAllowed(OnScreenKeyboardOnlyOnSteamDeck, IsSteamDeck, DebugForceControllerType.HasValue);
 
             foreach (var keyboard in _onScreenKeyboards)
             {

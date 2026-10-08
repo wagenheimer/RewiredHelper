@@ -252,5 +252,20 @@ namespace Wagenheimer.RewiredHelper.Tests
         {
             Assert.IsTrue(_manager.ShowOnScreenKeyboardOnGamepadTextInput);
         }
+
+        [Test]
+        public void ManagerDefaultsToTheSteamDeckOnly()
+        {
+            Assert.IsTrue(_manager.OnScreenKeyboardOnlyOnSteamDeck);
+        }
+
+        [TestCase(true, false, false, false)]  // Steam Deck only, not a Deck, no simulation: hidden
+        [TestCase(true, true, false, true)]    // on a Steam Deck: shown
+        [TestCase(true, false, true, true)]    // Editor device simulation: shown
+        [TestCase(false, false, false, true)]  // restriction turned off: any gamepad
+        public void IsOnScreenKeyboardAllowed_FollowsTheSteamDeckRule(bool onlyOnDeck, bool isDeck, bool simulated, bool expected)
+        {
+            Assert.AreEqual(expected, RewiredInputManager.IsOnScreenKeyboardAllowed(onlyOnDeck, isDeck, simulated));
+        }
     }
 }

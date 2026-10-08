@@ -128,9 +128,12 @@ namespace Wagenheimer.RewiredHelper.Editor
             if (manager != null)
             {
                 var so = new SerializedObject(manager);
-                var toggle = new PropertyField(so.FindProperty("ShowOnScreenKeyboardOnGamepadTextInput"));
-                toggle.Bind(so);
-                card.Add(toggle);
+                foreach (var field in new[] { "ShowOnScreenKeyboardOnGamepadTextInput", "OnScreenKeyboardOnlyOnSteamDeck" })
+                {
+                    var toggle = new PropertyField(so.FindProperty(field));
+                    toggle.Bind(so);
+                    card.Add(toggle);
+                }
             }
 
             card.Add(new RewiredOnScreenKeyboardPanel(Rebuild).Root);

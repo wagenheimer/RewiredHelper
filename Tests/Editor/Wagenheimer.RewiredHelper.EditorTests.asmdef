@@ -4,6 +4,7 @@
     "references": [
         "Wagenheimer.RewiredHelper",
         "Wagenheimer.RewiredHelper.Editor",
+        "Wagenheimer.PackageHub.Editor",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

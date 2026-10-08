@@ -27,7 +27,7 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// </summary>
     public static class LegacyDialogMigrator
     {
-        private const string MenuPath = "Tools/Wagenheimer/Rewired Helper/Migrate Legacy Dialog (delete old Dialog.cs)";
+        private const string MenuPath = RewiredHelperMenu.MigrateLegacyDialog;
         private const string PackageUsing = "using Wagenheimer.RewiredHelper.UI;";
 
         private static readonly string[] SerializedExtensions = { ".prefab", ".unity", ".asset", ".controller", ".playable", ".mat" };
@@ -40,7 +40,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             "Dialogs."
         };
 
-        [MenuItem(MenuPath)]
+        [MenuItem(MenuPath, priority = RewiredHelperMenu.MigrateLegacyDialogPriority)]
         public static void Migrate()
         {
             var newGuid = FindPackageDialogGuid();

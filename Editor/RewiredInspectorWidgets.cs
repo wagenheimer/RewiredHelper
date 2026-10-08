@@ -42,7 +42,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             return foldout;
         }
 
-        public static VisualElement CreateCheckRow(AuditResult result, Action onFixed)
+        /// <param name="trailing">Extra elements (e.g. copy buttons) placed after the fix button, in order.</param>
+        public static VisualElement CreateCheckRow(AuditResult result, Action onFixed, IEnumerable<VisualElement> trailing = null)
         {
             var row = new VisualElement();
             row.AddToClassList("rh-check");
@@ -63,6 +64,10 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             if (result.Fix != null)
                 row.Add(CreateFixButton(result, onFixed));
+
+            if (trailing != null)
+                foreach (var element in trailing)
+                    row.Add(element);
 
             return row;
         }

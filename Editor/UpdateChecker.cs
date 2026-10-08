@@ -5,7 +5,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 {
     public static class UpdateChecker
     {
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Check for Updates...", priority = 149)]
+        [MenuItem(RewiredHelperMenu.CheckForUpdates, priority = RewiredHelperMenu.CheckForUpdatesPriority)]
         public static void CheckForUpdateMenu() => CheckForUpdate(true);
 
         public static void CheckForUpdate(bool force = false)

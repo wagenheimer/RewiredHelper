@@ -32,13 +32,13 @@ namespace Wagenheimer.RewiredHelper.Editor
         private Label _headerBadge;
         private VisualElement _policyRows;
         private VisualElement _pauseChecks;
-        private VisualElement _overrideBox;
         private Foldout _automaticContent;
-        private Button _pauseScreenButton;
+        private RewiredPauseOverridePanel _pausePanel;
         private VisualElement _blockedScenesInfo;
         private VisualElement _liveCard;
-        private VisualElement _onScreenKeyboardStatus;
-        private Button _createKeyboardButton;
+        private Foldout _oskFoldout;
+        private RewiredOnScreenKeyboardPanel _oskPanel;
+        private bool _oskAutoOpened;
         private readonly Dictionary<string, Label> _liveValues = new Dictionary<string, Label>();
         private bool _refreshQueued;
         private bool _isSceneContext;
@@ -419,55 +419,33 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private void BuildOnScreenKeyboardSection()
         {
-            var section = RewiredInspectorWidgets.CreateSection(_root, "osk", "⌨ On-Screen Keyboard", false,
+            // Closed by default only when nothing needs attention; RefreshOnScreenKeyboard opens it once if the keyboard is missing.
+            _oskFoldout = RewiredInspectorWidgets.CreateSection(_root, "osk", "⌨ On-Screen Keyboard", false,
                 "Shown automatically when a TMP_InputField is selected with a gamepad. Touch uses the OS keyboard; mouse/keyboard needs none.");
-            AddFields(section, "ShowOnScreenKeyboardOnGamepadTextInput");
+            AddFields(_oskFoldout, "ShowOnScreenKeyboardOnGamepadTextInput");
 
             // The scene status / create button only make sense for an object in the open scene, like the Setup Health section.
             if (!_isSceneContext) return;
 
-            _onScreenKeyboardStatus = new VisualElement { style = { marginTop = 4 } };
-            section.Add(_onScreenKeyboardStatus);
-
-            _createKeyboardButton = RewiredHelperUIStyle.CreateButton("⌨ Create On-Screen Keyboard", () =>
-            {
-                DefaultSetupGenerator.CreateOnScreenKeyboardAndWire();
-                RefreshDynamic();
-            });
-            _createKeyboardButton.style.marginLeft = 0;
-            _createKeyboardButton.style.marginTop = 4;
-            _createKeyboardButton.style.alignSelf = Align.FlexStart;
-            _createKeyboardButton.tooltip = "Builds a plain QWERTY + digits keyboard from code and registers it; shown automatically for any TMP_InputField selected with a gamepad.";
-            section.Add(_createKeyboardButton);
+            _oskPanel = new RewiredOnScreenKeyboardPanel(RefreshDynamic);
+            _oskFoldout.Add(_oskPanel.Root);
         }
 
         private void RefreshOnScreenKeyboard()
         {
-            if (_onScreenKeyboardStatus == null) return;
+            if (_oskPanel == null) return;
 
-            _onScreenKeyboardStatus.Clear();
+            _oskPanel.Refresh();
 
-            int inputFields = RewiredHelperAudit.FindAll<TMP_InputField>().Count;
-            bool hasKeyboard = DefaultSetupGenerator.FindOnScreenKeyboardInScene() != null;
+            var state = RewiredOnScreenKeyboardPanel.StateLabel();
+            _oskFoldout.text = $"⌨ On-Screen Keyboard  ({state})";
 
-            if (inputFields == 0)
+            // Surface the problem instead of hiding it in a closed foldout, but only once so the user can still collapse it.
+            if (RewiredOnScreenKeyboardPanel.IsMissing() && !_oskAutoOpened)
             {
-                _onScreenKeyboardStatus.Add(RewiredHelperUIStyle.CreateCallout(
-                    "No TMP_InputField in this scene yet — the on-screen keyboard has nothing to type into.", AuditSeverity.Info));
+                _oskAutoOpened = true;
+                _oskFoldout.value = true;
             }
-            else if (hasKeyboard)
-            {
-                _onScreenKeyboardStatus.Add(RewiredHelperUIStyle.CreateCallout(
-                    $"On-screen keyboard found — covers all {inputFields} TMP_InputField(s) in the scene.", AuditSeverity.Pass));
-            }
-            else
-            {
-                _onScreenKeyboardStatus.Add(RewiredHelperUIStyle.CreateCallout(
-                    $"{inputFields} TMP_InputField(s) in the scene but no RewiredOnScreenKeyboard — a gamepad / Steam Deck player has no way to type.", AuditSeverity.Warning));
-            }
-
-            if (_createKeyboardButton != null)
-                _createKeyboardButton.style.display = hasKeyboard ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
         private void BuildControllerHelpSection()
@@ -538,44 +516,14 @@ namespace Wagenheimer.RewiredHelper.Editor
             {
                 if (evt.target == advanced) SessionState.SetBool("RewiredHelper.Inspector.pauseAdvanced", evt.newValue);
             });
-            advanced.Add(new Label("Leave these alone unless you need behavior that differs from the automatic policy.")
-            {
-                style = { fontSize = 10, whiteSpace = WhiteSpace.Normal, marginBottom = 4 }
-            });
-            AddFields(advanced, "OverridePlatformDefaults");
-
-            _overrideBox = new VisualElement();
-            foreach (var name in new[] { "PauseOnAppBackground", "PauseOnControllerDisconnect", "ResumeOnAnyInput" })
-                _overrideBox.Add(new PropertyField(serializedObject.FindProperty(name)));
-            advanced.Add(_overrideBox);
-
-            AddFields(advanced, "PauseOnSteamOverlay", "GamePaused");
-            advanced.Add(BuildPauseButtons());
+            _pausePanel = new RewiredPauseOverridePanel(serializedObject, _manager);
+            advanced.Add(_pausePanel.Root);
             section.Add(advanced);
-        }
-
-        private static bool NeedsPauseScreenFix(RewiredInputManager manager) =>
-            RewiredHelperAudit.CanFreezeOnSomePlatform(manager) && (manager.GamePaused == null || !RewiredHelperAudit.HasResumeButton(manager));
-
-        /// <summary>
-        /// Only offered while there is no pause screen with a Resume button. The automatic policy on mobile never
-        /// freezes the game, so this matters for the desktop/console overlay and for manual RequestPause().
-        /// </summary>
-        private VisualElement BuildPauseButtons()
-        {
-            _pauseScreenButton = RewiredHelperUIStyle.CreateButton("🛠 Create / complete Pause Screen",
-                () => DefaultSetupGenerator.CreatePauseScreenAndWire(_manager, new SerializedObject(_manager)));
-            _pauseScreenButton.style.marginLeft = 0;
-            _pauseScreenButton.style.marginTop = 4;
-            _pauseScreenButton.style.alignSelf = Align.FlexStart;
-            _pauseScreenButton.tooltip = "Creates a pause screen with a Resume button, or adds the Resume button to the one assigned to Game Paused.";
-            return _pauseScreenButton;
         }
 
         private void RefreshPolicy()
         {
-            _overrideBox.style.display = _manager.OverridePlatformDefaults ? DisplayStyle.Flex : DisplayStyle.None;
-            _pauseScreenButton.style.display = NeedsPauseScreenFix(_manager) ? DisplayStyle.Flex : DisplayStyle.None;
+            _pausePanel.Refresh();
 
             _policyRows.Clear();
             bool activeIsMobile = RewiredHelperAudit.IsMobileTarget;

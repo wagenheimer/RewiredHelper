@@ -48,7 +48,7 @@ namespace Wagenheimer.RewiredHelper.Editor
         private const string CategoryMobile = "Mobile & Pause";
         private const string CategoryProject = "Project";
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Verify Setup...", priority = 139)]
+        [MenuItem(RewiredHelperMenu.VerifySetup, priority = RewiredHelperMenu.VerifySetupPriority)]
         public static void OpenWindow() => RewiredHelperDashboardWindow.OpenAuditTab();
 
         /// <summary>Writes a Markdown report to the log and exits with code 1 if any check failed (batch mode).</summary>

@@ -5,6 +5,8 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
+using Wagenheimer.PackageHub.Editor;
+
 namespace Wagenheimer.RewiredHelper.Editor
 {
     /// <summary>
@@ -25,19 +27,35 @@ namespace Wagenheimer.RewiredHelper.Editor
         private VisualElement _root;
         private ScrollView _contentContainer;
 
-        [MenuItem("Tools/Wagenheimer/Rewired Helper/Dashboard...", priority = 138)]
+        private static readonly Vector2 MinSize = new Vector2(620, 520);
+        private static readonly Vector2 DefaultSize = new Vector2(820, 640);
+
+        [MenuItem(RewiredHelperMenu.Dashboard, priority = RewiredHelperMenu.DashboardPriority)]
         [MenuItem("Window/Wagenheimer/Rewired Helper/Dashboard", priority = 212)]
         public static void OpenDashboard() => Open(Tab.SetupAudit);
+
+        /// <summary>Recovery for a window stuck off-screen (e.g. saved on a monitor that is no longer connected).</summary>
+        [MenuItem(RewiredHelperMenu.ResetWindowPosition, priority = RewiredHelperMenu.ResetWindowPositionPriority)]
+        public static void ResetWindowPosition()
+        {
+            var window = GetWindow<RewiredHelperDashboardWindow>("Rewired Helper");
+            window.minSize = MinSize;
+            EditorWindowPlacement.Center(window, MinSize, DefaultSize);
+            window.Show();
+            window.Focus();
+        }
 
         public static void OpenAuditTab() => Open(Tab.SetupAudit);
 
         private static void Open(Tab tab)
         {
             var window = GetWindow<RewiredHelperDashboardWindow>("Rewired Helper");
-            window.minSize = new Vector2(620, 520);
+            window.minSize = MinSize;
             window.titleContent = new GUIContent("Rewired Helper", EditorGUIUtility.IconContent("d_Favorite").image);
             window._currentTab = tab;
+            EditorWindowPlacement.EnsureOnScreen(window, MinSize, DefaultSize);
             window.Show();
+            window.Focus();
             if (window._root != null) window.RebuildUI();
         }
 

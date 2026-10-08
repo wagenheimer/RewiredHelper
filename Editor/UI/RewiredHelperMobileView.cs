@@ -16,11 +16,6 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// </summary>
     internal sealed class RewiredHelperMobileView
     {
-        private static readonly string[] OverrideFields =
-        {
-            "PauseOnAppBackground", "PauseOnControllerDisconnect", "ResumeOnAnyInput"
-        };
-
         public VisualElement Root { get; }
 
         public RewiredHelperMobileView()
@@ -42,6 +37,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             var manager = RewiredHelperAudit.FindAll<RewiredInputManager>().FirstOrDefault();
             Root.Add(BuildSceneStatusCard(manager));
+            Root.Add(BuildOnScreenKeyboardCard(manager));
             if (manager != null)
                 BuildAdvancedSection(manager);
 
@@ -121,6 +117,28 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         #endregion
 
+        #region On-Screen Keyboard
+
+        /// <summary>Same panel as the RewiredInputManager Inspector, so gamepad text input is visible from the Dashboard too.</summary>
+        private VisualElement BuildOnScreenKeyboardCard(RewiredInputManager manager)
+        {
+            var card = RewiredHelperUIStyle.CreateCard("⌨ On-Screen Keyboard",
+                "Gamepad / Steam Deck text input. Shown automatically for any TMP_InputField selected with a joystick; touch uses the OS keyboard.");
+
+            if (manager != null)
+            {
+                var so = new SerializedObject(manager);
+                var toggle = new PropertyField(so.FindProperty("ShowOnScreenKeyboardOnGamepadTextInput"));
+                toggle.Bind(so);
+                card.Add(toggle);
+            }
+
+            card.Add(new RewiredOnScreenKeyboardPanel(Rebuild).Root);
+            return card;
+        }
+
+        #endregion
+
         #region Advanced
 
         /// <summary>The only manual controls: an explicit override of the automatic policy and the pause-screen reference.</summary>
@@ -130,53 +148,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 "Leave everything here alone unless you need behavior that differs from the automatic policy.");
 
             var so = new SerializedObject(manager);
-            var overrideField = new PropertyField(so.FindProperty("OverridePlatformDefaults"));
-            section.Add(overrideField);
-
-            var overrideBox = new VisualElement();
-            foreach (var field in OverrideFields)
-                overrideBox.Add(new PropertyField(so.FindProperty(field)));
-            section.Add(overrideBox);
-            overrideBox.style.display = manager.OverridePlatformDefaults ? DisplayStyle.Flex : DisplayStyle.None;
-
-            section.Add(new PropertyField(so.FindProperty("PauseOnSteamOverlay")));
-            section.Add(new PropertyField(so.FindProperty("GamePaused")));
-
-            overrideField.RegisterValueChangeCallback(_ =>
-            {
-                overrideBox.style.display = so.FindProperty("OverridePlatformDefaults").boolValue ? DisplayStyle.Flex : DisplayStyle.None;
-                section.schedule.Execute(Rebuild).ExecuteLater(200);
-            });
-
-            if (EditorApplication.isPlaying)
-            {
-                var simRow = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap, alignItems = Align.Center, marginTop = 10 } };
-                var current = RewiredInputManager.DebugForceControllerType;
-                simRow.Add(new Label(current.HasValue ? $"🧪 Simulating: {current.Value}" : "🧪 Simulate text-input device:")
-                    { style = { marginRight = 6, unityTextAlign = TextAnchor.MiddleLeft } });
-                simRow.Add(RewiredHelperUIStyle.CreateButton("Gamepad (shows on-screen keyboard)",
-                    () => { RewiredInputManager.DebugForceControllerType = ControllerType.Joystick; Rebuild(); }));
-                simRow.Add(RewiredHelperUIStyle.CreateButton("Touch",
-                    () => { RewiredInputManager.DebugForceControllerType = ControllerType.Custom; Rebuild(); }));
-                simRow.Add(RewiredHelperUIStyle.CreateButton("Stop simulating (auto-detect)",
-                    () => { RewiredInputManager.DebugForceControllerType = null; Rebuild(); }));
-                section.Add(simRow);
-                section.Add(RewiredHelperUIStyle.CreateCallout(
-                    "Forces CurrentControllerType so you can preview gamepad-only behavior — like the RewiredOnScreenKeyboard popping up when a TMP_InputField is selected — without a physical controller plugged in. " +
-                    "Only affects this Editor session while in Play Mode; it is compiled out of builds entirely and resets when you stop Play Mode.",
-                    AuditSeverity.Info));
-            }
-
-            if (RewiredHelperAudit.CanFreezeOnSomePlatform(manager) && (manager.GamePaused == null || !RewiredHelperAudit.HasResumeButton(manager)))
-            {
-                var create = RewiredHelperUIStyle.CreateButton("🛠 Create / complete Pause Screen",
-                    () => DefaultSetupGenerator.CreatePauseScreenAndWire(manager, new SerializedObject(manager)));
-                create.style.marginLeft = 0;
-                create.style.marginTop = 6;
-                create.style.alignSelf = Align.FlexStart;
-                create.tooltip = "Creates a pause screen with a Resume button, or adds the Resume button to the one assigned to Game Paused.";
-                section.Add(create);
-            }
+            section.Add(new RewiredPauseOverridePanel(so, manager, () => section.schedule.Execute(Rebuild).ExecuteLater(200)).Root);
 
             section.Bind(so);
         }

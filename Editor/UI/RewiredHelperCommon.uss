@@ -26,6 +26,11 @@
     font-size: 12px;
 }
 
+/* Audit summary line colour (state classes toggled from RewiredHelperAuditView) */
+.rh-summary-pass { color: var(--rh-pass); }
+.rh-summary-warn { color: var(--rh-warn); }
+.rh-summary-fail { color: var(--rh-fail); }
+
 /* Centered, width-capped column holding header + tabs + content */
 .rh-page {
     flex-grow: 1;

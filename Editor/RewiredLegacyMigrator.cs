@@ -20,9 +20,9 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// </summary>
     public static class RewiredLegacyMigrator
     {
-        private const string MenuPath = "Tools/Wagenheimer/Rewired Helper/Migrate Legacy RewiredHelper Component...";
+        private const string MenuPath = RewiredHelperMenu.MigrateLegacyComponent;
 
-        [MenuItem(MenuPath, priority = 145)]
+        [MenuItem(MenuPath, priority = RewiredHelperMenu.MigrateLegacyComponentPriority)]
         public static void MenuMigrateProject()
         {
             var script = FindInputManagerScript();

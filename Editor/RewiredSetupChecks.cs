@@ -230,9 +230,24 @@ namespace Wagenheimer.RewiredHelper.Editor
         private static void CheckOnScreenKeyboard(List<AuditResult> results, RewiredInputManager manager)
         {
             int inputFields = RewiredHelperAudit.FindAll<TMP_InputField>().Count;
-            if (inputFields == 0) return;
-
             bool hasKeyboard = DefaultSetupGenerator.FindOnScreenKeyboardInScene() != null;
+
+            // A persistent Main/bootstrap scene usually has no TMP_InputField itself (the forms live in prefabs or other scenes),
+            // so staying silent here hid the keyboard from the audit. Say so, and offer the keyboard for this scene.
+            if (inputFields == 0)
+            {
+                if (!hasKeyboard)
+                {
+                    RewiredHelperAudit.Add(results, Category, "On-Screen Keyboard for gamepad text input", false, string.Empty,
+                        "No TMP_InputField in the open scene, so none is needed here. If your forms live in prefabs or other scenes " +
+                        "(e.g. the persistent Main/bootstrap scene), add the on-screen keyboard to the scene that shows them.",
+                        "Builds a plain QWERTY keyboard in this scene; shown automatically for any TMP_InputField selected with a gamepad.",
+                        "Create On-Screen Keyboard", () => DefaultSetupGenerator.CreateOnScreenKeyboardAndWire(), AuditSeverity.Info);
+                }
+
+                return;
+            }
+
             RewiredHelperAudit.Add(results, Category, "On-Screen Keyboard for gamepad text input", hasKeyboard,
                 $"Found, covering all {inputFields} TMP_InputField(s) in the scene.",
                 $"{inputFields} TMP_InputField(s) in the scene but no RewiredOnScreenKeyboard: a gamepad or Steam Deck " +

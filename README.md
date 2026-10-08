@@ -450,7 +450,7 @@ controller is currently active. **Install it via that menu first** — this pack
 that addon itself, since it ships under Rewired's own commercial license rather than this
 package's MIT one.
 
-Once installed, use **Tools → Wagenheimer → Rewired Helper → Create Controller Help Form** to
+Once installed, use **Tools → Wagenheimer → Rewired Helper → Setup → Create Controller Help Form** to
 generate a panel in the open scene: it detects the addon via reflection, adds
 `UnityUITextMeshProGlyphHelper` to a TMP label, and fills it with one
 `<rewiredElement actionName="X"> <rewiredAction name="X">` line per Button-type Action already
@@ -492,7 +492,7 @@ keyboard for free; mouse/keyboard needs none.
 
 ```csharp
 // Optional: your own theme, or wire your own key art. Otherwise skip this entirely —
-// Tools → Wagenheimer → Rewired Helper → Create On-Screen Keyboard builds a plain, fully working one.
+// Tools → Wagenheimer → Rewired Helper → Setup → Create On-Screen Keyboard builds a plain, fully working one.
 RewiredInputManager.RegisterOnScreenKeyboard(myKeyboard);  // only if you built it by hand, not via the generator
 ```
 
@@ -509,7 +509,7 @@ customization applies to it too. The Setup Audit flags it (Warning) with a one-c
 RewiredInputManager** fix that swaps the component's script reference in place — the same technique Unity
 uses for an in-place class rename, so no data is lost and no other object's reference to that exact component
 breaks. For a project-wide sweep (every scene and prefab, not just the open scene), use
-**Tools → Wagenheimer → Rewired Helper → Migrate Legacy RewiredHelper Component...**.
+**Tools → Wagenheimer → Rewired Helper → Migrate → Legacy RewiredHelper Component...**.
 
 ## Editor Utilities
 
@@ -517,8 +517,12 @@ breaks. For a project-wide sweep (every scene and prefab, not just the open scen
 |---|---|
 | Tools → Wagenheimer → Rewired Helper → Dashboard... | Setup audit, mobile & pause policy, checklist, docs |
 | Tools → Wagenheimer → Rewired Helper → Verify Setup... | Opens the Dashboard on the Setup Audit tab |
-| Tools → Wagenheimer → Rewired Helper → Create Rewired Input Manager | Adds a `RewiredInputManager` GameObject to the open scene |
-| Tools → Wagenheimer → Rewired Helper → Create Controller Help Form | Generates a controller-help panel using Rewired's official glyph addon, if present |
+| Tools → Wagenheimer → Rewired Helper → Setup → Create Rewired Input Manager | Adds a `RewiredInputManager` GameObject to the open scene |
+| Tools → Wagenheimer → Rewired Helper → Setup → Create Controller Help Form | Generates a controller-help panel using Rewired's official glyph addon, if present |
+| Tools → Wagenheimer → Rewired Helper → Setup → Create On-Screen Keyboard | Builds a gamepad / Steam Deck on-screen keyboard in the open scene |
+| Tools → Wagenheimer → Rewired Helper → Fix → … | Verify & fix Game Cursor wiring, remove duplicate Event Systems |
+| Tools → Wagenheimer → Rewired Helper → Migrate → … | Migrate a legacy `RewiredHelper` component or the old `Dialog.cs` |
+| Tools → Wagenheimer → Rewired Helper → Reset Window Position | Centers the Dashboard if it opened off-screen (e.g. saved on a disconnected monitor) |
 | Tools → Wagenheimer → Rewired Helper → Check for Updates... | Manually check for a new package version |
 | Tools → Wagenheimer → Rewired Helper → Integration Guide (README) | Opens this README on GitHub |
 | Tools → Wagenheimer → Rewired Helper → Report Issue | Opens a new GitHub issue |

@@ -21,7 +21,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             DocsAndUpdates
         }
 
-        private Tab _currentTab = Tab.SetupAudit;
+        [SerializeField] private Tab _currentTab = Tab.SetupAudit;
         private VisualElement _root;
         private ScrollView _contentContainer;
 
@@ -46,17 +46,43 @@ namespace Wagenheimer.RewiredHelper.Editor
             _root = rootVisualElement;
             _root.style.flexGrow = 1;
             RewiredHelperUIStyle.Apply(_root);
+            // Gives the window the background/text colour/padding the stylesheet defines for .rh-root.
+            _root.AddToClassList("rh-root");
             RebuildUI();
         }
 
         private void RebuildUI()
         {
             _root.Clear();
-            _root.Add(CreateHeaderBanner());
-            _root.Add(CreateTabBar());
+
+            try
+            {
+                BuildPage();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
+                _root.Clear();
+                _root.Add(RewiredHelperUIStyle.CreateCallout(
+                    $"The Rewired Helper dashboard failed to build: {ex.GetType().Name}: {ex.Message}
+See the Console for the full stack trace.",
+                    AuditSeverity.Warning));
+            }
+        }
+
+        private void BuildPage()
+        {
+
+            // One centered column capped at MaxPageWidth so wide/maximized windows don't stretch the cards.
+            var page = new VisualElement();
+            page.AddToClassList("rh-page");
+            _root.Add(page);
+
+            page.Add(CreateHeaderBanner());
+            page.Add(CreateTabBar());
 
             _contentContainer = new ScrollView(ScrollViewMode.Vertical) { style = { flexGrow = 1 } };
-            _root.Add(_contentContainer);
+            page.Add(_contentContainer);
 
             RebuildContent();
         }
@@ -115,8 +141,9 @@ namespace Wagenheimer.RewiredHelper.Editor
                 {
                     _currentTab = tabValue;
                     RebuildUI();
-                })
-                { text = $"{icon} {title}" };
+                });
+                // Leading emoji in Button.text overlaps the label on Windows; give the icon its own box.
+                RewiredHelperUIStyle.ApplyIconText(button, $"{icon} {title}");
 
                 button.AddToClassList("rh-tab-btn");
                 if (_currentTab == tab) button.AddToClassList("active");
@@ -130,13 +157,27 @@ namespace Wagenheimer.RewiredHelper.Editor
         {
             _contentContainer.Clear();
 
-            VisualElement view = _currentTab switch
+            VisualElement view;
+            try
             {
-                Tab.SetupAudit => new RewiredHelperAuditView().Root,
-                Tab.MobileAndPause => new RewiredHelperMobileView().Root,
-                Tab.Checklist => new RewiredHelperChecklistView().Root,
-                _ => new RewiredHelperDocsView().Root
-            };
+                view = _currentTab switch
+                {
+                    Tab.SetupAudit => new RewiredHelperAuditView().Root,
+                    Tab.MobileAndPause => new RewiredHelperMobileView().Root,
+                    Tab.Checklist => new RewiredHelperChecklistView().Root,
+                    _ => new RewiredHelperDocsView().Root
+                };
+            }
+            catch (Exception ex)
+            {
+                // A throwing tab constructor used to leave the window blank with only a console error.
+                Debug.LogException(ex);
+                view = RewiredHelperUIStyle.CreateCallout(
+                    $"The '{_currentTab}' tab failed to build: {ex.GetType().Name}: {ex.Message}
+See the Console for the full stack trace.",
+                    AuditSeverity.Warning);
+            }
+
             _contentContainer.Add(view);
         }
 

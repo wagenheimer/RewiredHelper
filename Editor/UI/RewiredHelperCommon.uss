@@ -26,6 +26,14 @@
     font-size: 12px;
 }
 
+/* Centered, width-capped column holding header + tabs + content */
+.rh-page {
+    flex-grow: 1;
+    width: 100%;
+    max-width: 960px;
+    align-self: center;
+}
+
 /* Header Banner */
 .rh-header {
     background-color: var(--rh-card-bg);
@@ -118,6 +126,9 @@
 
 .rh-tab-btn {
     flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
     height: 32px;
     font-size: 11px;
     -unity-text-align: middle-center;

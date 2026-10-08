@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.62.5] - 2026-10-08
+
+### Fixed
+- fix(editor): the Dashboard window never applied the `.rh-root` class, so it had no background, text colour or padding. It now does, and header, tabs and content sit in a centered column capped at 960 px.
+- fix(editor): a tab (or the header) that throws while building no longer leaves the window empty/invisible; the error is shown in the window and logged.
+- fix(editor): tab buttons use `ApplyIconText` so the leading emoji no longer overlaps the label on Windows.
+- fix(editor): the selected Dashboard tab survives script recompiles.
+
 ## [0.62.4] - 2026-10-06
 
 ### Changed

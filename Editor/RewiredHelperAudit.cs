@@ -373,9 +373,12 @@ namespace Wagenheimer.RewiredHelper.Editor
             return sb.ToString();
         }
 
-        public static string ToPromptMarkdown(List<AuditResult> results)
+        /// <param name="category">When set, only the findings of that category are included.</param>
+        public static string ToPromptMarkdown(List<AuditResult> results, string category = null)
         {
-            var pending = results.Where(r => !string.IsNullOrEmpty(r.Prompt)).ToList();
+            var pending = results
+                .Where(r => !string.IsNullOrEmpty(r.Prompt) && (category == null || r.Category == category))
+                .ToList();
             if (pending.Count == 0) return "No actionable Rewired Helper findings.";
 
             var sb = new StringBuilder("Fix every Rewired Helper finding below, then re-run the audit.\n");

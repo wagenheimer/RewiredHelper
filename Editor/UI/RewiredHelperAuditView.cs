@@ -14,6 +14,11 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         public VisualElement Root { get; }
 
+        // The audit walks the whole scene, so switching Dashboard tabs reuses the last result while nothing changed.
+        // Any undoable edit, a scene switch or a build-target change invalidates it; "Run Audit Now" always re-runs.
+        private static List<AuditResult> _cachedResults;
+        private static string _cachedKey;
+
         private List<AuditResult> _results;
         private AuditSeverity? _severityFilter;
         private VisualElement _resultsContainer;
@@ -24,8 +29,20 @@ namespace Wagenheimer.RewiredHelper.Editor
             Root = new VisualElement();
             RewiredHelperUIStyle.Apply(Root);
             BuildUI();
-            RunAudit();
+
+            if (_cachedResults != null && _cachedKey == CurrentCacheKey())
+            {
+                _results = _cachedResults;
+                RefreshResults();
+            }
+            else
+            {
+                RunAudit();
+            }
         }
+
+        private static string CurrentCacheKey() =>
+            $"{UnityEngine.SceneManagement.SceneManager.GetActiveScene().path}|{UnityEditor.Undo.GetCurrentGroup()}|{UnityEditor.EditorUserBuildSettings.activeBuildTarget}";
 
         private void BuildUI()
         {
@@ -63,6 +80,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         public void RunAudit()
         {
             _results = RewiredHelperAudit.RunAudit();
+            _cachedResults = _results;
+            _cachedKey = CurrentCacheKey();
             RefreshResults();
         }
 
@@ -87,6 +106,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             foreach (var group in filtered.GroupBy(r => r.Category))
             {
                 var card = RewiredHelperUIStyle.CreateCard(group.Key);
+                AddCategoryPromptButton(card, group.Key);
                 foreach (var item in group)
                     card.Add(CreateRow(item));
                 _resultsContainer.Add(card);
@@ -117,6 +137,18 @@ namespace Wagenheimer.RewiredHelper.Editor
         }
 
         /// <summary>The shared check row (same look as the Inspector), plus per-finding copy buttons.</summary>
+        /// <summary>A per-category "copy AI prompt" button in the card header, for fixing one area at a time.</summary>
+        private void AddCategoryPromptButton(VisualElement card, string category)
+        {
+            var header = card.Q(className: "rh-card-header");
+            if (header == null) return;
+
+            var button = CreateCopyButton("🤖 Copy prompt", "Copy an AI prompt that fixes only the findings in this category.",
+                () => _results != null ? RewiredHelperAudit.ToPromptMarkdown(_results, category) : null);
+            button.style.marginLeft = 8;
+            header.Add(button);
+        }
+
         private void SetSummaryClass(string className)
         {
             _summaryLabel.RemoveFromClassList("rh-summary-fail");

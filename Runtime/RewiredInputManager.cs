@@ -335,6 +335,8 @@ namespace Wagenheimer.RewiredHelper
 
         private void Update()
         {
+            ResolveForeignEventSystemsThrottled();
+
             if (Player == null && ReInput.isReady)
             {
                 InitializePlayer();

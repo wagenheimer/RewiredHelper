@@ -89,7 +89,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private void BuildPage()
         {
-            // One centered column capped at 960 px (.rh-page) so wide/maximized windows don't stretch the cards.
+            // One full-width column (.rh-page) holding header, tabs and content.
             var page = new VisualElement();
             page.AddToClassList("rh-page");
             _root.Add(page);

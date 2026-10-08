@@ -31,12 +31,10 @@
 .rh-summary-warn { color: var(--rh-warn); }
 .rh-summary-fail { color: var(--rh-fail); }
 
-/* Centered, width-capped column holding header + tabs + content */
+/* Full-width column holding header + tabs + content (uses the whole window) */
 .rh-page {
     flex-grow: 1;
     width: 100%;
-    max-width: 960px;
-    align-self: center;
 }
 
 /* Header Banner */

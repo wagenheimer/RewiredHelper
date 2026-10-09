@@ -175,6 +175,17 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void SetActive_False_HidesAKeyboardThatWasLeftEnabledInTheScene()
+        {
+            Assert.IsTrue(_keyboardGo.activeSelf);
+            Assert.IsFalse(_keyboard.isActive, "Never opened through SetActive(true).");
+
+            _keyboard.SetActive(false);
+
+            Assert.IsFalse(_keyboardGo.activeSelf);
+        }
+
+        [Test]
         public void Close_HidesTheKeyboardAndRemembersTheField()
         {
             _keyboard.SetActiveFocus(_field);

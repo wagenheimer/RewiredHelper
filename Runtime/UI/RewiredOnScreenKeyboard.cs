@@ -112,6 +112,14 @@ namespace Wagenheimer.RewiredHelper.UI
 
         private void Start()
         {
+            // A keyboard saved enabled in the scene would start on screen. It only ever opens through SetActive(true), which sets isActive
+            // before the first Start, so "enabled but not open" here means it was left on by mistake: hide it.
+            if (Application.isPlaying && _animator == null && !isActive && gameObject.activeSelf)
+            {
+                DebugLog("keyboard was enabled in the scene without being opened: hiding it");
+                gameObject.SetActive(false);
+            }
+
             ShowNumeric(showNumeric);
             ApplyTheme();
         }
@@ -416,9 +424,11 @@ namespace Wagenheimer.RewiredHelper.UI
                     }
                 }
             }
-            else if (isActive)
+            else if (isActive || gameObject.activeSelf)
             {
-                if (_animator != null)
+                // "activeSelf" covers a keyboard left enabled in the scene: it is visible although it never "opened", so isActive is
+                // false and a plain "if (isActive)" would never hide it (CLOSE would do nothing).
+                if (_animator != null && isActive)
                     _animator.SetBool("Hide", true);
                 else
                     gameObject.SetActive(false);

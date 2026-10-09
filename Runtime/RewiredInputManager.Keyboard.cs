@@ -118,8 +118,25 @@ namespace Wagenheimer.RewiredHelper
             }
         }
 
+        /// <summary>
+        /// Where the keyboard is not allowed (everything except Steam Deck, unless turned off) it must never be visible, even when the scene
+        /// was saved with it enabled: a phone or tablet already has its own keyboard and has no way to close this one.
+        /// </summary>
+        private void HideKeyboardsWhereNotAllowed()
+        {
+            if (_onScreenKeyboards.Count == 0) return;
+            if (IsOnScreenKeyboardAllowed(OnScreenKeyboardOnlyOnSteamDeck, IsSteamDeck, IsOnScreenKeyboardTestingInEditor)) return;
+
+            foreach (var keyboard in _onScreenKeyboards)
+            {
+                if (keyboard != null && keyboard.gameObject.activeSelf)
+                    keyboard.SetActive(false);
+            }
+        }
+
         private void HandleOnScreenKeyboard()
         {
+            HideKeyboardsWhereNotAllowed();
             if (!ShowOnScreenKeyboardOnGamepadTextInput || _onScreenKeyboards.Count == 0) return;
 
             var eventSystem = EventSystem.current;

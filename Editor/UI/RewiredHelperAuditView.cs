@@ -106,6 +106,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
 
             UpdateSummary();
+            AddHistoryCard();
 
             var filtered = _results.Where(r => !_severityFilter.HasValue || r.Severity == _severityFilter.Value);
             foreach (var group in filtered.GroupBy(r => r.Category))
@@ -142,6 +143,30 @@ namespace Wagenheimer.RewiredHelper.Editor
         }
 
         /// <summary>The shared check row (same look as the Inspector), plus per-finding copy buttons.</summary>
+        /// <summary>What was already fixed from the Audit in this editor session, newest first.</summary>
+        private void AddHistoryCard()
+        {
+            var entries = RewiredAuditHistory.Entries();
+            if (entries.Count == 0) return;
+
+            var card = RewiredHelperUIStyle.CreateCard("✔ Done so far", "Fixes applied from the Audit in this editor session.");
+            foreach (var entry in entries.Take(8))
+            {
+                var line = new Label($"{entry.Time:HH:mm:ss}   {entry.FixLabel}   ({entry.Title})");
+                line.AddToClassList("rh-check-desc");
+                card.Add(line);
+            }
+
+            var clear = RewiredHelperUIStyle.CreateButton("Clear", () =>
+            {
+                RewiredAuditHistory.Clear();
+                RefreshResults();
+            });
+            clear.style.alignSelf = Align.FlexStart;
+            card.Add(clear);
+            _resultsContainer.Add(card);
+        }
+
         /// <summary>A per-category "copy AI prompt" button in the card header, for fixing one area at a time.</summary>
         private void AddCategoryPromptButton(VisualElement card, string category)
         {

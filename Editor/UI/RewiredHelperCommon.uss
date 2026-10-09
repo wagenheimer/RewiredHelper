@@ -26,6 +26,16 @@
     font-size: 12px;
 }
 
+/* Audit rows: the collapsed Details section and the Ping button */
+.rh-check-details {
+    margin-top: 4px;
+}
+
+.rh-check-ping {
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
 /* Audit summary line colour (state classes toggled from RewiredHelperAuditView) */
 .rh-summary-pass { color: var(--rh-pass); }
 .rh-summary-warn { color: var(--rh-warn); }

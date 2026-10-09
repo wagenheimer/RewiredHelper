@@ -55,6 +55,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                     {
                         result.Fix();
                         applied.Add(result.FixLabel);
+                        RewiredAuditHistory.Record(result.Title, result.FixLabel);
                     }
                     catch (Exception ex)
                     {
@@ -80,6 +81,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             DefaultSetupGenerator.CreateOnScreenKeyboardAndWire();
             applied.Add("Create On-Screen Keyboard");
+            RewiredAuditHistory.Record("On-Screen Keyboard for gamepad text input", "Create On-Screen Keyboard");
         }
 
         private static bool IsSafeFix(AuditResult result)

@@ -45,6 +45,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         /// <param name="trailing">Extra elements (e.g. copy buttons) placed after the fix button, in order.</param>
         public static VisualElement CreateCheckRow(AuditResult result, Action onFixed, IEnumerable<VisualElement> trailing = null)
         {
+            result = RewiredAuditInfo.Enrich(result);
+
             var row = new VisualElement();
             row.AddToClassList("rh-check");
             row.AddToClassList(SeverityClass(result.Severity));
@@ -60,7 +62,14 @@ namespace Wagenheimer.RewiredHelper.Editor
             if (result.Severity != AuditSeverity.Pass && result.Fix == null)
                 AddDescription(body, string.IsNullOrEmpty(result.FixHint) ? null : "💡 " + result.FixHint);
 
+            if (!string.IsNullOrEmpty(result.DoneNote))
+                AddDescription(body, "✔ " + result.DoneNote);
+
+            AddDetails(body, result);
             row.Add(body);
+
+            if (result.Target != null)
+                row.Add(CreatePingButton(result.Target));
 
             if (result.Fix != null)
                 row.Add(CreateFixButton(result, onFixed));
@@ -70,6 +79,49 @@ namespace Wagenheimer.RewiredHelper.Editor
                     row.Add(element);
 
             return row;
+        }
+
+        /// <summary>A collapsed "Details" section: what the finding is, the code behind it (with Copy) and how to fix it by hand.</summary>
+        private static void AddDetails(VisualElement body, AuditResult result)
+        {
+            if (string.IsNullOrEmpty(result.About) && string.IsNullOrEmpty(result.Code)) return;
+
+            var key = SessionKeyPrefix + "details." + result.Title;
+            var foldout = new Foldout { text = "Details", value = SessionState.GetBool(key, false) };
+            foldout.AddToClassList("rh-check-details");
+            foldout.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.target == foldout) SessionState.SetBool(key, evt.newValue);
+            });
+
+            if (!string.IsNullOrEmpty(result.About))
+                AddDescription(foldout, result.About);
+
+            if (!string.IsNullOrEmpty(result.Code))
+                foldout.Add(RewiredHelperUIStyle.CreateCodeBox(result.Code));
+
+            if (!string.IsNullOrEmpty(result.FixHint) && result.Fix != null)
+                AddDescription(foldout, "🛠 The fix: " + result.FixHint);
+
+            body.Add(foldout);
+        }
+
+        private static Button CreatePingButton(UnityEngine.Object target)
+        {
+            var button = new Button(() =>
+            {
+                if (target == null) return;
+
+                Selection.activeObject = target;
+                EditorGUIUtility.PingObject(target);
+            })
+            {
+                tooltip = "Select and highlight the related object in the Hierarchy / Project window."
+            };
+            RewiredHelperUIStyle.ApplyIconText(button, "📍 Ping");
+            button.AddToClassList("rh-toolbar-btn");
+            button.AddToClassList("rh-check-ping");
+            return button;
         }
 
         private static void AddDescription(VisualElement body, string text)
@@ -85,7 +137,11 @@ namespace Wagenheimer.RewiredHelper.Editor
         {
             var button = new Button(() =>
             {
-                try { result.Fix(); }
+                try
+                {
+                    result.Fix();
+                    RewiredAuditHistory.Record(result.Title, result.FixLabel);
+                }
                 catch (Exception ex) { Debug.LogError($"[RewiredHelper] '{result.FixLabel}' failed: {ex.Message}"); }
                 onFixed?.Invoke();
             })

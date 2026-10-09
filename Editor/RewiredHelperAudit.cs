@@ -32,6 +32,18 @@ namespace Wagenheimer.RewiredHelper.Editor
         /// <summary>Ready-to-paste task for an AI coding agent. Empty for Pass results.</summary>
         public string Prompt;
 
+        /// <summary>Plain-language explanation of what the finding is and why it matters (filled in by <see cref="RewiredAuditInfo"/>).</summary>
+        public string About;
+
+        /// <summary>The code / Inspector shape that satisfies the finding, shown with a Copy button.</summary>
+        public string Code;
+
+        /// <summary>Scene object or asset the Ping button selects.</summary>
+        public UnityEngine.Object Target;
+
+        /// <summary>"Fixed with ... at 10:42" when a fix from the Audit already resolved it in this session.</summary>
+        public string DoneNote;
+
         /// <summary>One-click in-Editor fix (label + action). Null when the finding needs manual work.</summary>
         public string FixLabel;
         public Action Fix;

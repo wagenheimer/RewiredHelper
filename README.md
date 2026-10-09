@@ -80,7 +80,8 @@ substitute it.
    (or **Dashboard → Setup Audit → Fix All Safe Issues**). It creates the Rewired Input Manager, the Rewired Event System, a Canvas, the
    Game Cursor, the Rewired UI actions (navigation, submit, cancel, mapped to gamepad and keyboard) and the on-screen keyboard, repeating
    until the audit has nothing left to fix.
-3. Run the **Setup Audit** once more and read what is left: it lists anything manual (pause screen, controller help, glyphs) with a fix or a hint.
+3. Run the **Setup Audit** once more and read what is left (every row has a collapsible **Details** section with what it is and the code behind it, a **Ping**
+   button to select the related object, and a **Done so far** card listing the fixes already applied): it lists anything manual (pause screen, controller help, glyphs) with a fix or a hint.
 
 What you get without writing code: joystick cursor and menu navigation, Escape/Return routing, per-platform pause policy, a Steam Deck
 on-screen keyboard that hides when its form closes, and forms that lift themselves above the soft keyboard (OS keyboard on mobile).

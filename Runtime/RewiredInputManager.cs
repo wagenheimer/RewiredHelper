@@ -365,6 +365,7 @@ namespace Wagenheimer.RewiredHelper
             UpdatePauseState();
             HandleOnScreenKeyboard();
             SuspendCursorWhileOnScreenKeyboard();
+            EnsureKeyboardAvoiderForSelection();
         }
 
 

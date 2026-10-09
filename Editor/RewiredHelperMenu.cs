@@ -16,6 +16,8 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         // Setup/ (create what is missing)
         private const string SetupGroup = Root + "/Setup/";
+        public const string SetUpEverything = SetupGroup + "Set Up Everything (fix all)";
+        public const int SetUpEverythingPriority = 19;
         public const string CreateInputManager = SetupGroup + "Create Rewired Input Manager";
         public const int CreateInputManagerPriority = 20;
         public const string CreateEventSystem = SetupGroup + "Create Rewired Event System";

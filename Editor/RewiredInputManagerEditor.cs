@@ -422,7 +422,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             // Closed by default only when nothing needs attention; RefreshOnScreenKeyboard opens it once if the keyboard is missing.
             _oskFoldout = RewiredInspectorWidgets.CreateSection(_root, "osk", "⌨ On-Screen Keyboard", false,
                 "Shown automatically when a TMP_InputField is selected with a gamepad. Touch uses the OS keyboard; mouse/keyboard needs none.");
-            AddFields(_oskFoldout, "ShowOnScreenKeyboardOnGamepadTextInput", "OnScreenKeyboardOnlyOnSteamDeck", "HideCursorWhileOnScreenKeyboardOpen");
+            AddFields(_oskFoldout, "ShowOnScreenKeyboardOnGamepadTextInput", "OnScreenKeyboardOnlyOnSteamDeck", "HideCursorWhileOnScreenKeyboardOpen", "AutoLiftFormsAboveKeyboard");
 
             // The scene status / create button only make sense for an object in the open scene, like the Setup Health section.
             if (!_isSceneContext) return;

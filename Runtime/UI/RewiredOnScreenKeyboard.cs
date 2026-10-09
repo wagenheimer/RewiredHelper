@@ -100,6 +100,16 @@ namespace Wagenheimer.RewiredHelper.UI
 
         private void OnDestroy() => RewiredInputManager.UnregisterOnScreenKeyboard(this);
 
+        private void Update()
+        {
+            // The form that owned the field was closed (or destroyed): the keyboard has nothing left to type into.
+            if (isActive && (focus == null || !focus.isActiveAndEnabled))
+            {
+                DebugLog("field is gone (form closed): hiding");
+                SetActive(false);
+            }
+        }
+
         private void Start()
         {
             ShowNumeric(showNumeric);

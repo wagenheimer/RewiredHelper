@@ -51,6 +51,11 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             var actionsRow = Row();
             actionsRow.Add(RewiredHelperUIStyle.CreateButton("▶ Run Audit Now", RunAudit, primary: true));
+            actionsRow.Add(RewiredHelperUIStyle.CreateButton("🛠 Fix All Safe Issues", () =>
+            {
+                RewiredSetupAll.Run();
+                RunAudit();
+            }));
             actionsRow.Add(RewiredHelperUIStyle.CreateButton("All", () => SetFilter(null)));
             actionsRow.Add(RewiredHelperUIStyle.CreateButton("✕ Fails Only", () => SetFilter(AuditSeverity.Fail)));
             actionsRow.Add(RewiredHelperUIStyle.CreateButton("⚠ Warnings Only", () => SetFilter(AuditSeverity.Warning)));

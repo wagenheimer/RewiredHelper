@@ -354,6 +354,29 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void ManagerLiftsFormsAboveTheKeyboardByDefault()
+        {
+            Assert.IsTrue(_manager.AutoLiftFormsAboveKeyboard);
+        }
+
+        [Test]
+        public void FindFormRoot_FallsBackToTheTopLevelPanelUnderTheCanvas()
+        {
+            var canvasGo = new GameObject("Canvas", typeof(Canvas));
+            var panel = new GameObject("Panel", typeof(RectTransform));
+            panel.transform.SetParent(canvasGo.transform, false);
+            var inner = new GameObject("Inner", typeof(RectTransform));
+            inner.transform.SetParent(panel.transform, false);
+            var field = new GameObject("Field", typeof(RectTransform));
+            field.transform.SetParent(inner.transform, false);
+
+            var root = RewiredInputManager.FindFormRoot(field.transform);
+
+            Assert.AreSame(panel.transform, root);
+            Object.DestroyImmediate(canvasGo);
+        }
+
+        [Test]
         public void ManagerHidesTheJoystickCursorWhileTheKeyboardIsOpenByDefault()
         {
             Assert.IsTrue(_manager.HideCursorWhileOnScreenKeyboardOpen);

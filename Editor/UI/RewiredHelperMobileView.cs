@@ -128,7 +128,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             if (manager != null)
             {
                 var so = new SerializedObject(manager);
-                foreach (var field in new[] { "ShowOnScreenKeyboardOnGamepadTextInput", "OnScreenKeyboardOnlyOnSteamDeck", "HideCursorWhileOnScreenKeyboardOpen" })
+                foreach (var field in new[] { "ShowOnScreenKeyboardOnGamepadTextInput", "OnScreenKeyboardOnlyOnSteamDeck", "HideCursorWhileOnScreenKeyboardOpen", "AutoLiftFormsAboveKeyboard" })
                 {
                     var toggle = new PropertyField(so.FindProperty(field));
                     toggle.Bind(so);

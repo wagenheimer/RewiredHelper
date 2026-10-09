@@ -37,6 +37,22 @@ namespace Wagenheimer.RewiredHelper
             }
         }
 
+        /// <summary>
+        /// True only in the Unity Editor, where the keyboard is always allowed so it can be tested with a gamepad. (The Play Mode device
+        /// simulation, <c>DebugForceControllerType</c>, is itself Editor-only, so it must not be referenced from code that ships in builds.)
+        /// </summary>
+        private static bool IsOnScreenKeyboardTestingInEditor
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
+
         /// <summary>Pure rule for whether the keyboard may open on this device. The Editor and a simulated device (testing) always count.</summary>
         public static bool IsOnScreenKeyboardAllowed(bool onlyOnSteamDeck, bool isSteamDeck, bool testingInEditor) =>
             !onlyOnSteamDeck || isSteamDeck || testingInEditor;
@@ -92,7 +108,7 @@ namespace Wagenheimer.RewiredHelper
 
             var inputField = selected.GetComponent<TMP_InputField>();
             if (inputField == null) return;
-            if (!IsOnScreenKeyboardAllowed(OnScreenKeyboardOnlyOnSteamDeck, IsSteamDeck, Application.isEditor || DebugForceControllerType.HasValue)) return;
+            if (!IsOnScreenKeyboardAllowed(OnScreenKeyboardOnlyOnSteamDeck, IsSteamDeck, IsOnScreenKeyboardTestingInEditor)) return;
             if (!IsSubmitActionPressed() && !Input.GetKeyDown(KeyCode.JoystickButton0)) return;
 
             foreach (var keyboard in _onScreenKeyboards)
@@ -118,7 +134,7 @@ namespace Wagenheimer.RewiredHelper
 
             var inputField = selected != null ? selected.GetComponent<TMP_InputField>() : null;
             bool wantsKeyboard = inputField != null && CurrentControllerType == ControllerType.Joystick &&
-                                 IsOnScreenKeyboardAllowed(OnScreenKeyboardOnlyOnSteamDeck, IsSteamDeck, Application.isEditor || DebugForceControllerType.HasValue);
+                                 IsOnScreenKeyboardAllowed(OnScreenKeyboardOnlyOnSteamDeck, IsSteamDeck, IsOnScreenKeyboardTestingInEditor);
 
             foreach (var keyboard in _onScreenKeyboards)
             {

@@ -65,6 +65,9 @@ namespace Wagenheimer.RewiredHelper.UI
         [Tooltip("Invoked on every key press (character or special). Wire your own SFX here.")]
         public UnityEvent OnKeyPressed;
 
+        /// <summary>Set by the setup generator; lets the Inspector offer an upgrade for keyboards built by an older layout.</summary>
+        [HideInInspector] public int layoutVersion;
+
         [HideInInspector] public bool isActive;
         [HideInInspector] public bool capsEnabled;
 
@@ -117,12 +120,19 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             if (!roundedKeys || !Application.isPlaying) return;
 
-            var rounded = RewiredOnScreenKeyboardSprites.Rounded;
-            ForEachImage(keys, img => UseSliced(img, mainSprite != null ? mainSprite : rounded));
-            ForEachImage(specialKeys, img => UseSliced(img, specialSprite != null ? specialSprite : rounded));
+            try
+            {
+                var rounded = RewiredOnScreenKeyboardSprites.Rounded;
+                ForEachImage(keys, img => UseSliced(img, mainSprite != null ? mainSprite : rounded));
+                ForEachImage(specialKeys, img => UseSliced(img, specialSprite != null ? specialSprite : rounded));
 
-            var background = GetComponent<Image>();
-            if (background != null) UseSliced(background, rounded);
+                var background = GetComponent<Image>();
+                if (background != null) UseSliced(background, rounded);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[RewiredHelper] Could not apply the rounded on-screen keyboard look: {ex.Message}", this);
+            }
         }
 
         private static void UseSliced(Image image, Sprite sprite)

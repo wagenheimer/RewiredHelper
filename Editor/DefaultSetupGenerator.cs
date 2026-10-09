@@ -648,6 +648,9 @@ namespace Wagenheimer.RewiredHelper.Editor
         internal static Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard FindOnScreenKeyboardInScene() =>
             RewiredHelperAudit.FindAll<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard>().FirstOrDefault();
 
+        /// <summary>Bumped whenever the generated layout/colours change, so older keyboards in scenes can be upgraded.</summary>
+        internal const int KeyboardLayoutVersion = 2;
+
         private const float KeyHeight = 62f;
         private const float KeySpacing = 8f;
         private const float KeyboardPadding = 16f;
@@ -737,7 +740,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         /// labels, glyphs missing from most fonts). Only those are offered the upgrade; a hand-made keyboard is never touched.
         /// </summary>
         internal static bool IsLegacyGeneratedKeyboard(Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard keyboard) =>
-            keyboard != null && keyboard.gameObject.name == "OnScreenKeyboard" && keyboard.GetComponent<GridLayoutGroup>() != null;
+            keyboard != null && keyboard.gameObject.name == "OnScreenKeyboard" &&
+            (keyboard.GetComponent<GridLayoutGroup>() != null || keyboard.layoutVersion < KeyboardLayoutVersion);
 
         /// <summary>Replaces a legacy generated keyboard with the current layout (undoable).</summary>
         internal static Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard UpgradeLegacyOnScreenKeyboard()
@@ -820,6 +824,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             keyboard.selectedColor = new Color32(70, 140, 255, 255);
             keyboard.textColor = new Color32(240, 244, 255, 255);
             keyboard.font = font;
+            keyboard.layoutVersion = KeyboardLayoutVersion;
 
             // Bake the look into the objects now so it is correct in the Scene view, not only after Play starts.
             keyboard.ApplyTheme();

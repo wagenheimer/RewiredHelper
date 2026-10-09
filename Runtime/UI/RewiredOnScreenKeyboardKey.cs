@@ -28,6 +28,11 @@ namespace Wagenheimer.RewiredHelper.UI
         [Tooltip("-1 = character key (types Label's text). 0+ = a special key; see RewiredOnScreenKeyboard.WriteSpecialKey.")]
         public int specialKey = -1;
 
+        // One physical press can reach the key more than once: the virtual cursor's click, the module's Submit and the
+        // RewiredInputManager submit bridge all activate the selected button. A real player cannot press a key twice this fast.
+        private const float DuplicatePressWindow = 0.12f;
+
+        private float _lastPressTime = float.NegativeInfinity;
         private Image _image;
         private Color _baseColor = Color.white;
         private bool _hasBaseColor;
@@ -36,6 +41,10 @@ namespace Wagenheimer.RewiredHelper.UI
         public void Press()
         {
             if (keyboard == null) return;
+
+            var now = Time.unscaledTime;
+            if (now - _lastPressTime < DuplicatePressWindow) return;
+            _lastPressTime = now;
 
             if (specialKey >= 0) keyboard.WriteSpecialKey(specialKey);
             else keyboard.WriteKey(label);

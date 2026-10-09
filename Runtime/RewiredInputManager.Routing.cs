@@ -120,10 +120,16 @@ namespace Wagenheimer.RewiredHelper
                 button = UnityEngine.EventSystems.PointerEventData.InputButton.Left
             };
 
-            // 1. Dispatch pointerDown / pointerUp / pointerClick hierarchy (upwards)
+            // When a Rewired Submit action exists, the Event System's input module already submits the selected button, and
+            // PointerClick would activate it a second time (a button's onClick runs for both). Then the bridge only supplies the
+            // press feedback (pointer down/up) for sound listeners. Without a Submit action nothing else would press the button.
+            bool moduleSubmits = _submitActionIds != null && _submitActionIds.Length > 0;
+
+            // 1. Dispatch pointerDown / pointerUp (and pointerClick when nothing else submits) up the hierarchy
             UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler);
             UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler);
-            UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
+            if (!moduleSubmits)
+                UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
 
             // 2. Also dispatch to any child handlers (e.g. EventSounds components attached to child objects)
             var pointerDownChildren = selected.GetComponentsInChildren<UnityEngine.EventSystems.IPointerDownHandler>();
@@ -135,7 +141,9 @@ namespace Wagenheimer.RewiredHelper
                 }
             }
 
-            var pointerClickChildren = selected.GetComponentsInChildren<UnityEngine.EventSystems.IPointerClickHandler>();
+            var pointerClickChildren = moduleSubmits
+                ? System.Array.Empty<UnityEngine.EventSystems.IPointerClickHandler>()
+                : selected.GetComponentsInChildren<UnityEngine.EventSystems.IPointerClickHandler>();
             foreach (var handler in pointerClickChildren)
             {
                 if (handler is Component c && c.gameObject != selected)

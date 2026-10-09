@@ -254,6 +254,25 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void Key_IgnoresASecondPressInTheSameMoment()
+        {
+            _keyboard.autoCapitalize = false;
+            _keyboard.SetFocus(_field);
+            _field.text = string.Empty;
+
+            var keyGo = new GameObject("Key_a", typeof(RectTransform), typeof(UnityEngine.UI.Button), typeof(RewiredOnScreenKeyboardKey));
+            var key = keyGo.GetComponent<RewiredOnScreenKeyboardKey>();
+            key.keyboard = _keyboard;
+            key.label = CreateLabel("a");
+
+            key.Press();
+            key.Press();
+
+            Assert.AreEqual("a", _field.text);
+            Object.DestroyImmediate(keyGo);
+        }
+
+        [Test]
         public void ReopenFor_ShowsTheKeyboardAgainAfterItWasClosed()
         {
             _keyboard.SetActiveFocus(_field);

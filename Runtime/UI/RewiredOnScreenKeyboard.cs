@@ -453,8 +453,35 @@ namespace Wagenheimer.RewiredHelper.UI
         /// <summary>Moves the gamepad selection onto the first key so the player can navigate the keyboard right away.</summary>
         private void SelectFirstKeyIfNeeded()
         {
+            if (!selectFirstKeyOnShow || !Application.isPlaying || !gameObject.activeInHierarchy) return;
+
+            // Not immediately: the input field that just opened this keyboard re-selects itself in its own LateUpdate
+            // (TMP_InputField.ActivateInputField), which would steal the selection straight back from the first key.
+            StartCoroutine(SelectFirstKeyAfterFrames(SelectionSettleFrames));
+        }
+
+        private const int SelectionSettleFrames = 2;
+
+        private System.Collections.IEnumerator SelectFirstKeyAfterFrames(int frames)
+        {
+            for (var i = 0; i < frames; i++)
+                yield return null;
+
+            if (!isActive) yield break;
+
+            // Only take the selection from the field (or nothing): if the player already moved onto a key, leave it alone.
             var eventSystem = EventSystem.current;
-            if (!selectFirstKeyOnShow || eventSystem == null || keys == null || !gameObject.activeInHierarchy) return;
+            var selected = eventSystem != null ? eventSystem.currentSelectedGameObject : null;
+            var selectionIsFreeToMove = selected == null || (focus != null && selected == focus.gameObject);
+            if (!selectionIsFreeToMove) yield break;
+
+            SelectFirstKey();
+        }
+
+        private void SelectFirstKey()
+        {
+            var eventSystem = EventSystem.current;
+            if (eventSystem == null || keys == null) return;
 
             foreach (var key in keys)
             {
@@ -464,6 +491,7 @@ namespace Wagenheimer.RewiredHelper.UI
                 if (selectable == null || !selectable.IsInteractable()) continue;
 
                 eventSystem.SetSelectedGameObject(key);
+                DebugLog($"first key '{key.name}' selected");
                 return;
             }
         }

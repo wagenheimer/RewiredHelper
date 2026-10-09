@@ -649,7 +649,10 @@ namespace Wagenheimer.RewiredHelper.Editor
             RewiredHelperAudit.FindAll<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard>().FirstOrDefault();
 
         /// <summary>Bumped whenever the generated layout/colours change, so older keyboards in scenes can be upgraded.</summary>
-        internal const int KeyboardLayoutVersion = 2;
+        internal const int KeyboardLayoutVersion = 3;
+
+        private const string KeyboardSpriteFolder = "Assets/RewiredHelperGenerated";
+        private const string KeyboardSpritePath = KeyboardSpriteFolder + "/OnScreenKeyboard_Rounded.png";
 
         private const float KeyHeight = 62f;
         private const float KeySpacing = 8f;
@@ -718,6 +721,39 @@ namespace Wagenheimer.RewiredHelper.Editor
                 else row.AddRange((KeySpec[])part);
             }
             return row.ToArray();
+        }
+
+        /// <summary>
+        /// The rounded-key sprite as a real project asset (PNG + sliced Sprite import), so the keyboard's rounded look is serialized in
+        /// the scene and does not depend on anything being generated at runtime.
+        /// </summary>
+        private static Sprite EnsureRoundedKeySprite()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Sprite>(KeyboardSpritePath);
+            if (existing != null) return existing;
+
+            if (!AssetDatabase.IsValidFolder(KeyboardSpriteFolder))
+                AssetDatabase.CreateFolder("Assets", "RewiredHelperGenerated");
+
+            var texture = Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboardSprites.CreateRoundedTexture();
+            System.IO.File.WriteAllBytes(KeyboardSpritePath, texture.EncodeToPNG());
+            UnityEngine.Object.DestroyImmediate(texture);
+            AssetDatabase.ImportAsset(KeyboardSpritePath, ImportAssetOptions.ForceSynchronousImport);
+
+            if (AssetImporter.GetAtPath(KeyboardSpritePath) is TextureImporter importer)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.spritePixelsPerUnit = 100f;
+                var border = Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboardSprites.BorderPixels;
+                importer.spriteBorder = new Vector4(border, border, border, border);
+                importer.alphaIsTransparency = true;
+                importer.mipmapEnabled = false;
+                importer.filterMode = FilterMode.Bilinear;
+                importer.SaveAndReimport();
+            }
+
+            return AssetDatabase.LoadAssetAtPath<Sprite>(KeyboardSpritePath);
         }
 
         /// <summary>The plain TextMeshPro font asset, if present: the project's default TMP font may carry an outline that looks wrong on keys.</summary>
@@ -825,6 +861,16 @@ namespace Wagenheimer.RewiredHelper.Editor
             keyboard.textColor = new Color32(240, 244, 255, 255);
             keyboard.font = font;
             keyboard.layoutVersion = KeyboardLayoutVersion;
+
+            var roundedSprite = EnsureRoundedKeySprite();
+            if (roundedSprite != null)
+            {
+                keyboard.mainSprite = roundedSprite;
+                keyboard.specialSprite = roundedSprite;
+                var background = keyboard.GetComponent<Image>();
+                background.sprite = roundedSprite;
+                background.type = Image.Type.Sliced;
+            }
 
             // Bake the look into the objects now so it is correct in the Scene view, not only after Play starts.
             keyboard.ApplyTheme();

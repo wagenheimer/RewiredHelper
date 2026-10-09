@@ -125,6 +125,8 @@ namespace Wagenheimer.RewiredHelper
             // press feedback (pointer down/up) for sound listeners. Without a Submit action nothing else would press the button.
             bool moduleSubmits = _submitActionIds != null && _submitActionIds.Length > 0;
 
+            ActiveOnScreenKeyboard?.DebugLog($"submit bridge fired on '{selected.name}' (sends PointerClick: {!moduleSubmits})");
+
             // 1. Dispatch pointerDown / pointerUp (and pointerClick when nothing else submits) up the hierarchy
             UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler);
             UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(selected, eventData, UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler);

@@ -46,6 +46,10 @@ namespace Wagenheimer.RewiredHelper.UI
         public Sprite mainSprite;
         public Sprite specialSprite;
 
+        [Header("Debug")]
+        [Tooltip("Logs every key event (pointer down/up/click, submit, selection, caps) with the frame and the selected object, to track double or missed clicks. Only active in the Editor and development builds.")]
+        public bool debugLogging = true;
+
         [Header("Behaviour")]
         [Tooltip("Hide the keyboard after the OK key submits the field.")]
         public bool hideOnSubmit = true;
@@ -115,10 +119,24 @@ namespace Wagenheimer.RewiredHelper.UI
             ColorSpecialKeys();
         }
 
+        /// <summary>Writes one line describing a keyboard event. No-op outside the Editor and development builds, or when <see cref="debugLogging"/> is off.</summary>
+        internal void DebugLog(string message)
+        {
+            if (!debugLogging || !(Application.isEditor || Debug.isDebugBuild)) return;
+
+            var eventSystem = EventSystem.current;
+            var selected = eventSystem != null && eventSystem.currentSelectedGameObject != null ? eventSystem.currentSelectedGameObject.name : "none";
+            Debug.Log($"[OSK f{Time.frameCount} t{Time.unscaledTime:F2}] {message} | selected={selected} active={isActive} shift={capsEnabled} lock={CapsLocked} focus={(focus != null ? focus.name : "none")}", this);
+        }
+
         /// <summary>Soft corners from a generated sprite. Runtime only: a generated sprite cannot be serialized into a scene.</summary>
         private void ApplyRoundedLook()
         {
-            if (!roundedKeys || !Application.isPlaying) return;
+            if (!roundedKeys || !Application.isPlaying)
+            {
+                DebugLog($"rounded look skipped (roundedKeys={roundedKeys}, playing={Application.isPlaying})");
+                return;
+            }
 
             try
             {
@@ -128,6 +146,7 @@ namespace Wagenheimer.RewiredHelper.UI
 
                 var background = GetComponent<Image>();
                 if (background != null) UseSliced(background, rounded);
+                DebugLog($"rounded look applied: sprite={(rounded != null ? rounded.name : "null")} border={(rounded != null ? rounded.border.ToString() : "-")} keys={(keys != null ? keys.Length : 0)}");
             }
             catch (System.Exception ex)
             {
@@ -151,8 +170,15 @@ namespace Wagenheimer.RewiredHelper.UI
                 var key = go != null ? go.GetComponent<RewiredOnScreenKeyboardKey>() : null;
                 if (key == null) continue;
 
-                if (key.specialKey == 1) key.SetBaseColor(submitColor);
-                else if (key.specialKey == 2) key.SetBaseColor(capsEnabled ? capsActiveColor : specialColor);
+                if (key.specialKey == 1)
+                {
+                    key.SetBaseColor(submitColor);
+                }
+                else if (key.specialKey == 2)
+                {
+                    key.SetBaseColor(capsEnabled ? capsActiveColor : specialColor);
+                    if (key.label != null) key.label.text = !capsEnabled ? "CAPS" : CapsLocked ? "CAPS LOCK" : "SHIFT";
+                }
             }
         }
 
@@ -189,13 +215,20 @@ namespace Wagenheimer.RewiredHelper.UI
         public void SetMainSprite(Sprite sprite)
         {
             if (sprite == null) return;
-            ForEachImage(keys, img => img.sprite = sprite);
+            ForEachImage(keys, img => AssignSprite(img, sprite));
         }
 
         public void SetSpecialSprite(Sprite sprite)
         {
             if (sprite == null) return;
-            ForEachImage(specialKeys, img => img.sprite = sprite);
+            ForEachImage(specialKeys, img => AssignSprite(img, sprite));
+        }
+
+        /// <summary>Assigns a sprite and slices it when it has borders (a rounded-corner sprite must not be stretched).</summary>
+        private static void AssignSprite(Image image, Sprite sprite)
+        {
+            image.sprite = sprite;
+            if (sprite.border != Vector4.zero) image.type = Image.Type.Sliced;
         }
 
         public void SetFocus(TMP_InputField inputField) => focus = inputField;
@@ -211,6 +244,7 @@ namespace Wagenheimer.RewiredHelper.UI
 
             RefreshAutoCapitalization();
             SelectFirstKeyIfNeeded();
+            DebugLog($"opened for '{(focus != null ? focus.name : "none")}'");
         }
 
         /// <summary>Opens the keyboard again on a field the player had closed it on (pressing A on the selected field).</summary>
@@ -299,6 +333,7 @@ namespace Wagenheimer.RewiredHelper.UI
             var field = focus;
             _dismissedFor = field;
             SetActive(false);
+            DebugLog("closed");
 
             var eventSystem = EventSystem.current;
             if (eventSystem != null && field != null && field.gameObject.activeInHierarchy)
@@ -343,22 +378,35 @@ namespace Wagenheimer.RewiredHelper.UI
 
         public void SwitchCaps() => SetCaps(!capsEnabled);
 
-        /// <summary>The CAPS key: off, then Shift for one letter, then Caps Lock, then off again.</summary>
+        // Two presses of CAPS within this window lock caps (like double-tapping Shift on a phone).
+        private const float CapsDoubleTapWindow = 0.45f;
+        private float _lastCapsPressTime = float.NegativeInfinity;
+
+        /// <summary>
+        /// The CAPS key. One press toggles Shift on/off (it can already be on because of auto-capitalisation, in which case one
+        /// press turns it off); pressing again right away locks caps; pressing while locked turns it off.
+        /// </summary>
         public void CapsKeyPressed()
         {
-            if (!capsEnabled)
+            var now = Time.unscaledTime;
+            var doubleTap = now - _lastCapsPressTime <= CapsDoubleTapWindow;
+            _lastCapsPressTime = now;
+
+            if (CapsLocked)
             {
-                SetCaps(true);
+                SetCaps(false);
             }
-            else if (!CapsLocked)
+            else if (capsEnabled && doubleTap)
             {
                 CapsLocked = true;
                 ColorSpecialKeys();
             }
             else
             {
-                SetCaps(false);
+                SetCaps(!capsEnabled);
             }
+
+            DebugLog($"CAPS pressed -> shift={capsEnabled} lock={CapsLocked} (doubleTap={doubleTap})");
         }
 
         /// <summary>Shift is on while the field is empty (first letter capitalised); never fights a Caps Lock the player chose.</summary>

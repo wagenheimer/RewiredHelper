@@ -215,6 +215,19 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void CapsKeyPressed_TurnsOffAnAutoShift_WithASinglePress()
+        {
+            _field.text = string.Empty;
+            _keyboard.SetActiveFocus(_field);
+            Assert.IsTrue(_keyboard.capsEnabled, "Auto-capitalisation starts the empty field in Shift.");
+
+            _keyboard.CapsKeyPressed();
+
+            Assert.IsFalse(_keyboard.capsEnabled);
+            Assert.IsFalse(_keyboard.CapsLocked);
+        }
+
+        [Test]
         public void WriteKey_SpendsAOneLetterShift()
         {
             _keyboard.autoCapitalize = false;

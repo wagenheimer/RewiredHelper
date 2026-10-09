@@ -18,7 +18,8 @@ namespace Wagenheimer.RewiredHelper.UI
     /// Cancel button (B / Circle) closes the keyboard.
     /// </summary>
     [RequireComponent(typeof(Button))]
-    public class RewiredOnScreenKeyboardKey : MonoBehaviour, ISelectHandler, IDeselectHandler, ICancelHandler
+    public class RewiredOnScreenKeyboardKey : MonoBehaviour, ISelectHandler, IDeselectHandler, ICancelHandler,
+        IPointerDownHandler, IPointerUpHandler, IPointerClickHandler, ISubmitHandler
     {
         public RewiredOnScreenKeyboard keyboard;
 
@@ -43,8 +44,15 @@ namespace Wagenheimer.RewiredHelper.UI
             if (keyboard == null) return;
 
             var now = Time.unscaledTime;
-            if (now - _lastPressTime < DuplicatePressWindow) return;
+            var sinceLast = now - _lastPressTime;
+            if (sinceLast < DuplicatePressWindow)
+            {
+                keyboard.DebugLog($"key '{name}' Press IGNORED (duplicate {sinceLast * 1000f:F0} ms after the previous one)");
+                return;
+            }
+
             _lastPressTime = now;
+            keyboard.DebugLog($"key '{name}' Press ACCEPTED");
 
             if (specialKey >= 0) keyboard.WriteSpecialKey(specialKey);
             else keyboard.WriteKey(label);
@@ -62,12 +70,32 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             _isSelected = true;
             ApplyColor();
+            Trace("Select");
         }
+
+        // The four handlers below only trace which input path reaches the key (Button.onClick still does the work):
+        // a mouse/cursor click gives PointerDown + PointerUp + PointerClick, a gamepad Submit gives Submit.
+        public void OnPointerDown(PointerEventData eventData) => Trace($"PointerDown {Describe(eventData)}");
+
+        public void OnPointerUp(PointerEventData eventData) => Trace($"PointerUp {Describe(eventData)}");
+
+        public void OnPointerClick(PointerEventData eventData) => Trace($"PointerClick {Describe(eventData)}");
+
+        public void OnSubmit(BaseEventData eventData) => Trace("Submit");
+
+        private void Trace(string what)
+        {
+            if (keyboard != null) keyboard.DebugLog($"key '{name}' {what}");
+        }
+
+        private static string Describe(PointerEventData eventData) =>
+            eventData == null ? "-" : $"[{eventData.GetType().Name} button={eventData.button} id={eventData.pointerId} pos={eventData.position}]";
 
         public void OnDeselect(BaseEventData eventData)
         {
             _isSelected = false;
             ApplyColor();
+            Trace("Deselect");
         }
 
         /// <summary>B / Circle on any key closes the keyboard and returns to the field.</summary>

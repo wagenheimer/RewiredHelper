@@ -187,7 +187,10 @@ namespace Wagenheimer.RewiredHelper.Editor
             return id;
         }
 
-        /// <summary>Rewired keeps a per-category list of action ids as a hex string of little-endian int32 values.</summary>
+        /// <summary>
+        /// Rewired keeps a per-category list of action ids as a byte array of little-endian int32 values (the YAML shows it as a hex
+        /// string, but it is a byte[] for SerializedProperty: reading it as a string throws).
+        /// </summary>
         private static void RegisterInCategoryMap(SerializedProperty userData, int categoryId, int actionId)
         {
             var list = userData.FindPropertyRelative("actionCategoryMap")?.FindPropertyRelative("list");
@@ -199,14 +202,18 @@ namespace Wagenheimer.RewiredHelper.Editor
                 if (entry.FindPropertyRelative("categoryId").intValue != categoryId) continue;
 
                 var actionIds = entry.FindPropertyRelative("actionIds");
-                actionIds.stringValue += EncodeId(actionId);
+                var bytes = EncodeId(actionId);
+                var start = actionIds.arraySize;
+                actionIds.arraySize = start + bytes.Length;
+                for (var b = 0; b < bytes.Length; b++)
+                    actionIds.GetArrayElementAtIndex(start + b).intValue = bytes[b];
                 return;
             }
         }
 
-        /// <summary>One id as 8 lowercase hex digits, little-endian (id 10 -> "0a000000").</summary>
-        internal static string EncodeId(int id) =>
-            BitConverter.ToString(BitConverter.GetBytes(id)).Replace("-", string.Empty).ToLowerInvariant();
+        /// <summary>One id as its 4 little-endian bytes (id 10 -> 0a 00 00 00, shown in the YAML as "0a000000").</summary>
+        internal static byte[] EncodeId(int id) => new[] { (byte)id, (byte)(id >> 8), (byte)(id >> 16), (byte)(id >> 24) };
+
 
         #endregion
 

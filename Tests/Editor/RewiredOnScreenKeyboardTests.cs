@@ -354,6 +354,12 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void ManagerHidesTheJoystickCursorWhileTheKeyboardIsOpenByDefault()
+        {
+            Assert.IsTrue(_manager.HideCursorWhileOnScreenKeyboardOpen);
+        }
+
+        [Test]
         public void ManagerDefaultsToTheSteamDeckOnly()
         {
             Assert.IsTrue(_manager.OnScreenKeyboardOnlyOnSteamDeck);

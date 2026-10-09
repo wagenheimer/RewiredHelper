@@ -39,6 +39,8 @@ namespace Wagenheimer.RewiredHelper.UI
         public Color32 submitColor = new Color32(46, 160, 90, 255);
         [Tooltip("Colour of the CAPS key while Shift or Caps Lock is on.")]
         public Color32 capsActiveColor = new Color32(240, 170, 40, 255);
+        [Tooltip("Corner size of the rounded keys, in canvas units. Independent of the Canvas 'Reference Pixels Per Unit'.")]
+        [Min(1f)] public float cornerRadius = 16f;
         [Tooltip("Give the keys and the background soft rounded corners (a generated sprite; ignored when a sprite is assigned below).")]
         public bool roundedKeys = true;
         [Tooltip("Optional font for every key label. Leave empty to keep each label's own font (the project default TMP font can carry an outline that looks wrong on keys).")]
@@ -115,6 +117,7 @@ namespace Wagenheimer.RewiredHelper.UI
             SetMainSprite(mainSprite);
             SetSpecialSprite(specialSprite);
             ApplyRoundedLook();
+            ApplyCornerSizes();
             SetFont(font);
             ColorSpecialKeys();
         }
@@ -154,10 +157,38 @@ namespace Wagenheimer.RewiredHelper.UI
             }
         }
 
-        private static void UseSliced(Image image, Sprite sprite)
+        /// <summary>Re-applies the corner size to every sliced key/background (also in the Editor, for sprites assigned by the generator).</summary>
+        private void ApplyCornerSizes()
+        {
+            ForEachImage(keys, img => ApplyCornerSize(img, img.sprite));
+            ForEachImage(specialKeys, img => ApplyCornerSize(img, img.sprite));
+
+            var background = GetComponent<Image>();
+            if (background != null) ApplyCornerSize(background, background.sprite);
+        }
+
+        private void UseSliced(Image image, Sprite sprite)
         {
             image.sprite = sprite;
             image.type = Image.Type.Sliced;
+            ApplyCornerSize(image, sprite);
+        }
+
+        /// <summary>
+        /// A sliced sprite's border is drawn at (sprite pixels per unit / Canvas reference pixels per unit) per sprite pixel. A project that
+        /// sets the Canvas "Reference Pixels Per Unit" to 1 therefore shrinks a 20 px border to a fraction of a pixel and the corners look square.
+        /// The multiplier cancels that, so the corner is <see cref="cornerRadius"/> canvas units whatever the project uses.
+        /// </summary>
+        private void ApplyCornerSize(Image image, Sprite sprite)
+        {
+            if (image == null || sprite == null || sprite.border.x <= 0f) return;
+
+            var canvas = image.GetComponentInParent<Canvas>(true);
+            var reference = canvas != null && canvas.referencePixelsPerUnit > 0f ? canvas.referencePixelsPerUnit : 100f;
+            var spritePpu = sprite.pixelsPerUnit > 0f ? sprite.pixelsPerUnit : 100f;
+            var wantedPpu = sprite.border.x / Mathf.Max(1f, cornerRadius);
+
+            image.pixelsPerUnitMultiplier = wantedPpu / (spritePpu / reference);
         }
 
         /// <summary>OK gets the submit colour and CAPS shows its state, on top of the shared special-key colour.</summary>
@@ -225,10 +256,13 @@ namespace Wagenheimer.RewiredHelper.UI
         }
 
         /// <summary>Assigns a sprite and slices it when it has borders (a rounded-corner sprite must not be stretched).</summary>
-        private static void AssignSprite(Image image, Sprite sprite)
+        private void AssignSprite(Image image, Sprite sprite)
         {
             image.sprite = sprite;
-            if (sprite.border != Vector4.zero) image.type = Image.Type.Sliced;
+            if (sprite.border == Vector4.zero) return;
+
+            image.type = Image.Type.Sliced;
+            ApplyCornerSize(image, sprite);
         }
 
         public void SetFocus(TMP_InputField inputField) => focus = inputField;

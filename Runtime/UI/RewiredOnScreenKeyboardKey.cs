@@ -69,6 +69,7 @@ namespace Wagenheimer.RewiredHelper.UI
         public void OnSelect(BaseEventData eventData)
         {
             _isSelected = true;
+            if (keyboard != null) keyboard.NotifyKeySelected(gameObject);
             ApplyColor();
             Trace("Select");
         }

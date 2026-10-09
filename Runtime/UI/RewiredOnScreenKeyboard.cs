@@ -281,6 +281,21 @@ namespace Wagenheimer.RewiredHelper.UI
             DebugLog($"opened for '{(focus != null ? focus.name : "none")}'");
         }
 
+        private GameObject _lastSelectedKey;
+
+        /// <summary>Called by a key when the gamepad selects it, so the selection can return to the same key later.</summary>
+        internal void NotifyKeySelected(GameObject key) => _lastSelectedKey = key;
+
+        /// <summary>
+        /// Gives the gamepad selection back to the keys. Game code often selects the input field again after the keyboard has opened
+        /// (for example a form that calls <c>Select()</c> on its field half a second after showing); that would leave the keyboard open but
+        /// unreachable, so <see cref="RewiredInputManager"/> calls this whenever the selection lands on the field while the keyboard is open.
+        /// </summary>
+        public void RestoreKeySelection()
+        {
+            if (isActive) SelectFirstKeyIfNeeded();
+        }
+
         /// <summary>Opens the keyboard again on a field the player had closed it on (pressing A on the selected field).</summary>
         public void ReopenFor(TMP_InputField inputField)
         {
@@ -516,6 +531,14 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             var eventSystem = EventSystem.current;
             if (eventSystem == null || keys == null) return;
+
+            // Prefer the key the player was on, so the selection does not jump back to "1" every time.
+            if (_lastSelectedKey != null && _lastSelectedKey.activeInHierarchy)
+            {
+                eventSystem.SetSelectedGameObject(_lastSelectedKey);
+                DebugLog($"key selection restored to '{_lastSelectedKey.name}'");
+                return;
+            }
 
             foreach (var key in keys)
             {

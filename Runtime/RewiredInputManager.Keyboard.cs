@@ -132,6 +132,8 @@ namespace Wagenheimer.RewiredHelper
                 {
                     if (!keyboard.isActive || keyboard.focus != inputField)
                         keyboard.SetActiveFocus(inputField);
+                    else
+                        keyboard.RestoreKeySelection();
                 }
                 else if (keyboard.isActive && !keyboard.ContainsSelection(selected))
                 {

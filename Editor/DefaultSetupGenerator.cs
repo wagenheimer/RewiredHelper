@@ -648,9 +648,9 @@ namespace Wagenheimer.RewiredHelper.Editor
         internal static Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard FindOnScreenKeyboardInScene() =>
             RewiredHelperAudit.FindAll<Wagenheimer.RewiredHelper.UI.RewiredOnScreenKeyboard>().FirstOrDefault();
 
-        private const float KeyHeight = 64f;
-        private const float KeySpacing = 6f;
-        private const float KeyboardPadding = 12f;
+        private const float KeyHeight = 62f;
+        private const float KeySpacing = 8f;
+        private const float KeyboardPadding = 16f;
         private const int RowCount = 5;
         private const float KeyboardHeight = RowCount * KeyHeight + (RowCount - 1) * KeySpacing + 2 * KeyboardPadding;
 
@@ -812,11 +812,13 @@ namespace Wagenheimer.RewiredHelper.Editor
             keyboard.panels = new[] { root };
             keyboard.keys = keys.ToArray();
             keyboard.specialKeys = specialKeys.ToArray();
-            keyboard.backgroundColor = new Color32(24, 24, 28, 245);
-            keyboard.mainColor = new Color32(70, 70, 80, 255);
-            keyboard.specialColor = new Color32(40, 100, 220, 255);
-            keyboard.selectedColor = new Color32(255, 170, 40, 255);
-            keyboard.textColor = Color.white;
+            keyboard.backgroundColor = new Color32(18, 20, 28, 248);
+            keyboard.mainColor = new Color32(56, 62, 82, 255);
+            keyboard.specialColor = new Color32(36, 42, 60, 255);
+            keyboard.submitColor = new Color32(46, 160, 90, 255);
+            keyboard.capsActiveColor = new Color32(240, 170, 40, 255);
+            keyboard.selectedColor = new Color32(70, 140, 255, 255);
+            keyboard.textColor = new Color32(240, 244, 255, 255);
             keyboard.font = font;
 
             // Bake the look into the objects now so it is correct in the Scene view, not only after Play starts.
@@ -881,13 +883,13 @@ namespace Wagenheimer.RewiredHelper.Editor
             labelRect.offsetMax = Vector2.zero;
 
             var label = labelGo.AddComponent<TextMeshProUGUI>();
-            label.text = spec.IsSpace ? string.Empty : spec.Glyph;
+            label.text = spec.IsSpace ? "space" : spec.Glyph;
             label.alignment = TextAlignmentOptions.Center;
             label.color = Color.white;
             label.raycastTarget = false;
             label.enableAutoSizing = true;
             label.fontSizeMin = 12f;
-            label.fontSizeMax = spec.Special >= 0 ? 26f : 34f;
+            label.fontSizeMax = spec.Special >= 0 ? 24f : 34f;
             label.fontStyle = FontStyles.Bold;
             if (font != null) label.font = font;
 

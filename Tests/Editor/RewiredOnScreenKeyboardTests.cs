@@ -199,6 +199,74 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
+        public void CapsKeyPressed_CyclesOffShiftLockOff()
+        {
+            _keyboard.CapsKeyPressed();
+            Assert.IsTrue(_keyboard.capsEnabled);
+            Assert.IsFalse(_keyboard.CapsLocked);
+
+            _keyboard.CapsKeyPressed();
+            Assert.IsTrue(_keyboard.capsEnabled);
+            Assert.IsTrue(_keyboard.CapsLocked);
+
+            _keyboard.CapsKeyPressed();
+            Assert.IsFalse(_keyboard.capsEnabled);
+            Assert.IsFalse(_keyboard.CapsLocked);
+        }
+
+        [Test]
+        public void WriteKey_SpendsAOneLetterShift()
+        {
+            _keyboard.autoCapitalize = false;
+            _keyboard.SetFocus(_field);
+            _field.text = string.Empty;
+            _keyboard.SetCaps(true);
+
+            _keyboard.WriteKey(CreateLabel("A"));
+
+            Assert.AreEqual("A", _field.text);
+            Assert.IsFalse(_keyboard.capsEnabled);
+        }
+
+        [Test]
+        public void WriteKey_KeepsCapsLockOn()
+        {
+            _keyboard.autoCapitalize = false;
+            _keyboard.SetFocus(_field);
+            _field.text = string.Empty;
+            _keyboard.CapsKeyPressed();
+            _keyboard.CapsKeyPressed();
+
+            _keyboard.WriteKey(CreateLabel("A"));
+
+            Assert.IsTrue(_keyboard.capsEnabled);
+            Assert.IsTrue(_keyboard.CapsLocked);
+        }
+
+        [Test]
+        public void SetActiveFocus_TurnsShiftOnForAnEmptyField_WhenAutoCapitalizing()
+        {
+            _field.text = string.Empty;
+
+            _keyboard.SetActiveFocus(_field);
+
+            Assert.IsTrue(_keyboard.capsEnabled);
+        }
+
+        [Test]
+        public void ReopenFor_ShowsTheKeyboardAgainAfterItWasClosed()
+        {
+            _keyboard.SetActiveFocus(_field);
+            _keyboard.Close();
+            Assert.IsFalse(_keyboard.isActive);
+
+            _keyboard.ReopenFor(_field);
+
+            Assert.IsTrue(_keyboard.isActive);
+            Assert.IsNull(_keyboard.DismissedFor);
+        }
+
+        [Test]
         public void ContainsSelection_IsTrueOnlyForTheKeyboardAndItsChildren()
         {
             var key = new GameObject("Key", typeof(RectTransform));

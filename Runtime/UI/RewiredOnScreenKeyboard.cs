@@ -1,3 +1,5 @@
+using System.Linq;
+
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
@@ -33,6 +35,12 @@ namespace Wagenheimer.RewiredHelper.UI
         public Color32 backgroundColor = Color.white;
         [Tooltip("Tint of the key currently selected with the gamepad (D-pad / stick).")]
         public Color32 selectedColor = new Color32(51, 119, 255, 255);
+        [Tooltip("Colour of the OK (submit) key.")]
+        public Color32 submitColor = new Color32(46, 160, 90, 255);
+        [Tooltip("Colour of the CAPS key while Shift or Caps Lock is on.")]
+        public Color32 capsActiveColor = new Color32(240, 170, 40, 255);
+        [Tooltip("Give the keys and the background soft rounded corners (a generated sprite; ignored when a sprite is assigned below).")]
+        public bool roundedKeys = true;
         [Tooltip("Optional font for every key label. Leave empty to keep each label's own font (the project default TMP font can carry an outline that looks wrong on keys).")]
         public TMP_FontAsset font;
         public Sprite mainSprite;
@@ -43,6 +51,8 @@ namespace Wagenheimer.RewiredHelper.UI
         public bool hideOnSubmit = true;
         [Tooltip("When the keyboard opens, move the gamepad selection to the first key so it can be navigated immediately.")]
         public bool selectFirstKeyOnShow = true;
+        [Tooltip("Start each sentence with a capital letter: Shift is on while the field is empty, and turns off after the first letter.")]
+        public bool autoCapitalize = true;
 
         [Header("Layout")]
         [Tooltip("panels[0] = lowercase letters, [1] = uppercase/caps, [2] = optional extra symbol panel, [3] = numeric (toggled by ShowNumeric).")]
@@ -57,6 +67,9 @@ namespace Wagenheimer.RewiredHelper.UI
 
         [HideInInspector] public bool isActive;
         [HideInInspector] public bool capsEnabled;
+
+        /// <summary>True when caps is locked (stays on until CAPS is pressed again); false when it is a one-letter Shift.</summary>
+        public bool CapsLocked { get; private set; }
 
         private Animator _animator;
         private TMP_InputField _dismissedFor;
@@ -94,7 +107,43 @@ namespace Wagenheimer.RewiredHelper.UI
             SetBackgroundColor(backgroundColor);
             SetMainSprite(mainSprite);
             SetSpecialSprite(specialSprite);
+            ApplyRoundedLook();
             SetFont(font);
+            ColorSpecialKeys();
+        }
+
+        /// <summary>Soft corners from a generated sprite. Runtime only: a generated sprite cannot be serialized into a scene.</summary>
+        private void ApplyRoundedLook()
+        {
+            if (!roundedKeys || !Application.isPlaying) return;
+
+            var rounded = RewiredOnScreenKeyboardSprites.Rounded;
+            ForEachImage(keys, img => UseSliced(img, mainSprite != null ? mainSprite : rounded));
+            ForEachImage(specialKeys, img => UseSliced(img, specialSprite != null ? specialSprite : rounded));
+
+            var background = GetComponent<Image>();
+            if (background != null) UseSliced(background, rounded);
+        }
+
+        private static void UseSliced(Image image, Sprite sprite)
+        {
+            image.sprite = sprite;
+            image.type = Image.Type.Sliced;
+        }
+
+        /// <summary>OK gets the submit colour and CAPS shows its state, on top of the shared special-key colour.</summary>
+        private void ColorSpecialKeys()
+        {
+            if (specialKeys == null) return;
+
+            foreach (var go in specialKeys)
+            {
+                var key = go != null ? go.GetComponent<RewiredOnScreenKeyboardKey>() : null;
+                if (key == null) continue;
+
+                if (key.specialKey == 1) key.SetBaseColor(submitColor);
+                else if (key.specialKey == 2) key.SetBaseColor(capsEnabled ? capsActiveColor : specialColor);
+            }
         }
 
         public void ShowNumeric(bool show)
@@ -110,9 +159,9 @@ namespace Wagenheimer.RewiredHelper.UI
             ForEachLabel(specialKeys, t => t.color = color);
         }
 
-        public void SetMainColor(Color32 color) => ForEachImage(keys, img => img.color = color);
+        public void SetMainColor(Color32 color) => ForEachKeyColor(keys, color);
 
-        public void SetSpecialColor(Color32 color) => ForEachImage(specialKeys, img => img.color = color);
+        public void SetSpecialColor(Color32 color) => ForEachKeyColor(specialKeys, color);
 
         public void SetBackgroundColor(Color32 color)
         {
@@ -146,8 +195,19 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             focus = inputField;
             SetActive(true);
-            if (focus != null) focus.MoveTextEnd(true);
+
+            // Caret at the end WITHOUT extending the selection: Select()/ActivateInputField() leave the whole text highlighted.
+            if (focus != null) focus.MoveTextEnd(false);
+
+            RefreshAutoCapitalization();
             SelectFirstKeyIfNeeded();
+        }
+
+        /// <summary>Opens the keyboard again on a field the player had closed it on (pressing A on the selected field).</summary>
+        public void ReopenFor(TMP_InputField inputField)
+        {
+            _dismissedFor = null;
+            SetActiveFocus(inputField);
         }
 
         /// <summary>True when <paramref name="selected"/> is this keyboard or one of its keys (the gamepad is navigating the keyboard).</summary>
@@ -172,6 +232,10 @@ namespace Wagenheimer.RewiredHelper.UI
             focus.text += typed;
             if (focus.characterLimit > 0 && focus.text.Length > focus.characterLimit)
                 focus.text = focus.text.Substring(0, focus.characterLimit);
+
+            // A one-letter Shift is spent by the letter it capitalised; Caps Lock stays on.
+            if (capsEnabled && !CapsLocked && typed.Any(char.IsLetter))
+                SetCaps(false);
         }
 
         /// <summary>0 = backspace, 1 = submit/enter, 2 = toggle caps, 3 = hide, 4/5/8 = switch panel, 6/7 = focus prev/next.</summary>
@@ -182,7 +246,7 @@ namespace Wagenheimer.RewiredHelper.UI
             {
                 case 0: Backspace(); break;
                 case 1: Submit(); break;
-                case 2: SwitchCaps(); break;
+                case 2: CapsKeyPressed(); break;
                 case 3: Close(); break;
                 case 4: SetKeyboardType(1); break;
                 case 5: SetKeyboardType(2); break;
@@ -196,6 +260,7 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             if (focus == null || focus.readOnly || focus.text.Length == 0) return;
             focus.text = focus.text.Substring(0, focus.text.Length - 1);
+            RefreshAutoCapitalization();
         }
 
         /// <summary>
@@ -262,9 +327,38 @@ namespace Wagenheimer.RewiredHelper.UI
         {
             ForEachLabel(keys, t => t.text = enabled ? t.text.ToUpperInvariant() : t.text.ToLowerInvariant());
             capsEnabled = enabled;
+            if (!enabled) CapsLocked = false;
+            ColorSpecialKeys();
         }
 
         public void SwitchCaps() => SetCaps(!capsEnabled);
+
+        /// <summary>The CAPS key: off, then Shift for one letter, then Caps Lock, then off again.</summary>
+        public void CapsKeyPressed()
+        {
+            if (!capsEnabled)
+            {
+                SetCaps(true);
+            }
+            else if (!CapsLocked)
+            {
+                CapsLocked = true;
+                ColorSpecialKeys();
+            }
+            else
+            {
+                SetCaps(false);
+            }
+        }
+
+        /// <summary>Shift is on while the field is empty (first letter capitalised); never fights a Caps Lock the player chose.</summary>
+        private void RefreshAutoCapitalization()
+        {
+            if (!autoCapitalize || CapsLocked || focus == null) return;
+
+            var wantsShift = focus.text.Length == 0;
+            if (wantsShift != capsEnabled) SetCaps(wantsShift);
+        }
 
         public void FocusPrevious() => MoveFocus(s => s.FindSelectableOnLeft() ?? s.FindSelectableOnUp());
 
@@ -360,6 +454,25 @@ namespace Wagenheimer.RewiredHelper.UI
             {
                 var label = go != null ? go.GetComponentInChildren<TMP_Text>(true) : null;
                 if (label != null) apply(label);
+            }
+        }
+
+        private static void ForEachKeyColor(GameObject[] targets, Color32 color)
+        {
+            if (targets == null) return;
+            foreach (var go in targets)
+            {
+                if (go == null) continue;
+
+                var key = go.GetComponent<RewiredOnScreenKeyboardKey>();
+                if (key != null)
+                {
+                    key.SetBaseColor(color);
+                    continue;
+                }
+
+                var image = go.GetComponent<Image>();
+                if (image != null) image.color = color;
             }
         }
 

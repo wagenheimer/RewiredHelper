@@ -82,13 +82,38 @@ namespace Wagenheimer.RewiredHelper
             }
         }
 
+        /// <summary>
+        /// After CLOSE / B the field stays selected, so the selection does not change and nothing would reopen the keyboard.
+        /// Pressing A (submit) on that field brings it back.
+        /// </summary>
+        private void TryReopenDismissedKeyboard(GameObject selected)
+        {
+            if (selected == null || CurrentControllerType != ControllerType.Joystick) return;
+
+            var inputField = selected.GetComponent<TMP_InputField>();
+            if (inputField == null) return;
+            if (!IsOnScreenKeyboardAllowed(OnScreenKeyboardOnlyOnSteamDeck, IsSteamDeck, Application.isEditor || DebugForceControllerType.HasValue)) return;
+            if (!IsSubmitActionPressed() && !Input.GetKeyDown(KeyCode.JoystickButton0)) return;
+
+            foreach (var keyboard in _onScreenKeyboards)
+            {
+                if (keyboard != null && !keyboard.isActive && keyboard.DismissedFor == inputField)
+                    keyboard.ReopenFor(inputField);
+            }
+        }
+
         private void HandleOnScreenKeyboard()
         {
             if (!ShowOnScreenKeyboardOnGamepadTextInput || _onScreenKeyboards.Count == 0) return;
 
             var eventSystem = EventSystem.current;
             var selected = eventSystem != null ? eventSystem.currentSelectedGameObject : null;
-            if (selected == _lastKeyboardSelection) return;
+            if (selected == _lastKeyboardSelection)
+            {
+                TryReopenDismissedKeyboard(selected);
+                return;
+            }
+
             _lastKeyboardSelection = selected;
 
             var inputField = selected != null ? selected.GetComponent<TMP_InputField>() : null;

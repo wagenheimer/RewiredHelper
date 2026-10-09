@@ -29,8 +29,9 @@ namespace Wagenheimer.RewiredHelper.UI
         public int specialKey = -1;
 
         private Image _image;
-        private Color _restoreColor;
-        private bool _isHighlighted;
+        private Color _baseColor = Color.white;
+        private bool _hasBaseColor;
+        private bool _isSelected;
 
         public void Press()
         {
@@ -40,19 +41,25 @@ namespace Wagenheimer.RewiredHelper.UI
             else keyboard.WriteKey(label);
         }
 
-        public void OnSelect(BaseEventData eventData)
+        /// <summary>The resting colour of the key. The selection tint is layered on top and removed when the key is deselected.</summary>
+        public void SetBaseColor(Color color)
         {
-            if (keyboard == null) return;
-
-            if (_image == null) _image = GetComponent<Image>();
-            if (_image == null || _isHighlighted) return;
-
-            _restoreColor = _image.color;
-            _image.color = keyboard.selectedColor;
-            _isHighlighted = true;
+            _baseColor = color;
+            _hasBaseColor = true;
+            ApplyColor();
         }
 
-        public void OnDeselect(BaseEventData eventData) => RestoreColor();
+        public void OnSelect(BaseEventData eventData)
+        {
+            _isSelected = true;
+            ApplyColor();
+        }
+
+        public void OnDeselect(BaseEventData eventData)
+        {
+            _isSelected = false;
+            ApplyColor();
+        }
 
         /// <summary>B / Circle on any key closes the keyboard and returns to the field.</summary>
         public void OnCancel(BaseEventData eventData)
@@ -60,14 +67,25 @@ namespace Wagenheimer.RewiredHelper.UI
             if (keyboard != null) keyboard.Close();
         }
 
-        private void OnDisable() => RestoreColor();
-
-        private void RestoreColor()
+        private void OnDisable()
         {
-            if (!_isHighlighted || _image == null) return;
+            _isSelected = false;
+            ApplyColor();
+        }
 
-            _image.color = _restoreColor;
-            _isHighlighted = false;
+        private void ApplyColor()
+        {
+            if (_image == null) _image = GetComponent<Image>();
+            if (_image == null) return;
+
+            // Remember whatever colour the key had the first time we touch it, so a keyboard themed by hand keeps its look.
+            if (!_hasBaseColor)
+            {
+                _baseColor = _image.color;
+                _hasBaseColor = true;
+            }
+
+            _image.color = _isSelected && keyboard != null ? (Color)keyboard.selectedColor : _baseColor;
         }
     }
 }

@@ -137,6 +137,7 @@ namespace Wagenheimer.RewiredHelper
         private bool _isUsingTouch;
         private bool _previousInputState;
         private bool lastInputWasTouch = false;
+        private bool _loggedIgnoredPcInput;
         private bool previousIsUsingTouch;
         private ControllerType _lastControllerType;
 
@@ -282,6 +283,16 @@ namespace Wagenheimer.RewiredHelper
             {
                 _lastKnownControllerType = ControllerType.Joystick;
             }
+            else if (ShouldIgnorePcInputOnThisDevice)
+            {
+                // Phone/tablet: start in touch mode, so popups shown before the first tap use touch UI
+                // instead of keyboard glyphs (the desktop default below assumed a keyboard everywhere).
+                _lastKnownControllerType = ControllerType.Custom;
+                _lastInputWasPC = false;
+                lastInputWasTouch = true;
+                _isUsingTouch = true;
+                if (GameCursor != null) GameCursor.enabled = false;
+            }
             else
             {
                 // Default to Keyboard/PC on startup so any popup showing before first input
@@ -384,6 +395,17 @@ namespace Wagenheimer.RewiredHelper
             }
             else if (controller.type == ControllerType.Keyboard || controller.type == ControllerType.Mouse)
             {
+                if (ShouldIgnorePcInputOnThisDevice)
+                {
+                    if (!_loggedIgnoredPcInput)
+                    {
+                        _loggedIgnoredPcInput = true;
+                        Debug.Log($"[RewiredHelper] Ignoring {controller.type} input on a touch device without a hardware keyboard " +
+                                  $"({controller.name}: media keys from a Bluetooth car kit/headset or touch emulating a mouse). UI stays on touch.");
+                    }
+                    return;
+                }
+
                 _lastInputWasPC = true;
                 var keyboardController = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
                 if (keyboardController != null)
@@ -411,6 +433,9 @@ namespace Wagenheimer.RewiredHelper
 
         void OnApplicationFocus(bool hasFocus)
         {
+            // A keyboard may have been paired while the app was in the background.
+            if (hasFocus) RefreshHardwareKeyboard();
+
             if (Application.platform == RuntimePlatform.Switch && !hasFocus)
                 StartCoroutine(HandleSwitchModeChange());
 
@@ -548,8 +573,9 @@ namespace Wagenheimer.RewiredHelper
             }
             else
             {
-                // Ensure there is always a default controller set.
-                if (LastActiveController == null && ReInput.isReady)
+                // Ensure there is always a default controller set (not on a touch device without a keyboard,
+                // where that would put keyboard glyphs back on screen).
+                if (LastActiveController == null && ReInput.isReady && !ShouldIgnorePcInputOnThisDevice)
                 {
                     LastActiveController = ReInput.controllers.GetController(ControllerType.Keyboard, 0);
                 }

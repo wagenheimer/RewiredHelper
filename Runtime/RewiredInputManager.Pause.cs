@@ -68,6 +68,56 @@ namespace Wagenheimer.RewiredHelper
 #endif
         }
 
+        private const int AndroidKeyboardNoKeys = 1;
+
+        /// <summary>
+        /// True when a physical keyboard is attached to this phone/tablet (Android reports it in
+        /// Configuration.keyboard). Bluetooth car kits and headsets are not keyboards for Android even though
+        /// their media keys reach Rewired as Keyboard input, so they don't count. Always false on iOS (no API
+        /// without a native plugin) and in the Editor. Re-read on focus, since a keyboard can be paired later.
+        /// </summary>
+        public static bool HasHardwareKeyboard
+        {
+            get
+            {
+                if (!_hasHardwareKeyboard.HasValue) _hasHardwareKeyboard = DetectHardwareKeyboard();
+                return _hasHardwareKeyboard.Value;
+            }
+        }
+
+        private static bool? _hasHardwareKeyboard;
+
+        private static void RefreshHardwareKeyboard() => _hasHardwareKeyboard = null;
+
+        private static bool DetectHardwareKeyboard()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
+                using (var resources = activity.Call<AndroidJavaObject>("getResources"))
+                using (var config = resources.Call<AndroidJavaObject>("getConfiguration"))
+                    return config.Get<int>("keyboard") > AndroidKeyboardNoKeys;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RewiredHelper] Could not detect a hardware keyboard, assuming none: " + ex.Message);
+                return false;
+            }
+#else
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// On a phone/tablet without a physical keyboard, Keyboard/Mouse "activity" is not the player switching to
+        /// PC controls: it is touch emulating a mouse, or a Bluetooth car kit/headset sending media keys
+        /// (seen on a Galaxy S23 paired with a car: "Switched to PC input: Keyboard" at startup, which made the UI
+        /// show keyboard glyphs on a touch screen). Such events are ignored and the UI stays on touch.
+        /// </summary>
+        private static bool ShouldIgnorePcInputOnThisDevice => IsMobilePolicyActive && !HasHardwareKeyboard;
+
         private PausePolicy Policy => PausePolicy.Resolve(
             OverridePlatformDefaults, PauseOnAppBackground, PauseOnControllerDisconnect, ResumeOnAnyInput, IsMobilePolicyActive);
 

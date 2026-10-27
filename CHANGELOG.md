@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.72.3] - 2026-10-27
 
 ### Fixed
+- keep the submit bridge out of UI Toolkit panels
+
+## [0.72.3] - 2026-10-27
+
+### Fixed
 - **Submit was clicking whatever sits in the bottom-left corner** (the debug overlays' floating buttons).
   A UI Toolkit runtime panel makes its own GameObject the Event System selection when you click inside
   it. The submit-to-pointer bridge then dispatched `PointerDown`/`PointerClick` to that GameObject with

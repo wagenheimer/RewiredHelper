@@ -981,9 +981,9 @@ namespace Wagenheimer.RewiredHelper.Editor
             var cursorGo = new GameObject("GameCursor", typeof(RectTransform), typeof(Image));
             var cursorRect = (RectTransform)cursorGo.transform;
             cursorRect.SetParent(canvas.transform, false);
-            cursorRect.anchorMin = new Vector2(0f, 1f); // top-left corner anchor
-            cursorRect.anchorMax = new Vector2(0f, 1f);
-            cursorRect.pivot = new Vector2(0f, 1f);      // top-left pivot
+            cursorRect.anchorMin = new Vector2(0.5f, 0.5f); // screen centre
+            cursorRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cursorRect.pivot = new Vector2(0.5f, 0.5f);     // hotspot at the middle of the image
             cursorRect.sizeDelta = new Vector2(32, 32);
             cursorRect.anchoredPosition = Vector2.zero;
 

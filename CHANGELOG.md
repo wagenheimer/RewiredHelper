@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.71.4] - 2026-10-27
+
+### Fixed
+- **Game cursor landed in the wrong place on scaled canvases.** `GameCursorPositioner` resolved its
+  Canvas with `GetComponentInParent<Canvas>()`, which returns the cursor's **own** nested sorting
+  Canvas. The screen point was therefore converted into a 32×32 rect and then applied as a local
+  position on the real canvas, so with `Scale With Screen Size` (almost every project) the cursor
+  drifted away from the pointer. It now walks up from the parent, converts through the cursor's
+  parent RectTransform (which is what `localPosition` expects), centres the image on the pointer
+  whatever its pivot, and clamps it to the canvas.
+- `RewiredInputManager.UpdateCursorPosition` uses the positioner conversion and the root Canvas
+  instead of the nested one, so `RewiredMousePosition` is correct too.
+- New cursors created by the setup wizard use a centred pivot (hot spot in the middle of the image).
+
 ## [0.71.3] - 2026-10-12
 
 ### Fixed

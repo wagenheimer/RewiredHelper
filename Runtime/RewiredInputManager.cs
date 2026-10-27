@@ -528,13 +528,28 @@ namespace Wagenheimer.RewiredHelper
         {
             if (GameCursor == null) return;
 
+            // Let the positioner do the conversion: it knows the real parent canvas and takes
+            // scaled canvases (Scale With Screen Size) into account. Falling back here keeps
+            // projects that wire the cursor manually working.
+            var positioner = GameCursor.GetComponent<UI.GameCursorPositioner>();
+            if (positioner != null)
+            {
+                RewiredMousePosition = positioner.GetScreenPosition();
+                return;
+            }
+
             // Screen Space - Overlay canvases render 1:1 with screen pixels and must be converted
             // with a null camera; passing Camera.main (or any camera) here skews the result whenever
             // that camera's projection doesn't happen to match the canvas 1:1 (e.g. a distinct
             // gameplay/UI camera setup), producing an out-of-bounds RewiredMousePosition that never
             // hits anything when raycast against world colliders.
             var canvas = GameCursor.canvas;
-            var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            if (canvas != null) canvas = canvas.rootCanvas;
+
+            var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera
+                : null;
+
             RewiredMousePosition = RectTransformUtility.WorldToScreenPoint(camera, GameCursor.transform.position);
         }
 

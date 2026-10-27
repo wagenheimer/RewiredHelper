@@ -106,6 +106,14 @@ namespace Wagenheimer.RewiredHelper
             var selected = es.currentSelectedGameObject;
             if (selected == null || !selected.activeInHierarchy) return;
 
+            // A UI Toolkit runtime panel makes *its own* GameObject the Event System selection when
+            // you click inside it (PanelRaycaster). Dispatching a synthetic pointer event to that
+            // GameObject forwards it to the panel at eventData.position, so an old bridge click with
+            // the default position landed at (0,0) — exactly the bottom-left corner where the debug
+            // overlays keep their floating buttons. Panels resolve their own hit target from the real
+            // pointer, so the bridge must stay out of them.
+            if (selected.GetComponent<UnityEngine.UIElements.PanelRaycaster>() != null) return;
+
             bool submitPressed = IsSubmitActionPressed();
             if (!submitPressed)
             {
@@ -114,10 +122,17 @@ namespace Wagenheimer.RewiredHelper
 
             if (!submitPressed) return;
 
+            var pointer = RewiredMousePosition;
+            var screenPoint = pointer.sqrMagnitude > 0.01f
+                ? new Vector2(pointer.x, pointer.y)
+                : (Vector2)Input.mousePosition;
+
             var eventData = new UnityEngine.EventSystems.PointerEventData(es)
             {
                 selectedObject = selected,
-                button = UnityEngine.EventSystems.PointerEventData.InputButton.Left
+                button = UnityEngine.EventSystems.PointerEventData.InputButton.Left,
+                position = screenPoint,
+                pressPosition = screenPoint
             };
 
             // When a Rewired Submit action exists, the Event System's input module already submits the selected button, and

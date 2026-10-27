@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.72.3] - 2026-10-27
+
+### Fixed
+- **Submit was clicking whatever sits in the bottom-left corner** (the debug overlays' floating buttons).
+  A UI Toolkit runtime panel makes its own GameObject the Event System selection when you click inside
+  it. The submit-to-pointer bridge then dispatched `PointerDown`/`PointerClick` to that GameObject with
+  the default `PointerEventData.position` of `(0,0)`, which the panel resolved as a click in the
+  bottom-left corner — so every `UISubmit`/`Return`/`A` reopened a debug overlay, even with the cursor
+  somewhere else. The bridge now ignores UI Toolkit panel raycasters (the panel resolves its own hit
+  target) and uses the real pointer position instead of `(0,0)`.
+
 ## [0.72.2] - 2026-10-27
 
 ### Fixed

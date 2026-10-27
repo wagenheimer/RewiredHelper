@@ -1170,10 +1170,54 @@ namespace Wagenheimer.RewiredHelper.Editor
             so.ApplyModifiedProperties();
 
             ConfigureMouseMovementElements(comp);
+            RegisterPlayerMouseWithInputModule(comp);
 
             Selection.activeGameObject = go;
             MarkSceneDirty();
             Debug.Log("[RewiredHelper] Created Player Mouse (Rewired.Components.PlayerMouse) with Movement elements bound to MouseX/MouseY.");
+        }
+
+        /// <summary>
+        /// Makes Rewired's Event System read the virtual pointer instead of the hardware mouse.
+        /// With an empty PlayerMice list, <c>RewiredPointerInputModule</c> falls back to
+        /// <c>Input.mousePosition</c>, so hover and clicks land wherever the OS pointer is — not
+        /// where the on-screen cursor is drawn — which makes the cursor look "off".
+        /// </summary>
+        internal static void RegisterPlayerMouseWithInputModule(Component playerMouse)
+        {
+            if (playerMouse == null) return;
+
+            var moduleType = FindRewiredInputModuleType();
+            if (moduleType == null) return;
+
+            var module = UnityEngine.Object.FindObjectOfType(moduleType) as UnityEngine.EventSystems.BaseInputModule;
+            if (module == null) return;
+
+            var so = new SerializedObject(module);
+            var mice = so.FindProperty("playerMice");
+            if (mice == null) return;
+
+            for (int i = 0; i < mice.arraySize; i++)
+            {
+                if (mice.GetArrayElementAtIndex(i).objectReferenceValue == playerMouse)
+                    return;
+            }
+
+            // Drop destroyed entries so the array never accumulates nulls.
+            for (int i = mice.arraySize - 1; i >= 0; i--)
+            {
+                if (mice.GetArrayElementAtIndex(i).objectReferenceValue == null)
+                    mice.DeleteArrayElementAtIndex(i);
+            }
+
+            mice.InsertArrayElementAtIndex(mice.arraySize);
+            mice.GetArrayElementAtIndex(mice.arraySize - 1).objectReferenceValue = playerMouse;
+
+            so.ApplyModifiedProperties();
+            EditorUtility.SetDirty(module);
+            MarkSceneDirty();
+
+            Debug.Log("[RewiredHelper] Registered Player Mouse with RewiredStandaloneInputModule so UI follows the on-screen cursor instead of the hardware pointer.");
         }
 
         private static void SetIfPresent(SerializedObject so, string propertyName, object value)
@@ -1548,7 +1592,10 @@ namespace Wagenheimer.RewiredHelper.Editor
             so.ApplyModifiedProperties();
             EditorUtility.SetDirty(playerMouse);
             MarkSceneDirty();
-            Debug.Log("[RewiredHelper] Player Mouse events auto-wired to Game Cursor (anchoredPosition & SetActive).");
+
+            RegisterPlayerMouseWithInputModule(playerMouse);
+
+            Debug.Log("[RewiredHelper] Player Mouse events auto-wired to Game Cursor (localPosition & SetActive).");
         }
 
         private static void PruneNullListeners(UnityEngine.Events.UnityEventBase ev)

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.71.6] - 2026-10-27
+
+### Fixed
+- **UI clicks did not follow the on-screen cursor.** `RewiredStandaloneInputModule` was left with an
+  empty `PlayerMice` list, so `RewiredPointerInputModule` fell back to `Input.mousePosition`: the
+  cursor moved with the stick, but hover/clicks happened wherever the hardware pointer was. The setup
+  wizard (and the "Fix Wiring" action) now register the scene's Player Mouse with the input module,
+  and the audit reports it with a one-click fix.
+
 ## [0.71.5] - 2026-10-27
 
 ## [0.71.4] - 2026-10-27

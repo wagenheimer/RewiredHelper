@@ -217,6 +217,43 @@ namespace Wagenheimer.RewiredHelper.Editor
                     : "On Screen Position Changed is not wired to GameCursorPositioner.SetScreenPosition (the cursor may drift off-screen).",
                 "Rewires both events to the Game Cursor.", "Fix Wiring",
                 () => DefaultSetupGenerator.WirePlayerMouseEvents(manager, playerMouse), severity);
+
+            CheckInputModuleUsesPlayerMouse(results, playerMouse, severity);
+        }
+
+        /// <summary>
+        /// An empty PlayerMice list makes Rewired's input module fall back to Input.mousePosition,
+        /// so hover/clicks happen at the hardware pointer while the visible cursor is elsewhere.
+        /// </summary>
+        private static void CheckInputModuleUsesPlayerMouse(List<AuditResult> results, Component playerMouse, AuditSeverity severity)
+        {
+            var moduleType = DefaultSetupGenerator.FindRewiredInputModuleType();
+            if (moduleType == null) return;
+
+            var module = UnityEngine.Object.FindObjectOfType(moduleType) as UnityEngine.EventSystems.BaseInputModule;
+            if (module == null) return;
+
+            bool usesPlayerMouse = false;
+            using (var serialized = new SerializedObject(module))
+            {
+                var mice = serialized.FindProperty("playerMice");
+                if (mice == null) return;
+
+                for (int i = 0; i < mice.arraySize; i++)
+                {
+                    if (mice.GetArrayElementAtIndex(i).objectReferenceValue == playerMouse)
+                    {
+                        usesPlayerMouse = true;
+                        break;
+                    }
+                }
+            }
+
+            RewiredHelperAudit.Add(results, Category, "Event System reads the on-screen cursor", usesPlayerMouse,
+                "RewiredStandaloneInputModule is using the Player Mouse.",
+                "The Event System is not using this Player Mouse, so UI raycasts fall back to Input.mousePosition: the cursor moves but clicks land wherever the hardware pointer is.",
+                "Registers the Player Mouse with the Event System's input module.",
+                "Register Player Mouse", () => DefaultSetupGenerator.RegisterPlayerMouseWithInputModule(playerMouse), severity);
         }
 
         private static bool IsEventWiredTo(SerializedProperty eventProp, UnityEngine.Object target, string methodName)

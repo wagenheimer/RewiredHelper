@@ -88,7 +88,9 @@ namespace Wagenheimer.RewiredHelper.Editor
                          "The helper decides cursor visibility for the active input device, so a direct toggle can " +
                          "leave two pointers on screen (game cursor + OS cursor) or none after switching devices.",
                 FixHint = "Keep the player preference in the game, but let the helper apply it: assign " +
-                          "RewiredInputManager.UseProjectCustomCursor and call RefreshCursor() instead of toggling Cursor.visible.",
+                          "RewiredInputManager.UseProjectCustomCursor and call RefreshCursor() instead of toggling Cursor.visible. " +
+                          "For a deliberate fallback that only runs without the helper, add the comment " +
+                          "'rewired-helper: ignore-cursor' to the file.",
                 Code = "manager.UseProjectCustomCursor = customCursorEnabled;\nmanager.RefreshCursor();",
                 Target = hits[0].Asset
             });

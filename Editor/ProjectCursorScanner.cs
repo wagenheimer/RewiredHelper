@@ -28,6 +28,12 @@ namespace Wagenheimer.RewiredHelper.Editor
             @"Cursor\s*\.\s*(visible\s*=|SetCursor\s*\()",
             RegexOptions.Compiled);
 
+        /// <summary>
+        /// Put <c>rewired-helper: ignore-cursor</c> in a comment to opt a file out of this scan.
+        /// Use it for deliberate fallbacks that only run when the helper is not installed.
+        /// </summary>
+        public const string IgnoreMarker = "rewired-helper: ignore-cursor";
+
         const int MaxFileBytes = 512 * 1024;
 
         public static List<CursorCodeHit> FindCursorOverrides(int maxHits = 20)
@@ -63,6 +69,9 @@ namespace Wagenheimer.RewiredHelper.Editor
 
                 // Cheap pre-filter: most scripts never mention the cursor.
                 if (text.IndexOf("Cursor", StringComparison.Ordinal) < 0) continue;
+
+                // Explicit opt-out for deliberate fallbacks (see IgnoreMarker).
+                if (text.IndexOf(IgnoreMarker, StringComparison.OrdinalIgnoreCase) >= 0) continue;
 
                 string[] lines = text.Split('\n');
                 for (int i = 0; i < lines.Length; i++)

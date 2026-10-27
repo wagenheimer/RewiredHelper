@@ -210,6 +210,11 @@ namespace Wagenheimer.RewiredHelper.Editor
                 if (legacyPaths.Contains(assetPath)) continue;
                 if (assetPath.IndexOf("RewiredHelper", System.StringComparison.OrdinalIgnoreCase) >= 0) continue;
 
+                // Third-party code never used the project's Dialog; a using there is just noise
+                // (and conflicts with the next asset update).
+                if (assetPath.IndexOf("/Plugins/", System.StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                if (assetPath.IndexOf("/ThirdParty/", System.StringComparison.OrdinalIgnoreCase) >= 0) continue;
+
                 var text = File.ReadAllText(file);
                 if (text.Contains(PackageUsing)) continue;
                 if (!NeedsNamespace(text)) continue;
@@ -227,8 +232,18 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         private static bool NeedsNamespace(string text)
         {
-            if (StrongTokens.Any(text.Contains)) return true;
-            return Regex.IsMatch(text, @"\bDialog\b") || Regex.IsMatch(text, @"\bDialogs\b");
+            // Comments/strings mention "Dialog" a lot (third-party plugins), so look at code only.
+            var code = StripComments(text);
+
+            if (StrongTokens.Any(code.Contains)) return true;
+            return Regex.IsMatch(code, @"\bDialog\b") || Regex.IsMatch(code, @"\bDialogs\b");
+        }
+
+        static string StripComments(string text)
+        {
+            // Block comments first, then line comments; keeps strings untouched enough for this check.
+            text = Regex.Replace(text, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
+            return Regex.Replace(text, @"//[^\n]*", string.Empty);
         }
 
         private static string InsertUsing(string text)

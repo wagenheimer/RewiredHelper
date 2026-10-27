@@ -41,27 +41,39 @@ namespace Wagenheimer.RewiredHelper.Editor
         };
 
         [MenuItem(MenuPath, priority = RewiredHelperMenu.MigrateLegacyDialogPriority)]
-        public static void Migrate()
+        public static void Migrate() => MigrateInternal(interactive: true);
+
+        /// <summary>
+        /// Same migration without any prompt, for automation (CI, batch scripts) and for the audit's
+        /// one-click fix when a confirmation was already shown.
+        /// </summary>
+        public static void MigrateSilent() => MigrateInternal(interactive: false);
+
+        static void MigrateInternal(bool interactive)
         {
             var newGuid = FindPackageDialogGuid();
             if (string.IsNullOrEmpty(newGuid))
             {
-                EditorUtility.DisplayDialog("Rewired Helper",
-                    "Could not find this package's Dialog.cs. Is com.wagenheimer.rewiredhelper installed?",
-                    "OK");
+                if (interactive)
+                    EditorUtility.DisplayDialog("Rewired Helper",
+                        "Could not find this package's Dialog.cs. Is com.wagenheimer.rewiredhelper installed?",
+                        "OK");
+                else
+                    Debug.LogWarning("[RewiredHelper] MigrateSilent: package Dialog.cs not found.");
                 return;
             }
 
             var legacy = FindLegacyDialogScripts();
             if (legacy.Count == 0)
             {
-                EditorUtility.DisplayDialog("Rewired Helper",
-                    "No legacy project-local Dialog.cs was found. Nothing to migrate.",
-                    "OK");
+                if (interactive)
+                    EditorUtility.DisplayDialog("Rewired Helper",
+                        "No legacy project-local Dialog.cs was found. Nothing to migrate.",
+                        "OK");
                 return;
             }
 
-            if (!EditorUtility.DisplayDialog("Migrate Legacy Dialog",
+            if (interactive && !EditorUtility.DisplayDialog("Migrate Legacy Dialog",
                     $"Found {legacy.Count} legacy Dialog.cs file(s):\n\n" +
                     string.Join("\n", legacy.Select(l => l.path)) +
                     "\n\nThis will delete them and repoint serialized references to the package Dialog.\n" +

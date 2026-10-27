@@ -79,6 +79,21 @@ namespace Wagenheimer.RewiredHelper
         [Tooltip("Texture used by the custom cursor when Custom Cursor Enabled is checked. Can be assigned here or at runtime.")]
         public Texture2D CursorTexture;
 
+        [Tooltip("Set by the game when it draws its own desktop cursor (a UI hand, for example). " +
+                 "The helper then keeps the OS pointer hidden on PC so two cursors do not show at once; " +
+                 "gamepads keep using the helper's GameCursor.")]
+        public bool UseProjectCustomCursor;
+
+        /// <summary>True when the visible pointer is the helper's GameCursor (gamepad / custom controller).</summary>
+        public bool IsUsingJoystickCursor =>
+            CurrentControllerType == ControllerType.Joystick || CurrentControllerType == ControllerType.Custom;
+
+        /// <summary>
+        /// Re-applies cursor visibility for the current input device. Call it after changing
+        /// <see cref="UseProjectCustomCursor"/> or <see cref="CustomCursorEnabled"/> at runtime.
+        /// </summary>
+        public void RefreshCursor() => HandleControllerType();
+
         [Tooltip("If enabled, joystick/keyboard UI confirmation (UISubmit / Return / Button A) automatically invokes PointerDown / PointerUp on the selected GameObject, fixing audio listeners (like EventSounds / PointerDown SFX) that only listen to pointer clicks.")]
         public bool AutoBridgeSubmitToPointerDown = true;
 
@@ -715,8 +730,15 @@ namespace Wagenheimer.RewiredHelper
         {
             if (GameCursor != null) GameCursor.enabled = false;
             CanShowCustomCursor = true;
-            Cursor.visible = true;
-            Cursor.SetCursor(CustomCursorEnabled ? CursorTexture : null, Vector2.zero, CursorMode.Auto);
+
+            // When the game draws its own cursor (UseProjectCustomCursor), the OS pointer must
+            // stay hidden or both appear at once. The hardware texture only applies when the
+            // project is not drawing its own pointer.
+            Cursor.visible = !UseProjectCustomCursor;
+            Cursor.SetCursor(
+                !UseProjectCustomCursor && CustomCursorEnabled ? CursorTexture : null,
+                Vector2.zero,
+                CursorMode.Auto);
         }
 
         private void ConfigureDefaultCursor()

@@ -54,9 +54,44 @@ namespace Wagenheimer.RewiredHelper.Editor
                 CheckRuntimeConfiguration(results, manager);
             }
 
+            CheckProjectCursorCode(results);
+
             CheckGlyphs(results, manager);
             CheckI2(results);
             CheckOnScreenKeyboard(results, manager);
+        }
+
+        /// <summary>
+        /// The helper owns cursor visibility per input device. Project scripts that also toggle the
+        /// OS cursor produce two pointers (game cursor + OS pointer) or none after switching between
+        /// mouse and gamepad — the classic "the cursor is in the wrong place" report.
+        /// </summary>
+        private static void CheckProjectCursorCode(List<AuditResult> results)
+        {
+            var hits = ProjectCursorScanner.FindCursorOverrides();
+
+            if (hits.Count == 0)
+            {
+                RewiredHelperAudit.Add(results, Category, "Cursor is owned by the helper", true,
+                    "No script under Assets writes Cursor.visible/Cursor.SetCursor.",
+                    null, null, null, null, AuditSeverity.Info);
+                return;
+            }
+
+            results.Add(new AuditResult
+            {
+                Category = Category,
+                Title = "Project code changes the OS cursor directly",
+                Severity = AuditSeverity.Warning,
+                Detail = hits.Count + " script(s) write Cursor.visible or Cursor.SetCursor (" +
+                         string.Join(", ", hits.Take(3).Select(h => h.ScriptName)) + "). " +
+                         "The helper decides cursor visibility for the active input device, so a direct toggle can " +
+                         "leave two pointers on screen (game cursor + OS cursor) or none after switching devices.",
+                FixHint = "Keep the player preference in the game, but let the helper apply it: assign " +
+                          "RewiredInputManager.UseProjectCustomCursor and call RefreshCursor() instead of toggling Cursor.visible.",
+                Code = "manager.UseProjectCustomCursor = customCursorEnabled;\nmanager.RefreshCursor();",
+                Target = hits[0].Asset
+            });
         }
 
         #region Core

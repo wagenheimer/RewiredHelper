@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.71.8] - 2026-10-27
+
+### Added
+- **`UseProjectCustomCursor` + `RefreshCursor()`** on `RewiredInputManager`. Games that draw their own
+  desktop cursor (a UI hand, for example) can hand the preference to the helper instead of toggling
+  `Cursor.visible` themselves. On PC the OS pointer then stays hidden while the project cursor is on;
+  gamepads keep using the helper's `GameCursor`. `IsUsingJoystickCursor` is exposed so the project
+  cursor can hide itself while a gamepad is the active device.
+- Audit item **"Project code changes the OS cursor directly"**: scans every script under `Assets/` for
+  `Cursor.visible =` / `Cursor.SetCursor(` and explains the two-cursor side effect, with the code
+  shape to use instead.
+
 ## [0.71.7] - 2026-10-27
 
 ## [0.71.6] - 2026-10-27

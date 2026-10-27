@@ -55,10 +55,47 @@ namespace Wagenheimer.RewiredHelper.Editor
             }
 
             CheckProjectCursorCode(results);
+            CheckProjectInputCode(results);
 
             CheckGlyphs(results, manager);
             CheckI2(results);
             CheckOnScreenKeyboard(results, manager);
+        }
+
+        /// <summary>
+        /// RewiredInputManager owns Escape/Return/Submit routing. A second raw Input handler in the
+        /// project presses the same dialog button twice, which is the classic "Escape closes two
+        /// screens" report.
+        /// </summary>
+        private static void CheckProjectInputCode(List<AuditResult> results)
+        {
+            var hits = ProjectInputScanner.FindRawInput();
+
+            if (hits.Count == 0)
+            {
+                RewiredHelperAudit.Add(results, Category, "Escape/Return are owned by the helper", true,
+                    "No script under Assets reads Escape/Return/Submit with legacy Input.",
+                    null, null, null, null, AuditSeverity.Info);
+                return;
+            }
+
+            results.Add(new AuditResult
+            {
+                Category = Category,
+                Title = "Project code reads Escape/Return/Submit directly",
+                Severity = AuditSeverity.Warning,
+                Detail = hits.Count + " script line(s) read them with legacy Input (" +
+                         string.Join(", ", hits.Take(3).Select(h => h.ScriptName + ":" + h.Line)) + "). " +
+                         "RewiredInputManager already routes those keys — including the gamepad Menu/Back buttons — " +
+                         "so the same dialog button fires twice (or the same screen closes twice).",
+                FixHint = "Remove the raw Input check and let the helper route it: register an IModalStackProvider " +
+                          "(RewiredInputManager.SetGlobalConfiguration) so Escape/Return press the top dialog, and use " +
+                          "EscapeButton/ReturnEscapeEvent for the rest. For deliberate legacy shortcuts, add the comment " +
+                          "'rewired-helper: ignore-input' to the file.",
+                Code = "RewiredInputManager.SetGlobalConfiguration(modalStack: new MyModalStack());\n" +
+                       "// Escape -> top dialog EscapeButton, Return -> top dialog OkButton, gamepad Menu/Back included",
+                Target = hits[0].Asset
+            });
         }
 
         /// <summary>

@@ -56,10 +56,48 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             CheckProjectCursorCode(results);
             CheckProjectInputCode(results);
+            CheckLegacyDialog(results);
 
             CheckGlyphs(results, manager);
             CheckI2(results);
             CheckOnScreenKeyboard(results, manager);
+        }
+
+        /// <summary>
+        /// A project-local Dialog.cs duplicates the package dialog: it has no gamepad support, does
+        /// not feed the modal stack and keeps every prefab pointing at an obsolete script.
+        /// </summary>
+        private static void CheckLegacyDialog(List<AuditResult> results)
+        {
+            int scripts = LegacyDialogMigrator.CountLegacyDialogs();
+
+            if (scripts == 0)
+            {
+                RewiredHelperAudit.Add(results, Category, "Dialogs use the package Dialog", true,
+                    "No project-local Dialog.cs found.", null, null, null, null, AuditSeverity.Info);
+                return;
+            }
+
+            int references = LegacyDialogMigrator.CountLegacySerializedReferences();
+
+            results.Add(new AuditResult
+            {
+                Category = Category,
+                Title = "Legacy Dialog.cs still in the project",
+                Severity = AuditSeverity.Warning,
+                Detail = scripts + " project-local Dialog.cs found" +
+                         (references > 0 ? ", referenced by " + references + " prefab/scene/asset file(s)" : "") +
+                         ". The package ships an equivalent Dialog (same fields) that works with the gamepad, " +
+                         "the modal stack and the on-screen keyboard.",
+                FixHint = "Migrate: deletes the project Dialog.cs, repoints every serialized reference to the package " +
+                          "Dialog and adds 'using Wagenheimer.RewiredHelper.UI;' to the scripts that need it. " +
+                          "Commit (or back up) first — the migration rewrites prefabs and scenes.",
+                Code = "// Keep the same calls after migrating:\n" +
+                       "Dialogs.ShowDialog(dialog);\n" +
+                       "dialogs now resolve to Wagenheimer.RewiredHelper.UI.Dialogs",
+                FixLabel = "Migrate to GameDialog",
+                Fix = LegacyDialogMigrator.Migrate
+            });
         }
 
         /// <summary>

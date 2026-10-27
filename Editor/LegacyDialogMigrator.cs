@@ -101,6 +101,34 @@ namespace Wagenheimer.RewiredHelper.Editor
             return null;
         }
 
+        /// <summary>How many project-local legacy <c>Dialog.cs</c> files exist. Used by the audit.</summary>
+        public static int CountLegacyDialogs() => FindLegacyDialogScripts().Count;
+
+        /// <summary>How many prefabs/scenes/assets still reference the legacy dialog script.</summary>
+        public static int CountLegacySerializedReferences()
+        {
+            var legacy = FindLegacyDialogScripts();
+            if (legacy.Count == 0) return 0;
+
+            var legacyGuids = new HashSet<string>(legacy.Select(l => l.guid));
+            var dataPath = ToAbsolute("Assets");
+            var count = 0;
+
+            foreach (var file in Directory.GetFiles(dataPath, "*", SearchOption.AllDirectories))
+            {
+                var ext = Path.GetExtension(file).ToLowerInvariant();
+                if (!SerializedExtensions.Contains(ext)) continue;
+
+                string text;
+                try { text = File.ReadAllText(file); }
+                catch { continue; }
+
+                if (legacyGuids.Any(text.Contains)) count++;
+            }
+
+            return count;
+        }
+
         private static List<(string path, string guid)> FindLegacyDialogScripts()
         {
             var result = new List<(string path, string guid)>();

@@ -403,6 +403,14 @@ namespace Wagenheimer.RewiredHelper
             if (controller.type == ControllerType.Joystick)
             {
                 _lastInputWasPC = false;
+
+                // A controller is not a touch. Without this, a single tap/click left the manager in
+                // touch mode forever (lastInputWasTouch only cleared when the hardware mouse moved),
+                // so LastActiveController was forced back to null every frame and the virtual cursor
+                // was never shown - the gamepad could not aim at or click world objects (cards).
+                _isUsingTouch = false;
+                lastInputWasTouch = false;
+
                 LastActiveController = controller;
                 _lastKnownControllerType = ControllerType.Joystick;
                 UpdateUIForInputType();

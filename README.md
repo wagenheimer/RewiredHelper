@@ -63,7 +63,7 @@ Or add it manually to `Packages/manifest.json`:
 To lock a specific tag:
 
 ```
-https://github.com/wagenheimer/RewiredHelper.git#v0.74.3
+https://github.com/wagenheimer/RewiredHelper.git#vX.Y.Z
 ```
 
 Rewired itself must already be imported into your project — this package does not bundle or

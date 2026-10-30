@@ -33,7 +33,7 @@ namespace Wagenheimer.RewiredHelper
 
                 // Other code (HandleJoystickOrCustomController) turns the cursor back on every frame the joystick is active.
                 if (GameCursor != null && GameCursor.enabled) GameCursor.enabled = false;
-                Cursor.visible = false;
+                SetOsCursorVisible(false);
             }
             else if (_cursorSuspendedByKeyboard)
             {

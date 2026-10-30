@@ -313,7 +313,8 @@ namespace Wagenheimer.RewiredHelper.Editor
                  hasSteam ? "SteamManager found: the overlay pauses the game and resumes it when it closes."
                           : "No SteamManager in the project: nothing to configure (only used on Steam builds)."),
                 ("Cursor per input device",
-                 "Touch: hidden. Mouse/keyboard: OS cursor (custom texture on standalone). Gamepad/remote: on-screen Game Cursor."),
+                 "Touch: hidden. Mouse/keyboard: OS cursor (custom texture on standalone). Gamepad/remote: on-screen Game Cursor. " +
+                 "In the Editor the OS pointer stays visible so the game can be tested with the mouse (Keep OS Cursor Visible In Editor)."),
                 ("Controller help",
                  "Shown once, the first time a gamepad button is pressed in an allowed scene. Never on touch."),
                 ("Every build",
@@ -414,7 +415,7 @@ namespace Wagenheimer.RewiredHelper.Editor
         private void BuildCursorSection()
         {
             var section = RewiredInspectorWidgets.CreateSection(_root, "cursor", "🖱 Cursor & Glyphs", false);
-            AddFields(section, "GameCursor", "CustomCursorEnabled", "CursorTexture", "ForceGlyphCustomControllerLast");
+            AddFields(section, "GameCursor", "CustomCursorEnabled", "CursorTexture", "ForceGlyphCustomControllerLast", "KeepOsCursorVisibleInEditor");
         }
 
         private void BuildOnScreenKeyboardSection()

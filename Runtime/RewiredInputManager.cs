@@ -84,6 +84,14 @@ namespace Wagenheimer.RewiredHelper
                  "gamepads keep using the helper's GameCursor.")]
         public bool UseProjectCustomCursor;
 
+#if UNITY_EDITOR
+        [Tooltip("Editor only. Keeps the OS mouse pointer visible and unlocked in Play Mode, whatever the active " +
+                 "device is, so the game can always be played and tested with the mouse (a hidden pointer on mouse, " +
+                 "gamepad or custom-cursor input makes Play Mode untestable). Turn it off to preview the exact " +
+                 "per-device cursor behavior. Never compiled into a build.")]
+        public bool KeepOsCursorVisibleInEditor = true;
+#endif
+
         /// <summary>True when the visible pointer is the helper's GameCursor (gamepad / custom controller).</summary>
         public bool IsUsingJoystickCursor =>
             CurrentControllerType == ControllerType.Joystick || CurrentControllerType == ControllerType.Custom;
@@ -93,6 +101,14 @@ namespace Wagenheimer.RewiredHelper
         /// <see cref="UseProjectCustomCursor"/> or <see cref="CustomCursorEnabled"/> at runtime.
         /// </summary>
         public void RefreshCursor() => HandleControllerType();
+
+        /// <summary>
+        /// Pure rule for the OS pointer: in the Editor an explicit request to hide it is ignored while
+        /// <paramref name="keepVisibleInEditor"/> is on, because Play Mode is where the game gets
+        /// played and tested with the mouse.
+        /// </summary>
+        public static bool ResolveOsCursorVisible(bool requestVisible, bool keepVisibleInEditor, bool isEditor)
+            => requestVisible || (isEditor && keepVisibleInEditor);
 
         [Tooltip("If enabled, joystick/keyboard UI confirmation (UISubmit / Return / Button A) automatically invokes PointerDown / PointerUp on the selected GameObject, fixing audio listeners (like EventSounds / PointerDown SFX) that only listen to pointer clicks.")]
         public bool AutoBridgeSubmitToPointerDown = true;
@@ -392,6 +408,11 @@ namespace Wagenheimer.RewiredHelper
             HandleOnScreenKeyboard();
             SuspendCursorWhileOnScreenKeyboard();
             EnsureKeyboardAvoiderForSelection();
+
+#if UNITY_EDITOR
+            // Must stay last: wins over every other path (and over project scripts) that hides the pointer.
+            EnsureEditorMouseCursor();
+#endif
         }
 
 
@@ -692,7 +713,7 @@ namespace Wagenheimer.RewiredHelper
                 bool enableCursor = isAndroidMobile && CanActivateAndroidCursor(LastActiveController);
                 GameCursor.enabled = CurrentControllerType == ControllerType.Joystick || enableCursor;
             }
-            Cursor.visible = false;
+            SetOsCursorVisible(false);
             CanShowCustomCursor = false;
         }
 
@@ -742,7 +763,7 @@ namespace Wagenheimer.RewiredHelper
             // When the game draws its own cursor (UseProjectCustomCursor), the OS pointer must
             // stay hidden or both appear at once. The hardware texture only applies when the
             // project is not drawing its own pointer.
-            Cursor.visible = !UseProjectCustomCursor;
+            SetOsCursorVisible(!UseProjectCustomCursor);
             Cursor.SetCursor(
                 !UseProjectCustomCursor && CustomCursorEnabled ? CursorTexture : null,
                 Vector2.zero,
@@ -752,16 +773,48 @@ namespace Wagenheimer.RewiredHelper
         private void ConfigureDefaultCursor()
         {
             if (GameCursor != null) GameCursor.enabled = false;
-            Cursor.visible = true;
+            SetOsCursorVisible(true);
             CanShowCustomCursor = false;
         }
 
         private void DisableAllCursors()
         {
             if (GameCursor != null) GameCursor.enabled = false;
-            Cursor.visible = false;
+            SetOsCursorVisible(false);
             CanShowCustomCursor = false;
         }
+
+        /// <summary>
+        /// Single entry point for <see cref="Cursor.visible"/>. Every path that hides the pointer
+        /// (gamepad, touch, project custom cursor, on-screen keyboard) goes through here, so the
+        /// Editor override has exactly one place to apply.
+        /// </summary>
+        private void SetOsCursorVisible(bool visible)
+        {
+#if UNITY_EDITOR
+            visible = ResolveOsCursorVisible(visible, KeepOsCursorVisibleInEditor, true);
+
+            // A locked pointer is invisible in practice (Unity recenters it every frame), so the
+            // Editor override has to release the lock too, not just Cursor.visible.
+            if (KeepOsCursorVisibleInEditor) Cursor.lockState = CursorLockMode.None;
+#endif
+            Cursor.visible = visible;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Safety net for Play Mode: another script (a third-party asset or a gameplay path that
+        /// locks the pointer) can hide or lock the OS pointer after the per-device update already
+        /// ran. Re-assert it every frame so the mouse stays usable while testing.
+        /// </summary>
+        private void EnsureEditorMouseCursor()
+        {
+            if (!KeepOsCursorVisibleInEditor) return;
+
+            if (!Cursor.visible) Cursor.visible = true;
+            if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
+        }
+#endif
         #endregion
 
         #region Event Handlers

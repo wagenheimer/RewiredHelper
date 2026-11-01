@@ -1,16 +1,19 @@
 using UnityEngine;
 using Rewired;
+using I2.Loc;
 using Wagenheimer.RewiredHelper;
 
 namespace I2.Loc
 {
-    // Requires I2 Localization to already define the partial SpecializationManager class.
-    public partial class SpecializationManager
+    /// <summary>
+    /// Rewired-aware specialization: returns "Touch", "Controller" or "PC" from the
+    /// last active input device so I2 picks the right term/glyph variant.
+    ///
+    /// This subclass replaces <see cref="SpecializationManager.Singleton"/> at startup,
+    /// enabling compatibility with I2 Localization when packaged as an asmdef UPM package.
+    /// </summary>
+    public sealed class RewiredSpecializationManager : SpecializationManager
     {
-        /// <summary>
-        /// Determines the current input specialization ("Touch", "Controller", "PC") so I2
-        /// Localization can pick the right term/glyph variant for the active input device.
-        /// </summary>
         public override string GetCurrentSpecialization()
         {
             if (RewiredInputManager.IsUsingTouch)
@@ -55,6 +58,21 @@ namespace I2.Loc
 
 namespace Wagenheimer.RewiredHelper.Integration
 {
+    /// <summary>
+    /// Installs the Rewired specialization before the first scene loads.
+    /// </summary>
+    internal static class I2SpecializationInstaller
+    {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Install()
+        {
+            if (SpecializationManager.Singleton is RewiredSpecializationManager)
+                return;
+
+            SpecializationManager.Singleton = new RewiredSpecializationManager();
+        }
+    }
+
     // Marker type used by the Editor Setup Checker to detect if this integration is imported.
     internal struct I2SpecializationImportedMarker {}
 }

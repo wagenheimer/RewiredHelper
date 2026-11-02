@@ -114,16 +114,13 @@ namespace Wagenheimer.RewiredHelper.UI
                     _targetRect, screenPosition, camera, out var localPoint))
                 return;
 
-            if (centerOnPointer)
-            {
-                // localPosition places the pivot, so shift by the distance between the pivot and
-                // the centre of the image (top-left pivots would otherwise sit one half-image off).
-                var rect = cursorRectTransform.rect;
-                var scale = cursorRectTransform.localScale;
-
-                localPoint.x += (0.5f - cursorRectTransform.pivot.x) * rect.width * scale.x;
-                localPoint.y += (0.5f - cursorRectTransform.pivot.y) * rect.height * scale.y;
-            }
+            // localPosition places the pivot. centerOnPointer wants the image CENTRE on the pointer,
+            // so move the pivot back by the pivot-to-hotspot distance. Subtracting is essential:
+            // adding it (the old behaviour) puts the cursor a whole image away from the pointer.
+            var hotspot = HotspotFromPivot();
+            var scale = cursorRectTransform.localScale;
+            localPoint.x -= hotspot.x * scale.x;
+            localPoint.y -= hotspot.y * scale.y;
 
             if (clampToParent)
             {
@@ -136,7 +133,21 @@ namespace Wagenheimer.RewiredHelper.UI
         }
 
         /// <summary>
-        /// Projects the cursor back to screen pixels (used by RewiredInputManager).
+        /// Offset from the pivot to the point that must sit on the pointer, in the cursor's local
+        /// rect units. Zero when the pivot itself is the hot spot (centerOnPointer off).
+        /// </summary>
+        private Vector3 HotspotFromPivot()
+        {
+            if (!centerOnPointer || cursorRectTransform == null) return Vector3.zero;
+
+            var rect = cursorRectTransform.rect;
+            var pivot = cursorRectTransform.pivot;
+            return new Vector3((0.5f - pivot.x) * rect.width, (0.5f - pivot.y) * rect.height, 0f);
+        }
+
+        /// <summary>
+        /// Projects the cursor's hot spot back to screen pixels (used by RewiredInputManager, so UI
+        /// clicks land where the pointer is actually drawn, not at the pivot).
         /// </summary>
         public Vector2 GetScreenPosition()
         {
@@ -147,7 +158,8 @@ namespace Wagenheimer.RewiredHelper.UI
                 ? root.worldCamera
                 : null;
 
-            return RectTransformUtility.WorldToScreenPoint(camera, cursorRectTransform.position);
+            var hotspotWorld = cursorRectTransform.TransformPoint(HotspotFromPivot());
+            return RectTransformUtility.WorldToScreenPoint(camera, hotspotWorld);
         }
     }
 }

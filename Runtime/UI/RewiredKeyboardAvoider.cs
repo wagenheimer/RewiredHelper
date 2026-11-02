@@ -76,7 +76,12 @@ namespace Wagenheimer.RewiredHelper.UI
 
             // Part of the current lift is already included in fieldBottom, so work out the total needed from the resting position.
             var needed = keyboardTop + padding * ScaleFactor() - (fieldBottom - _currentLift * ScaleFactor());
-            return Mathf.Max(0f, needed / ScaleFactor());
+            var lift = Mathf.Max(0f, needed / ScaleFactor());
+
+            // Safety net: no form ever needs to move more than the whole screen to clear a keyboard.
+            // Without this, any unit/camera mismatch feeds back into the next frame and the form flies
+            // off-screen (it happened with an Overlay keyboard read through a Screen Space - Camera canvas).
+            return Mathf.Min(lift, Screen.height / ScaleFactor());
         }
 
         /// <summary>Screen y (pixels, from the bottom) of the top edge of the visible soft keyboard, or 0 when there is none.</summary>
@@ -88,11 +93,21 @@ namespace Wagenheimer.RewiredHelper.UI
                 var rect = onScreen.transform as RectTransform;
                 if (rect != null)
                 {
+                    // The keyboard can live on a different canvas than the form (a DontDestroyOnLoad
+                    // Overlay keyboard with the form in a Screen Space - Camera scene canvas, for
+                    // example). Project its corners with the KEYBOARD's own camera: using the form's
+                    // camera turns Overlay screen coordinates into a far-off value (above Screen.height)
+                    // and the lift feedback then pushes the form off-screen.
+                    var keyboardCanvas = rect.GetComponentInParent<Canvas>();
+                    var keyboardCamera = keyboardCanvas != null && keyboardCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+                        ? keyboardCanvas.worldCamera
+                        : null;
+
                     var corners = new Vector3[4];
                     rect.GetWorldCorners(corners);
                     var top = float.MinValue;
                     foreach (var corner in corners)
-                        top = Mathf.Max(top, RectTransformUtility.WorldToScreenPoint(EventCamera(), corner).y);
+                        top = Mathf.Max(top, RectTransformUtility.WorldToScreenPoint(keyboardCamera, corner).y);
                     return top;
                 }
             }

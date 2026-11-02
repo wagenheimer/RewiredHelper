@@ -117,7 +117,7 @@ namespace Wagenheimer.RewiredHelper.Editor
                 return;
             }
 
-            results.Add(new AuditResult
+            var result = new AuditResult
             {
                 Category = Category,
                 Title = "Project code reads Escape/Return/Submit directly",
@@ -132,8 +132,12 @@ namespace Wagenheimer.RewiredHelper.Editor
                           "'rewired-helper: ignore-input' to the file.",
                 Code = "RewiredInputManager.SetGlobalConfiguration(modalStack: new MyModalStack());\n" +
                        "// Escape -> top dialog EscapeButton, Return -> top dialog OkButton, gamepad Menu/Back included",
-                Target = hits[0].Asset
-            });
+                Target = hits[0].Asset,
+                FixLabel = "Desativar Input Legado (MainBase)",
+                Fix = () => RewiredLegacyInputMigrator.MigrateHits(hits),
+                Prompt = RewiredLegacyInputMigrator.BuildAiPrompt(hits)
+            };
+            results.Add(result);
         }
 
         /// <summary>

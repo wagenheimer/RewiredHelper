@@ -44,6 +44,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         public const int MigrateLegacyComponentPriority = 60;
         public const string MigrateLegacyDialog = MigrateGroup + "Legacy Dialog (delete old Dialog.cs)";
         public const int MigrateLegacyDialogPriority = 61;
+        public const string MigrateLegacyMainInput = MigrateGroup + "Legacy Escape && Return Input (MainBase / Main)...";
+        public const int MigrateLegacyMainInputPriority = 62;
 
         // Utilities and links
         public const string ResetWindowPosition = Root + "/Reset Window Position";

@@ -119,3 +119,43 @@ fallback emoji glyph draws wider than Unity measures it, so the following text r
 `RewiredHelperUIStyle.ApplyIconText(button, text)` directly; for title labels use
 `RewiredHelperUIStyle.CreateIconLabel`. This splits the leading icon into its own `min-width` element
 so the two never overlap. This is the only supported way to show an icon before a label.
+
+## Legacy Input Migration (MainBase.cs / Main.cs)
+
+In older Green Sauce Games codebases (e.g. MainBase.cs / Main.cs), games handled Escape and Return manually in Update():
+
+`csharp
+if (Input.GetKeyDown(KeyCode.Escape))
+{
+    if (Dialogs.Modals.Count > 0 && Dialogs.Modals[Dialogs.Modals.Count - 1].EscapeButton != null &&
+        Dialogs.Modals[Dialogs.Modals.Count - 1].EscapeButton.interactable &&
+        Dialogs.Modals[Dialogs.Modals.Count - 1].EscapeButton.onClick.GetPersistentEventCount() > 0)
+        Dialogs.Modals[Dialogs.Modals.Count - 1].EscapeButton.onClick.Invoke();
+    else
+        ReturnEscapeEvent.EscapePressed = true;
+}
+
+if (Input.GetKeyDown(KeyCode.Return))
+{
+    if (Dialogs.Modals.Count > 0 && Dialogs.Modals[Dialogs.Modals.Count - 1].OkButton != null &&
+        Dialogs.Modals[Dialogs.Modals.Count - 1].OkButton.interactable & Dialogs.Modals[Dialogs.Modals.Count - 1].OkButton.onClick.GetPersistentEventCount() > 0)
+        Dialogs.Modals[Dialogs.Modals.Count - 1].OkButton.onClick.Invoke();
+    else
+        ReturnEscapeEvent.OkPressed = true;
+}
+`
+
+### Why this must be removed
+RewiredInputManager already does all of this natively inside RewiredInputManager.Routing.cs:
+- It tracks _modalStack / Dialogs.Modals automatically or via IModalStackProvider.
+- It executes EscapeButton.PressedScape() with interactability checks and persistent event validation.
+- It triggers ReturnEscapeEvent.TriggerEscape() / ReturnEscapeEvent.TriggerReturnConfirm().
+- Leaving the manual block in MainBase.cs causes **duplicate input execution**: both RewiredInputManager and MainBase.Update() run on the same frame, popping two dialogs at once or double-firing back button logic.
+
+### How to migrate in projects
+1. **Automated (1-click)**:
+   - Run the Audit Dashboard (Tools/Wagenheimer/Rewired Helper/Dashboard) -> click 🛠 Desativar Input Legado (MainBase).
+   - Or use the dedicated menu item: Tools/Wagenheimer/Rewired Helper/Migrate/Migrate Legacy MainBase Input (Escape & Return)....
+2. **AI Instructions (Prompt)**:
+   - Click the 🤖 button beside the audit issue to copy the exact instructions for any AI assistant editing the game code.
+   - The AI should comment out or delete the Input.GetKeyDown(KeyCode.Escape) / KeyCode.Return block in MainBase.Update() and ensure RewiredInputManager.Configure(uiBlocker: () => Main.main != null && Main.main.IsUiBlocked) is called during startup.

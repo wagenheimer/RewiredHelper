@@ -87,6 +87,25 @@
     color: var(--rh-accent-light);
 }
 
+/* Header: live result of "Check Updates" (hidden until the check runs). */
+.rh-header-update {
+    margin-left: 8px;
+    padding: 1px 2px;
+    border-width: 0;
+    background-color: transparent;
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: var(--rh-text-dim);
+}
+
+.rh-header-update:hover {
+    color: #ffffff;
+}
+
+.rh-update-checking { color: var(--rh-text-dim); }
+.rh-update-current { color: var(--rh-pass); }
+.rh-update-available { color: var(--rh-warn); }
+
 .rh-header-subtitle {
     font-size: 11px;
     color: var(--rh-text-dim);

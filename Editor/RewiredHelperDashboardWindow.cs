@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 using UnityEditor;
 
@@ -26,6 +28,9 @@ namespace Wagenheimer.RewiredHelper.Editor
         [SerializeField] private Tab _currentTab = Tab.SetupAudit;
         private VisualElement _root;
         private ScrollView _contentContainer;
+
+        private const string PackageId = "com.wagenheimer.rewiredhelper";
+        private Button _updateStatus;
 
         private static readonly Vector2 MinSize = new Vector2(620, 520);
         private static readonly Vector2 DefaultSize = new Vector2(820, 640);
@@ -121,12 +126,26 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             var versionBadge = new Label("v" + GetPackageVersion());
             versionBadge.AddToClassList("rh-header-version");
+            versionBadge.tooltip = "Installed version of com.wagenheimer.rewiredhelper.";
             left.Add(versionBadge);
+
+            // Live result of "Check Updates" (hidden until the check runs). Clicking it opens the
+            // Package Hub on this package so the new tag can be installed in one step.
+            _updateStatus = new Button(() => PackageHubWindow.OpenToPackage(PackageId))
+            {
+                tooltip = "Click to open the Package Hub for this package."
+            };
+            _updateStatus.AddToClassList("rh-header-update");
+            _updateStatus.style.display = DisplayStyle.None;
+            left.Add(_updateStatus);
+
             row.Add(left);
 
             var toolbar = new VisualElement();
             toolbar.AddToClassList("rh-toolbar-actions");
-            toolbar.Add(RewiredHelperUIStyle.CreateButton("🔄 Updates", () => UpdateChecker.CheckForUpdate(force: true)));
+            var checkUpdates = RewiredHelperUIStyle.CreateButton("🔄 Check Updates", CheckForUpdates);
+            checkUpdates.tooltip = "Compares the installed version with the latest GitHub tag and shows the result here.";
+            toolbar.Add(checkUpdates);
             row.Add(toolbar);
             banner.Add(row);
 
@@ -135,6 +154,70 @@ namespace Wagenheimer.RewiredHelper.Editor
             banner.Add(subtitle);
 
             return banner;
+        }
+
+        /// <summary>
+        /// Checks the latest GitHub tag through the Package Hub's update service and shows the result
+        /// next to the version badge, so the installed version and the available one are visible together.
+        /// </summary>
+        private void CheckForUpdates()
+        {
+            SetUpdateStatus("checking…", "rh-update-checking");
+
+            PackageItem item = null;
+            try
+            {
+                item = PackageDiscovery.GetAllPackages()?.FirstOrDefault(p => p.PackageId == PackageId);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[RewiredHelper] Could not list package versions: {ex.Message}");
+            }
+
+            if (item == null)
+            {
+                SetUpdateStatus("Package Hub unavailable", "rh-update-available");
+                PackageHubWindow.OpenToPackage(PackageId);
+                return;
+            }
+
+            // Compare against what is actually installed; the discovery snapshot can be stale.
+            item.IsInstalled = true;
+            item.InstalledVersion = GetPackageVersion();
+
+            PackageUpdateService.CheckUpdates(new List<PackageItem> { item }, () => OnUpdateChecked(item));
+        }
+
+        private void OnUpdateChecked(PackageItem item)
+        {
+            if (item == null)
+            {
+                SetUpdateStatus(null, null);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(item.LatestRemoteVersion))
+            {
+                SetUpdateStatus("could not check", "rh-update-available");
+                return;
+            }
+
+            SetUpdateStatus(
+                item.HasUpdate ? $"v{item.LatestRemoteVersion} available" : "up to date",
+                item.HasUpdate ? "rh-update-available" : "rh-update-current");
+        }
+
+        private void SetUpdateStatus(string text, string stateClass)
+        {
+            if (_updateStatus == null) return;
+
+            _updateStatus.text = text ?? string.Empty;
+            _updateStatus.style.display = string.IsNullOrEmpty(text) ? DisplayStyle.None : DisplayStyle.Flex;
+
+            _updateStatus.RemoveFromClassList("rh-update-checking");
+            _updateStatus.RemoveFromClassList("rh-update-current");
+            _updateStatus.RemoveFromClassList("rh-update-available");
+            if (!string.IsNullOrEmpty(stateClass)) _updateStatus.AddToClassList(stateClass);
         }
 
         private VisualElement CreateTabBar()

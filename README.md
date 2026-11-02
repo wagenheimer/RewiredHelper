@@ -130,6 +130,8 @@ Rewired Helper features professional, color-coded custom inspectors to speed up 
 - **Dashboard** (**Tools → Wagenheimer → Rewired Helper → Dashboard...**): UI Toolkit window like the other Wagenheimer packages, with four tabs:
   **Setup Audit** (scene + project scan with one-click fixes, *Copy Report* and *Copy AI Fix Prompt*), **Automatic** (the policy per platform and the status of your scene; manual overrides are tucked into a collapsed *Advanced* section),
   **Checklist** (persistent manual release checklist, mirrored in [`REWIRED-CHECKLIST.md`](REWIRED-CHECKLIST.md)) and **Docs & Updates**.
+  The header always shows the installed version and a **Check Updates** button; the result (*up to date* /
+  *vX.Y.Z available*) appears next to the version and opens the Package Hub on this package when clicked.
   The audit also runs headless for CI: `-executeMethod Wagenheimer.RewiredHelper.Editor.RewiredHelperAudit.RunHeadlessAndLog`.
 - **One-Click Setup Generators**: Directly from the `RewiredInputManager` inspector, you can generate a default Pause Screen or a Controller Help Form.
 - **Player Mouse Auto-Configuration**: The diagnostics window can automatically configure Rewired's Player Mouse settings for joystick cursor movement.

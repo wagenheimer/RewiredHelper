@@ -30,6 +30,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             ("Desktop / Console", "pc_cursor", "Custom cursor texture is Read/Write, uncompressed, no mipmaps", "Otherwise the OS cannot read the pixels."),
             ("UI / Modal", "ui_stack", "Escape/Return hit the top-most Dialog", "DefaultModalStackProvider passed to Configure()."),
             ("UI / Modal", "ui_visibility", "InputVisibilityController shows the right UI per input type", "Touch, mouse/keyboard and joystick variants."),
+            ("UI / Modal", "ui_cursor_option", "Custom Cursor option disappears on joystick/touch", "It only changes the OS mouse texture; hide the row with InputVisibilityController and keep the saved preference."),
+            ("UI / Modal", "ui_anybutton", "Click-to-continue screens react to any gamepad button", "Splash, credits and level summary must use ReInput.controllers.GetAnyButtonDown() instead of Input.anyKey/GetMouseButton."),
             ("UI / Modal", "ui_help", "Controller Help form appears once, not in ControllerHelpBlockedScenes", "Test with a real gamepad in an allowed scene."),
             ("Release", "rel_logs", "No input-switch log spam in the release build", "Logs in per-switch paths only in editor/development builds."),
             ("Release", "rel_version", "Package version bumped and CHANGELOG generated", "Automated by bump-version.yml from Conventional Commits.")

@@ -373,6 +373,42 @@ private void UpdateCursorToggleState()
 }
 ```
 
+> **Preferred behavior:** hide the whole row (option 1) instead of just graying it out — with a
+> controller the OS cursor texture does not exist at all, so a visible-but-disabled option only
+> looks broken. `InputVisibilityController` with
+> `ShowOnMouseOrKeyboardHideOnJoystickOrTouch` + `TargetAction.ToggleGameObject` hides the Toggle
+> GameObject, and since the label is usually its child, the label goes with it. The saved
+> `CustomCursor` preference must stay untouched; `SetCustomCursor`/`CustomCursorEnabled` still apply
+> when the player returns to the mouse.
+>
+> **Setup Audit:** the *Custom Cursor option is not hidden on gamepad* check scans the project for
+> Options scripts that reference `CustomCursor` + a `Toggle`/`Selectable` without reacting to the
+> active device (`InputVisibilityController`, `OnInputSpecializationChanged`, `IsUsingJoystickCursor`,
+> `CurrentControllerType`...). It reports the files and ships a ready-to-paste AI prompt (🤖 button).
+
+### Legacy Input audit (gamepad reachability)
+`UnityEngine.Input` reads the hardware mouse/keyboard directly, and the helper's virtual cursor never
+moves `Input.mousePosition`. Any screen that waits for `Input.GetMouseButton*`, `Input.anyKey*`,
+`Input.GetKey*` or `Input.GetButton("Name")` is therefore impossible to trigger with a controller.
+The *Legacy Input that a gamepad cannot reach* check lists those lines and ships an AI prompt that
+migrates each case (`ReInput.controllers.GetAnyButtonDown()` for "press any button",
+`Player.GetButtonDown("Action")` for named actions, `RewiredInputManager.RewiredMousePosition` + the
+same raycast for world clicks, EventSystem/Button for UI).
+
+Opting a file out:
+- `// rewired-helper: ignore-input` — deliberate legacy input (also silences the Escape/Return check).
+- `// rewired-helper: ignore-legacy-input` — only the reachability check (developer shortcuts).
+
+Opting whole third-party folders out (their own examples read legacy Input) — create
+`ProjectSettings/RewiredHelperIgnore.txt`, one path prefix per line (`#` comments allowed):
+
+```
+Assets/EasyTouchBundle/
+Assets/Plugins/
+```
+
+`Assets/Rewired/` and every `/Editor/` folder are always skipped.
+
 **Testing in the Editor:** the standalone cursor path runs whenever `UNITY_STANDALONE` *or*
 `UNITY_EDITOR` is defined, so Play Mode always exercises it regardless of the active Build Target
 (e.g. it still works when the target platform is Android/iOS). In Play Mode, `Keep OS Cursor Visible

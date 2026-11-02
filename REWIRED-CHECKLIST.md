@@ -35,6 +35,10 @@ This file lists the items that cannot be verified from source. The Dashboard **C
 ## UI / Modal
 - [ ] Escape/Return reach the top-most `Dialog` (`DefaultModalStackProvider` passed to the manager).
 - [ ] `InputVisibilityController` shows the right UI for touch / mouse-keyboard / joystick.
+- [ ] The Custom Cursor option disappears while a joystick/touch is active and comes back on mouse/keyboard
+      (the audit flags Options scripts that expose the preference without reacting to the device).
+- [ ] Click-to-continue screens (splash, credits, level summary) react to any gamepad button — the audit lists
+      raw `Input` reads that a controller cannot reach.
 - [ ] Controller Help form appears once and never in `ControllerHelpBlockedScenes`.
 
 ## Release

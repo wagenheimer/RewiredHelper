@@ -56,6 +56,8 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             CheckProjectCursorCode(results);
             CheckProjectInputCode(results);
+            CheckProjectLegacyInputReachability(results);
+            CheckCustomCursorOptionDeviceAwareness(results);
             CheckLegacyDialog(results);
 
             CheckGlyphs(results, manager);
@@ -138,6 +140,82 @@ namespace Wagenheimer.RewiredHelper.Editor
                 Prompt = RewiredLegacyInputMigrator.BuildAiPrompt(hits)
             };
             results.Add(result);
+        }
+
+        /// <summary>
+        /// Mouse/keyboard-only reads (<c>Input.GetMouseButton</c>, <c>Input.anyKey</c>, <c>Input.GetKey</c>,
+        /// <c>Input.GetButton("name")</c>, <c>Input.mousePosition</c>) are invisible to a gamepad: the helper's
+        /// virtual cursor does not move <c>Input.mousePosition</c>, so a controller-only player can never trigger
+        /// that code. Reports every hit with a ready-to-paste AI prompt and points at the opt-out marker for
+        /// deliberate developer shortcuts.
+        /// </summary>
+        private static void CheckProjectLegacyInputReachability(List<AuditResult> results)
+        {
+            var hits = ProjectInputScanner.FindLegacyInput();
+
+            if (hits.Count == 0)
+            {
+                RewiredHelperAudit.Add(results, Category, "Legacy Input is reachable by every device", true,
+                    "No script under Assets reads mouse/keyboard-only Input APIs.", null, null, null, null, AuditSeverity.Info);
+                return;
+            }
+
+            int files = hits.Select(h => h.Path).Distinct().Count();
+            results.Add(new AuditResult
+            {
+                Category = Category,
+                Title = "Legacy Input that a gamepad cannot reach",
+                Severity = AuditSeverity.Warning,
+                Detail = $"{hits.Count} line(s) in {files} script(s) read UnityEngine.Input directly (" +
+                         string.Join(", ", hits.Take(3).Select(h => h.ScriptName + ":" + h.Line)) +
+                         (hits.Count > 3 ? ", ..." : "") + "). Hardware mouse/keyboard state ignores the gamepad and the " +
+                         "virtual cursor (which never moves Input.mousePosition), so a joystick-only player cannot trigger " +
+                         "those actions. Dev-only shortcuts can opt out with 'rewired-helper: ignore-legacy-input'.",
+                FixHint = "Migrate to Rewired: ReInput.controllers.GetAnyButtonDown() for 'press any button', " +
+                          "Player.GetButtonDown(\"Action\") for named actions, and RewiredInputManager.RewiredMousePosition " +
+                          "with the same raycast (or EventSystem pointer events for UI) for clicks.",
+                Code = "if (ReInput.controllers.GetAnyButtonDown()) Continue();\n" +
+                       "// World clicks: raycast from RewiredInputManager.RewiredMousePosition\n" +
+                       "// UI: Button + Rewired UI actions (UISubmit/UICancel)",
+                Target = hits[0].Asset,
+                Prompt = RewiredInputAuditPrompts.BuildGamepadReachabilityPrompt(hits)
+            });
+        }
+
+        /// <summary>
+        /// The Custom Cursor toggle only affects the mouse pointer texture. On a gamepad/touch the helper draws
+        /// its own cursor, so the option must disappear instead of staying visible and doing nothing.
+        /// </summary>
+        private static void CheckCustomCursorOptionDeviceAwareness(List<AuditResult> results)
+        {
+            var files = ProjectInputScanner.FindDeviceAgnosticCustomCursorOptions();
+
+            if (files.Count == 0)
+            {
+                RewiredHelperAudit.Add(results, Category, "Custom Cursor option follows the input device", true,
+                    "No Options script exposes the preference without reacting to the active device.",
+                    null, null, null, null, AuditSeverity.Info);
+                return;
+            }
+
+            results.Add(new AuditResult
+            {
+                Category = Category,
+                Title = "Custom Cursor option is not hidden on gamepad",
+                Severity = AuditSeverity.Warning,
+                Detail = $"{files.Count} script(s) expose the custom cursor preference to a Toggle but never look at the " +
+                         "active device (" + string.Join(", ", files.Take(3).Select(f => Path.GetFileName(f))) + "). " +
+                         "The OS cursor texture only exists on the mouse; with a joystick/touch the helper draws its own " +
+                         "cursor, so the option does nothing and should disappear.",
+                FixHint = "Add InputVisibilityController to the Toggle GameObject with VisibilityMode " +
+                          "ShowOnMouseOrKeyboardHideOnJoystickOrTouch (TargetAction ToggleGameObject), or subscribe to " +
+                          "RewiredInputManager.OnInputSpecializationChanged and hide it while IsUsingJoystickCursor/IsUsingTouch. " +
+                          "Never delete the saved preference — only hide the row.",
+                Code = "var v = toggle.gameObject.AddComponent<InputVisibilityController>();\n" +
+                       "v.SetVisibilityMode(InputVisibilityController.VisibilityMode.ShowOnMouseOrKeyboardHideOnJoystickOrTouch);",
+                Target = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(files[0]),
+                Prompt = RewiredInputAuditPrompts.BuildCustomCursorOptionPrompt(files)
+            });
         }
 
         /// <summary>

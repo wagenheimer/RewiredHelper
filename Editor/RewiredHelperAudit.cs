@@ -357,6 +357,10 @@ namespace Wagenheimer.RewiredHelper.Editor
                                     (r.Severity == AuditSeverity.Info && !string.IsNullOrEmpty(r.FixHint));
                 if (!isActionable) continue;
 
+                // A check may already ship a detailed, finding-specific prompt (legacy input migrator,
+                // gamepad reachability, custom cursor option...). Keep it; only fill the generic one.
+                if (!string.IsNullOrEmpty(r.Prompt)) continue;
+
                 r.Prompt = $"In the Unity project, resolve this Rewired Helper audit finding.\nCategory: {r.Category}\nFinding: {r.Title}\n" +
                            $"Evidence: {r.Detail}\nExpected fix: {r.FixHint}\n" +
                            "Keep the change minimal and re-run Tools > Wagenheimer > Rewired Helper > Verify Setup to confirm.";

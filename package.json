@@ -19,6 +19,28 @@
     "dialog"
   ],
   "category": "Tools",
+  "wagenheimer": {
+    "defines": [
+      {
+        "symbol": "WAGENHEIMER_STEAMWORKS",
+        "description": "Enables RewiredHelper's Steamworks integrations (Steam overlay pause, Steam Input glyph hints). Automatic inside the RewiredHelper assemblies when Steamworks.NET is installed.",
+        "scope": "assembly",
+        "autoFromPackage": "com.rlabrecque.steamworks.net",
+        "platforms": [
+          "Standalone"
+        ]
+      },
+      {
+        "symbol": "WAGENHEIMER_STEAM_DECK_DETECTION",
+        "description": "Detects Steam Deck through Steamworks (SteamUtils.IsSteamRunningOnSteamDeck) to pick gamepad defaults and pause behaviour. Automatic with Steamworks.NET; ignored on Android/iOS.",
+        "scope": "assembly",
+        "autoFromPackage": "com.rlabrecque.steamworks.net",
+        "platforms": [
+          "Standalone"
+        ]
+      }
+    ]
+  },
   "dependencies": {},
   "samples": [
     {

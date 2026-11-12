@@ -37,6 +37,8 @@ namespace Wagenheimer.RewiredHelper.Editor
         public const int FixCursorWiringPriority = 40;
         public const string RemoveDuplicateEventSystems = FixGroup + "Remove Duplicate Event Systems (All Scenes)";
         public const int RemoveDuplicateEventSystemsPriority = 41;
+        public const string FixRewiredInputModule = FixGroup + "Patch Rewired Input Module (ReInput not initialized)";
+        public const int FixRewiredInputModulePriority = 42;
 
         // Migrate/ (legacy projects)
         private const string MigrateGroup = Root + "/Migrate/";

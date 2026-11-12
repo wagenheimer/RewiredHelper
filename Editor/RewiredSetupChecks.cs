@@ -44,6 +44,7 @@ namespace Wagenheimer.RewiredHelper.Editor
 
             CheckEventSystemActions(results);
             CheckDuplicateEventSystems(results);
+            CheckRewiredInputModulePatch(results);
             CheckCanvas(results);
             CheckLegacyComponent(results, manager);
 
@@ -293,6 +294,25 @@ namespace Wagenheimer.RewiredHelper.Editor
                 $"{count} Event Systems in the open scene: Unity logs 'There can be only one active Event System'.",
                 "Keeps only the Event System running Rewired's input module, in every scene of the project.",
                 "Remove Duplicates (All Scenes)", DefaultSetupGenerator.RemoveDuplicateEventSystemsInAllScenes, AuditSeverity.Warning);
+        }
+
+        /// <summary>
+        /// Rewired's input module reads <c>ReInput.touch</c> in Awake. When the Event System awakens before Rewired is
+        /// initialized (deferred platform init on iOS) that throws a NullReferenceException, the module's OnEnable never
+        /// runs and UI navigation/clicks die for the session. The guard lives in Rewired's own source, so it is reported
+        /// here to stay visible after a Rewired update.
+        /// </summary>
+        private static void CheckRewiredInputModulePatch(List<AuditResult> results)
+        {
+            if (!RewiredInputModulePatch.IsRewiredPresent()) return;
+
+            RewiredHelperAudit.Add(results, Category, "Input module tolerates Rewired not initialized",
+                RewiredInputModulePatch.IsApplied(),
+                "Guard present in Rewired's UnityUI source (reapplied automatically after a Rewired update).",
+                "Rewired's module reads ReInput.touch in Awake; when Rewired is still initializing this throws " +
+                "NullReferenceException and the Event System loses UI navigation/clicks for the session (seen on iOS).",
+                "Applies the guard to Rewired's UnityUI input module source. Safe and idempotent.",
+                "Patch Now", RewiredInputModulePatch.Fix);
         }
 
         private static void CheckCanvas(List<AuditResult> results)

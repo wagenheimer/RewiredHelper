@@ -60,6 +60,7 @@ namespace Wagenheimer.RewiredHelper.Editor
             CheckProjectLegacyInputReachability(results);
             CheckCustomCursorOptionDeviceAwareness(results);
             CheckLegacyDialog(results);
+            CheckLegacyComponents(results);
 
             CheckGlyphs(results, manager);
             CheckI2(results);
@@ -100,6 +101,43 @@ namespace Wagenheimer.RewiredHelper.Editor
                        "dialogs now resolve to Wagenheimer.RewiredHelper.UI.Dialogs",
                 FixLabel = "Migrate to GameDialog",
                 Fix = LegacyDialogMigrator.Migrate
+            });
+        }
+
+        /// <summary>
+        /// A project-local copy of ReturnEscapeEvent / EscapeButton / InputVisibilityController shadows the
+        /// package component: nothing routes Escape/Return to it, so those buttons silently stop working.
+        /// </summary>
+        private static void CheckLegacyComponents(List<AuditResult> results)
+        {
+            var legacy = LegacyComponentMigrator.FindLegacyScripts();
+
+            if (legacy.Count == 0)
+            {
+                RewiredHelperAudit.Add(results, Category, "Escape/Return components come from the package", true,
+                    "No project-local copy of ReturnEscapeEvent, EscapeButton or InputVisibilityController.",
+                    null, null, null, null, AuditSeverity.Info);
+                return;
+            }
+
+            int references = LegacyComponentMigrator.CountSerializedReferences(legacy);
+            var staticUses = LegacyComponentMigrator.FindStaticMemberUses();
+
+            results.Add(new AuditResult
+            {
+                Category = Category,
+                Title = "Old copies of package components in the project",
+                Severity = AuditSeverity.Warning,
+                Detail = string.Join(", ", legacy.Select(l => l.ClassName).Distinct()) + " exist as project scripts" +
+                         (references > 0 ? ", used by " + references + " scene/prefab/asset file(s)" : "") +
+                         ". The old copies are not fed by RewiredInputManager, so Escape/Return handlers on them never fire." +
+                         (staticUses.Count > 0
+                             ? " " + staticUses.Count + " code line(s) set their static flags (EscapePressed/OkPressed) and must be removed by hand."
+                             : ""),
+                FixHint = "Migrate: repoints every scene/prefab reference to the package component (same fields), deletes the " +
+                          "old scripts and adds 'using Wagenheimer.RewiredHelper;' where needed. Commit first.",
+                FixLabel = "Migrate to package components",
+                Fix = LegacyComponentMigrator.Migrate
             });
         }
 

@@ -16,7 +16,11 @@ public class RewiredHelper : Wagenheimer.RewiredHelper.RewiredInputManager
         {
             if (Instance == null)
             {
-                Instance = Object.FindFirstObjectByType<Wagenheimer.RewiredHelper.RewiredInputManager>();
+#if UNITY_2023_1_OR_NEWER
+                Instance = Object.FindAnyObjectByType<Wagenheimer.RewiredHelper.RewiredInputManager>();
+#else
+                Instance = Object.FindObjectOfType<Wagenheimer.RewiredHelper.RewiredInputManager>();
+#endif
             }
             return Instance;
         }

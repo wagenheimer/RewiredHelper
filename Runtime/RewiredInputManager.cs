@@ -601,6 +601,7 @@ namespace Wagenheimer.RewiredHelper
         private const float MOUSE_MOVEMENT_INPUT_THRESHOLD = 0.1f;
 
         private bool _lastInputWasPC = true;
+        public bool LastInputWasPC => _lastInputWasPC;
 
         private void HandleInputSystem()
         {

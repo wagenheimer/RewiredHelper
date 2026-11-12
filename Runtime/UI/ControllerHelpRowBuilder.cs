@@ -193,7 +193,13 @@ namespace Wagenheimer.RewiredHelper.UI
 
 #if UNITY_EDITOR
             UnityEngine.Component manager = null;
+#if UNITY_6000_0_OR_NEWER
+            foreach (var go in UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsInactive.Exclude))
+#elif UNITY_2023_1_OR_NEWER
+            foreach (var go in UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+#else
             foreach (var go in UnityEngine.Object.FindObjectsOfType<GameObject>())
+#endif
             {
                 var comp = go.GetComponent("InputManager");
                 if (comp != null && comp.GetType().FullName == "Rewired.InputManager")
@@ -370,7 +376,9 @@ namespace Wagenheimer.RewiredHelper.UI
 
         private static Type FindGlyphHelperType()
         {
+#pragma warning disable UAC0005
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+#pragma warning restore UAC0005
             {
                 var type = assembly.GetType(GlyphHelperTypeName);
                 if (type != null)

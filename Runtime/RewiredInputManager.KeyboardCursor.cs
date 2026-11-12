@@ -75,7 +75,9 @@ namespace Wagenheimer.RewiredHelper
             _playerMouseType ??= FindTypeByName(PlayerMouseTypeName);
             if (_playerMouseType == null) return Array.Empty<Behaviour>();
 
-#if UNITY_2023_1_OR_NEWER
+#if UNITY_6000_0_OR_NEWER
+            var found = FindObjectsByType(_playerMouseType, FindObjectsInactive.Exclude);
+#elif UNITY_2023_1_OR_NEWER
             var found = FindObjectsByType(_playerMouseType, FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 #else
 #pragma warning disable 0618
@@ -93,7 +95,9 @@ namespace Wagenheimer.RewiredHelper
 
         private static Type FindTypeByName(string fullName)
         {
+#pragma warning disable UAC0005
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+#pragma warning restore UAC0005
             {
                 var type = assembly.GetType(fullName);
                 if (type != null) return type;

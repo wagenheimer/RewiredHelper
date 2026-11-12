@@ -105,7 +105,9 @@ namespace Wagenheimer.RewiredHelper
 
         private static Type FindType(string fullName)
         {
+#pragma warning disable UAC0005
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+#pragma warning restore UAC0005
             {
                 Type type;
                 try { type = assembly.GetType(fullName, false); }

@@ -54,7 +54,9 @@ namespace Wagenheimer.RewiredHelper
 
         private static EventSystem[] FindAllEventSystems()
         {
-#if UNITY_2023_1_OR_NEWER
+#if UNITY_6000_0_OR_NEWER
+            return Object.FindObjectsByType<EventSystem>(FindObjectsInactive.Exclude);
+#elif UNITY_2023_1_OR_NEWER
             return Object.FindObjectsByType<EventSystem>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 #else
 #pragma warning disable 0618

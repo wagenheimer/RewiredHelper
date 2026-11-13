@@ -156,25 +156,28 @@ namespace Wagenheimer.RewiredHelper.Tests
         }
 
         [Test]
-        public void StandaloneModule_WithUnexpectedLayout_IsUntouched()
+        public void StandaloneModule_TouchGuardWithUnexpectedLayout_IsUntouched()
         {
             // Do not guess when Rewired's private method moved: the audit then reports the missing guard.
             var moved = StandaloneModule.Replace("private void InitializeRewired()", "private void InitializeRewiredRenamed()");
 
-            Assert.AreEqual(moved, RewiredInputModulePatch.PatchStandaloneModule(moved));
+            Assert.AreEqual(moved, RewiredInputModulePatch.PatchStandaloneTouchRead(moved));
         }
 
         [Test]
-        public void StandaloneModule_WithAnIncompleteLayout_AppliesNothing()
+        public void StandaloneModule_DeferredGuardWithUnexpectedLayout_IsUntouched()
         {
-            // One anchor is gone (Rewired update renamed the shutdown handler): never leave a half-applied guard behind.
-            var incomplete = StandaloneModule.Replace("private void OnRewiredShutDown()", "private void OnRewiredStopped()");
+            // One anchor moved (Rewired update): the deferred guard is not applied half-way.
+            var moved = StandaloneModule.Replace("private void OnRewiredShutDown()", "private void OnRewiredStopped()");
 
-            var patched = RewiredInputModulePatch.PatchStandaloneModule(incomplete);
+            var patched = RewiredInputModulePatch.PatchStandaloneDeferredInit(moved);
 
+            Assert.AreEqual(moved, patched);
             Assert.IsFalse(RewiredInputModulePatch.HasDeferredInitGuard(patched));
             StringAssert.Contains("Debug.LogError(\"Rewired is not initialized!", patched);
         }
+    }
+}
 
         private static int CountOccurrences(string source, string value)
         {

@@ -17,6 +17,13 @@ namespace Wagenheimer.RewiredHelper.Editor
     /// threw a NullReferenceException inside <c>Awake</c>, its <c>OnEnable</c> never ran, and that session lost controller
     /// UI navigation and clicks - plus one crash report per start.
     /// <para>
+    /// A second guard covers the same deferred init from the other side: the module logged
+    /// "Rewired is not initialized! Are you missing a Rewired Input Manager in your scene?" on the very first frame, where
+    /// "not ready yet" is the normal case on mobile (Android and iOS deferred init, per-device Awake order under IL2CPP).
+    /// The module already retries from <c>ReInput.InitializedEvent</c>, so that error was a false positive on every start;
+    /// a genuinely missing Input Manager is now reported once, after a grace period.
+    /// </para>
+    /// <para>
     /// Rewired has no setting for this, so the fix is a guard in its integration source, which ships as loose scripts under
     /// <c>Assets/Rewired</c>. This class applies the guard and is idempotent: a Rewired update that restores the original
     /// file gets patched again on the next editor load, and the Setup Audit reports it if that did not happen.
@@ -30,6 +37,10 @@ namespace Wagenheimer.RewiredHelper.Editor
         internal const string StandaloneModuleFile = "RewiredStandaloneInputModule.cs";
 
         private const string TouchSupportedRead = "isTouchSupported = defaultTouchInputSource.touchSupported;";
+
+        /// <summary>Marker line of the deferred-init guard, used to tell an already patched file apart.</summary>
+        private const string DeferredInitMarker =
+            "// " + Marker + " Still waiting on Rewired: report only if it never comes up.";
 
         private static readonly Regex TouchSupportedStatement = Statement(
             @"return Rewired\.ReInput\.touch\.touchSupported;");
@@ -71,7 +82,8 @@ namespace Wagenheimer.RewiredHelper.Editor
             if (changed)
             {
                 Debug.Log("[RewiredHelper] Patched Rewired's UnityUI input module: it no longer throws when it awakens before " +
-                          "Rewired is initialized (deferred platform init on iOS). The guard is reapplied automatically if a " +
+                          "Rewired is initialized (deferred platform init on iOS), and it no longer reports \"Rewired is not " +
+                          "initialized\" on the first frame, where that is expected. The guards are reapplied automatically if a " +
                           "Rewired update restores the original file.");
             }
 
@@ -89,7 +101,11 @@ namespace Wagenheimer.RewiredHelper.Editor
 
         internal static bool NeedsStandalonePatch(string standaloneSource) =>
             !string.IsNullOrEmpty(standaloneSource) &&
-            CountOccurrences(standaloneSource, TouchSupportedRead) < 2;
+            (CountOccurrences(standaloneSource, TouchSupportedRead) < 2 || !HasDeferredInitGuard(standaloneSource));
+
+        /// <summary>True when the module already defers its first init instead of reporting it as an error.</summary>
+        internal static bool HasDeferredInitGuard(string source) =>
+            !string.IsNullOrEmpty(source) && source.IndexOf(DeferredInitMarker, StringComparison.Ordinal) >= 0;
 
         /// <summary>Guards the touch getters of <c>RewiredPointerInputModule.UnityInputSource</c>. Pure and idempotent.</summary>
         internal static string PatchPointerModule(string source)
@@ -118,11 +134,21 @@ namespace Wagenheimer.RewiredHelper.Editor
             return source;
         }
 
-        /// <summary>Re-reads <c>isTouchSupported</c> once Rewired is ready. Pure and idempotent.</summary>
+        /// <summary>
+        /// Applies every standalone-module guard: the touch re-read and the deferred-init guard. Pure and idempotent.
+        /// </summary>
         internal static string PatchStandaloneModule(string source)
         {
             if (string.IsNullOrEmpty(source)) return source;
-            if (!NeedsStandalonePatch(source)) return source;
+
+            return PatchStandaloneDeferredInit(PatchStandaloneTouchRead(source));
+        }
+
+        /// <summary>Re-reads <c>isTouchSupported</c> once Rewired is ready. Pure and idempotent.</summary>
+        internal static string PatchStandaloneTouchRead(string source)
+        {
+            if (string.IsNullOrEmpty(source)) return source;
+            if (CountOccurrences(source, TouchSupportedRead) >= 2) return source;
 
             var methodIndex = source.IndexOf("private void InitializeRewired()", StringComparison.Ordinal);
             if (methodIndex < 0) return source;
@@ -140,6 +166,132 @@ namespace Wagenheimer.RewiredHelper.Editor
                         indent + TouchSupportedRead + eol + eol;
 
             return source.Insert(indentStart, block);
+        }
+
+        /// <summary>
+        /// Stops the module from reporting "Rewired is not initialized" on its first frame, where not being ready yet is the
+        /// normal case: it already retries from <c>ReInput.InitializedEvent</c>. A genuinely missing Input Manager is
+        /// reported once, after a grace period, and the Setup Audit also catches it in the Editor. Pure and idempotent;
+        /// an unexpected layout (Rewired update moved the code) leaves the file untouched, so the audit reports it.
+        /// </summary>
+        internal static string PatchStandaloneDeferredInit(string source)
+        {
+            if (string.IsNullOrEmpty(source)) return source;
+            if (HasDeferredInitGuard(source)) return source;
+
+            var eol = DetectEol(source);
+            var edits = DeferredInitEdits(eol);
+
+            var patched = source;
+            foreach (var edit in edits)
+            {
+                var index = patched.IndexOf(edit.From, StringComparison.Ordinal);
+                if (index < 0) return source;
+                // Ambiguous anchor: do not guess which one Rewired meant.
+                if (patched.IndexOf(edit.From, index + edit.From.Length, StringComparison.Ordinal) >= 0) return source;
+
+                patched = patched.Substring(0, index) + edit.To + patched.Substring(index + edit.From.Length);
+            }
+
+            return patched;
+        }
+
+        private static (string From, string To)[] DeferredInitEdits(string eol)
+        {
+            string Join(params string[] lines) => string.Join(eol, lines);
+
+            return new[]
+            {
+                // 1. Grace-period state, next to the other non-serialized flags.
+                (Join(
+                    "        [NonSerialized]",
+                    "        private bool isTouchSupported;"),
+                 Join(
+                    "        [NonSerialized]",
+                    "        private bool isTouchSupported;",
+                    "",
+                    "        // " + Marker + " Rewired can initialize after this module awakens: platform init is deferred on iOS/Android and",
+                    "        // Awake order differs per device in IL2CPP builds. This module already retries from ReInput.InitializedEvent, so",
+                    "        // the first attempt not being ready is expected and must not be reported as an error; a genuinely missing",
+                    "        // Input Manager is reported only after this grace period.",
+                    "        private const float MissingInputManagerReportDelay = 5f;",
+                    "        [NonSerialized]",
+                    "        private float rewiredWaitStartTime = -1f;",
+                    "        [NonSerialized]",
+                    "        private bool missingInputManagerReported;")),
+
+                // 2. Report from the frame loop, not from the first frame.
+                (Join(
+                    "            CheckEditorRecompile();",
+                    "            if (recompiling) return;",
+                    "            if (!Rewired.ReInput.isReady) return;"),
+                 Join(
+                    "            CheckEditorRecompile();",
+                    "            if (recompiling) return;",
+                    "            if (!Rewired.ReInput.isReady) {",
+                    "                // " + Marker + " Still waiting on Rewired: report only if it never comes up.",
+                    "                VerifyRewiredInitialization();",
+                    "                return;",
+                    "            }")),
+
+                // 3. The first attempt is expected to fail: InitializedEvent calls this again.
+                (Join(
+                    "            if (!Rewired.ReInput.isReady) {",
+                    "                Debug.LogError(\"Rewired is not initialized! Are you missing a Rewired Input Manager in your scene?\");",
+                    "                return;",
+                    "            }",
+                    "            Rewired.ReInput.ShutDownEvent -= OnRewiredShutDown;"),
+                 Join(
+                    "            if (!Rewired.ReInput.isReady) {",
+                    "                // " + Marker + " Not an error: Awake() subscribes to ReInput.InitializedEvent, which calls this method",
+                    "                // again as soon as Rewired is up. Reporting here produced a false error on every app start.",
+                    "                return;",
+                    "            }",
+                    "            missingInputManagerReported = false;",
+                    "            rewiredWaitStartTime = -1f;",
+                    "            Rewired.ReInput.ShutDownEvent -= OnRewiredShutDown;")),
+
+                // 4. Fresh grace period on every (re)initialization, and the watchdog itself.
+                (Join(
+                    "        private void OnRewiredInitialized() {",
+                    "            InitializeRewired();",
+                    "        }",
+                    "",
+                    "        private void OnRewiredShutDown() {",
+                    "            ClearRewiredVars();",
+                    "        }"),
+                 Join(
+                    "        private void OnRewiredInitialized() {",
+                    "            rewiredWaitStartTime = -1f;",
+                    "            InitializeRewired();",
+                    "        }",
+                    "",
+                    "        private void OnRewiredShutDown() {",
+                    "            // " + Marker + " Rewired can come back after a shutdown (editor recompile, plugin reload): give the next",
+                    "            // initialization window a fresh grace period.",
+                    "            rewiredWaitStartTime = -1f;",
+                    "            missingInputManagerReported = false;",
+                    "            ClearRewiredVars();",
+                    "        }",
+                    "",
+                    "        /// <summary>",
+                    "        /// " + Marker + " Reports a missing Rewired Input Manager once the grace period has passed, instead of on the",
+                    "        /// very first frame, where \"not ready yet\" is the normal case on mobile (deferred platform init).",
+                    "        /// </summary>",
+                    "        private void VerifyRewiredInitialization() {",
+                    "            if (missingInputManagerReported) return;",
+                    "",
+                    "            if (rewiredWaitStartTime < 0f) {",
+                    "                rewiredWaitStartTime = Time.realtimeSinceStartup;",
+                    "                return;",
+                    "            }",
+                    "",
+                    "            if (Time.realtimeSinceStartup - rewiredWaitStartTime < MissingInputManagerReportDelay) return;",
+                    "",
+                    "            missingInputManagerReported = true;",
+                    "            Debug.LogError(\"Rewired is not initialized! Are you missing a Rewired Input Manager in your scene?\");",
+                    "        }")),
+            };
         }
 
         private static bool PatchFile(string path, Func<string, string> patch)

@@ -4,7 +4,7 @@ using System.Reflection;
 
 using Rewired;
 
-#if WAGENHEIMER_STEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
+#if WAGENHEIMER_STEAMWORKS && !DISABLESTEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
 using Steamworks;
 #endif
 
@@ -250,7 +250,7 @@ namespace Wagenheimer.RewiredHelper
         }
         #endregion
 
-#if WAGENHEIMER_STEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
+#if WAGENHEIMER_STEAMWORKS && !DISABLESTEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
         protected Callback<GameOverlayActivated_t> m_GameOverlayActivated;
 #endif
 
@@ -346,7 +346,7 @@ namespace Wagenheimer.RewiredHelper
 
             _lastMouseOrTouchMoveTime = Time.time;
 
-#if WAGENHEIMER_STEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
+#if WAGENHEIMER_STEAMWORKS && !DISABLESTEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
             if (IsSteamReady) m_GameOverlayActivated = Callback<GameOverlayActivated_t>.Create(OnGameOverlayActivated);
 #endif
 
@@ -365,7 +365,7 @@ namespace Wagenheimer.RewiredHelper
             DiscoverOnScreenKeyboards();
         }
 
-#if WAGENHEIMER_STEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
+#if WAGENHEIMER_STEAMWORKS && !DISABLESTEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
         private void OnGameOverlayActivated(GameOverlayActivated_t pCallback)
         {
             IsSteamOverlayActive = pCallback.m_bActive != 0;

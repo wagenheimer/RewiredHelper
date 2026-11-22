@@ -3,7 +3,7 @@ using System.Collections;
 
 using Rewired;
 
-#if WAGENHEIMER_STEAM_DECK_DETECTION && !UNITY_ANDROID && !UNITY_IOS
+#if WAGENHEIMER_STEAM_DECK_DETECTION && !DISABLESTEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
 using Steamworks;
 #endif
 
@@ -210,7 +210,7 @@ namespace Wagenheimer.RewiredHelper
         /// to enable Deck-specific suspend/resume handling.
         /// </summary>
         public const bool SupportsSteamDeckDetection =
-#if WAGENHEIMER_STEAM_DECK_DETECTION && !UNITY_ANDROID && !UNITY_IOS
+#if WAGENHEIMER_STEAM_DECK_DETECTION && !DISABLESTEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
             true;
 #else
             false;
@@ -218,7 +218,7 @@ namespace Wagenheimer.RewiredHelper
 
         private static bool DetectSteamDeck()
         {
-#if WAGENHEIMER_STEAM_DECK_DETECTION && !UNITY_ANDROID && !UNITY_IOS
+#if WAGENHEIMER_STEAM_DECK_DETECTION && !DISABLESTEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
             try { return SteamUtils.IsRunningOnSteamHardware() == ESteamHardwareType.k_ESteamHardwareTypeSteamDeck; }
             catch (Exception ex)
             {
@@ -321,7 +321,7 @@ namespace Wagenheimer.RewiredHelper
 
         private void UpdatePauseState()
         {
-#if WAGENHEIMER_STEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
+#if WAGENHEIMER_STEAMWORKS && !DISABLESTEAMWORKS && !UNITY_ANDROID && !UNITY_IOS
             if (PauseOnSteamOverlay && IsSteamReady)
             {
                 if (IsSteamOverlayActive && !Pause.Has(PauseReason.SteamOverlay))
